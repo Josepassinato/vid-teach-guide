@@ -33,6 +33,12 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const isPlayingRef = useRef(false);
   const videoControlsRef = useRef<VideoControls | null>(null);
   const processedCallIdsRef = useRef<Set<string>>(new Set());
+  
+  // Store callbacks in refs to avoid dependency issues
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  });
 
   // Keep videoControls ref updated
   useEffect(() => {
@@ -41,8 +47,8 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
   const updateStatus = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
-    options.onStatusChange?.(newStatus);
-  }, [options.onStatusChange]);
+    optionsRef.current.onStatusChange?.(newStatus);
+  }, []);
 
   const playQueue = useCallback(async (ctx: AudioContext) => {
     while (audioQueueRef.current.length > 0) {
@@ -116,9 +122,11 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     try {
       updateStatus('connecting');
       
+      const currentOptions = optionsRef.current;
+      
       // Get API key from edge function
       const { data, error } = await supabase.functions.invoke('openai-realtime-token', {
-        body: { systemInstruction: options.systemInstruction }
+        body: { systemInstruction: currentOptions.systemInstruction }
       });
       
       if (error || !data?.apiKey) {
@@ -178,7 +186,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           type: "session.update",
           session: {
             modalities: ["text", "audio"],
-            instructions: options.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro.",
+            instructions: currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro.",
             voice: "alloy",
             input_audio_format: "pcm16",
             output_audio_format: "pcm16",
@@ -210,12 +218,12 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           
           // Handle text transcript from assistant
           if (data.type === "response.audio_transcript.done" && data.transcript) {
-            options.onTranscript?.(data.transcript, 'assistant');
+            optionsRef.current.onTranscript?.(data.transcript, 'assistant');
           }
           
           // Handle user transcript
           if (data.type === "conversation.item.input_audio_transcription.completed" && data.transcript) {
-            options.onTranscript?.(data.transcript, 'user');
+            optionsRef.current.onTranscript?.(data.transcript, 'user');
           }
 
           const runFunctionCall = async (name: string, callId: string, argsJson?: string) => {
@@ -296,7 +304,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           // Handle errors
           if (data.type === "error") {
             console.error('OpenAI Realtime error:', data.error);
-            options.onError?.(data.error?.message || 'Unknown error');
+            optionsRef.current.onError?.(data.error?.message || 'Unknown error');
           }
         } catch (e) {
           console.error('Error processing message:', e);
@@ -306,7 +314,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         updateStatus('error');
-        options.onError?.('Connection error');
+        optionsRef.current.onError?.('Connection error');
       };
       
       ws.onclose = () => {
@@ -318,9 +326,9 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     } catch (error) {
       console.error('Connection error:', error);
       updateStatus('error');
-      options.onError?.(error instanceof Error ? error.message : 'Connection failed');
+      optionsRef.current.onError?.(error instanceof Error ? error.message : 'Connection failed');
     }
-  }, [options.systemInstruction, updateStatus, playAudioChunk, stopListening, options.onTranscript, options.onError]);
+  }, [updateStatus, playAudioChunk, stopListening]);
 
   const disconnect = useCallback(() => {
     stopListening();
@@ -338,7 +346,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
   const startListening = useCallback(async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      options.onError?.('Not connected');
+      optionsRef.current.onError?.('Not connected');
       return;
     }
     
@@ -393,13 +401,13 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       
     } catch (error) {
       console.error('Microphone error:', error);
-      options.onError?.('Could not access microphone');
+      optionsRef.current.onError?.('Could not access microphone');
     }
-  }, [options.onError]);
+  }, []);
 
   const sendText = useCallback((text: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      options.onError?.('Not connected');
+      optionsRef.current.onError?.('Not connected');
       return;
     }
     
@@ -421,8 +429,8 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       type: "response.create"
     }));
     
-    options.onTranscript?.(text, 'user');
-  }, [options.onError, options.onTranscript]);
+    optionsRef.current.onTranscript?.(text, 'user');
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
