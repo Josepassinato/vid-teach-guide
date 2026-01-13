@@ -117,10 +117,10 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       ws.onopen = () => {
         console.log('WebSocket connected');
         
-        // Send setup message with Gemini 2.5 Flash
+        // Send setup message with Gemini 2.0 Flash Live (supports Live API)
         ws.send(JSON.stringify({
           setup: {
-            model: "models/gemini-2.5-flash",
+            model: "models/gemini-2.0-flash-live-001",
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
