@@ -270,9 +270,10 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             options.onError?.(data.error?.message || 'Unknown error');
           }
           
-          // Handle response done
+          // Handle response done - DON'T clear audio queue here, let it finish playing
           if (data.type === "response.done") {
-            audioQueueRef.current = [];
+            // Audio queue will be cleared naturally when playback completes
+            console.log('Response done, audio queue length:', audioQueueRef.current.length);
           }
         } catch (e) {
           console.error('Error processing message:', e);
