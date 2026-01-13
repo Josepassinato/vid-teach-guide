@@ -24,7 +24,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const [currentTime, setCurrentTime] = useState(0);
     const playerRef = useRef<any>(null);
     const [isReady, setIsReady] = useState(false);
+    const isReadyRef = useRef(false);
     const timeIntervalRef = useRef<number | null>(null);
+    const pendingActionsRef = useRef<Array<() => void>>([]);
 
     useEffect(() => {
       // Load YouTube IFrame API
@@ -49,6 +51,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           clearInterval(timeIntervalRef.current);
           timeIntervalRef.current = null;
         }
+        pendingActionsRef.current = [];
+        isReadyRef.current = false;
         if (playerRef.current) {
           playerRef.current.destroy();
           playerRef.current = null;
@@ -58,12 +62,15 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
     const initPlayer = () => {
       setIsReady(false);
+      isReadyRef.current = false;
       setIsPlaying(false);
 
       if (timeIntervalRef.current) {
         clearInterval(timeIntervalRef.current);
         timeIntervalRef.current = null;
       }
+
+      pendingActionsRef.current = [];
 
       if (playerRef.current) {
         playerRef.current.destroy();
@@ -83,14 +90,25 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         events: {
           onReady: () => {
             setIsReady(true);
+            isReadyRef.current = true;
 
-            // Important: keep the player muted by default so programmatic play works
-            // even when triggered by the agent (browser autoplay policies).
+            // Keep muted by default so the first programmatic play isn't blocked.
+            // (We unmute when the agent explicitly plays/restarts.)
             try {
               playerRef.current?.mute();
               setIsMuted(true);
             } catch {
               // ignore
+            }
+
+            // Flush any queued actions that happened before the iframe was ready
+            const queued = pendingActionsRef.current.splice(0);
+            for (const fn of queued) {
+              try {
+                fn();
+              } catch (e) {
+                console.warn('VideoPlayer: queued action failed', e);
+              }
             }
 
             console.log('YouTube player ready');
@@ -109,41 +127,59 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       }, 1000);
     };
 
-    useImperativeHandle(ref, () => ({
-      play: () => {
-        console.log('VideoPlayer: play called');
-        // Unmute when agent triggers play so user hears audio
-        try { 
-          playerRef.current?.unMute(); 
-          setIsMuted(false);
-        } catch {}
-        playerRef.current?.playVideo();
-      },
-      pause: () => {
-        console.log('VideoPlayer: pause called');
-        playerRef.current?.pauseVideo();
-      },
-      restart: () => {
-        console.log('VideoPlayer: restart called');
-        playerRef.current?.seekTo(0, true);
-        // Unmute when agent triggers restart so user hears audio
-        try { 
-          playerRef.current?.unMute(); 
-          setIsMuted(false);
-        } catch {}
-        playerRef.current?.playVideo();
-      },
-      seekTo: (seconds: number) => {
-        console.log('VideoPlayer: seekTo called', seconds);
-        playerRef.current?.seekTo(seconds, true);
-      },
-      getCurrentTime: () => {
-        return playerRef.current?.getCurrentTime() || 0;
-      },
-      isPaused: () => {
-        return !isPlaying;
-      },
-    }));
+    useImperativeHandle(ref, () => {
+      const runOrQueue = (fn: () => void) => {
+        if (playerRef.current && isReadyRef.current) {
+          fn();
+          return;
+        }
+        pendingActionsRef.current.push(fn);
+        console.log('VideoPlayer: action queued (player not ready yet)');
+      };
+
+      return {
+        play: () => {
+          console.log('VideoPlayer: play called');
+          runOrQueue(() => {
+            // Unmute when agent triggers play so the user hears audio.
+            try {
+              playerRef.current?.unMute();
+              setIsMuted(false);
+            } catch {}
+            playerRef.current?.playVideo();
+          });
+        },
+        pause: () => {
+          console.log('VideoPlayer: pause called');
+          runOrQueue(() => {
+            playerRef.current?.pauseVideo();
+          });
+        },
+        restart: () => {
+          console.log('VideoPlayer: restart called');
+          runOrQueue(() => {
+            playerRef.current?.seekTo(0, true);
+            try {
+              playerRef.current?.unMute();
+              setIsMuted(false);
+            } catch {}
+            playerRef.current?.playVideo();
+          });
+        },
+        seekTo: (seconds: number) => {
+          console.log('VideoPlayer: seekTo called', seconds);
+          runOrQueue(() => {
+            playerRef.current?.seekTo(seconds, true);
+          });
+        },
+        getCurrentTime: () => {
+          return playerRef.current?.getCurrentTime?.() || 0;
+        },
+        isPaused: () => {
+          return !isPlaying;
+        },
+      };
+    });
 
     const handlePlay = () => {
       // Programmatic play may be blocked unless muted; we keep default muted.

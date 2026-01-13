@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,51 +24,25 @@ interface VoiceChatProps {
 export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
-  const [videoReady, setVideoReady] = useState(false);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
-  
-  // Mark video as ready after a short delay to ensure YouTube player has loaded
-  useEffect(() => {
-    if (videoId) {
-      setVideoReady(false);
-      const timer = setTimeout(() => {
-        setVideoReady(true);
-      }, 2000);
-      return () => clearTimeout(timer);
-    } else {
-      setVideoReady(false);
-    }
-  }, [videoId]);
   
   const systemInstruction = videoContext 
     ? `Você é um professor amigável e didático. Você está ajudando o aluno a entender o conteúdo de um vídeo-aula com os seguintes pontos principais:\n\n${videoContext}\n\nVocê tem controle sobre o vídeo e pode dar play, pausar, reiniciar ou pular para momentos específicos quando o aluno pedir. Quando o aluno pedir para controlar o vídeo, USE A FUNÇÃO CORRESPONDENTE imediatamente (play_video, pause_video, restart_video, seek_video). Fale em português brasileiro.`
     : "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Use exemplos práticos e linguagem acessível. Fale em português brasileiro.";
 
-  // Create stable video controls using useMemo - only when video is ready
+  // Controls are always available when a video exists; the VideoPlayer will queue commands until ready.
   const videoControls: VideoControls | null = useMemo(() => {
-    if (!videoId || !videoReady) return null;
-    
+    if (!videoId) return null;
+
     return {
-      play: () => {
-        console.log('VoiceChat: calling play on videoPlayerRef');
-        videoPlayerRef.current?.play();
-      },
-      pause: () => {
-        console.log('VoiceChat: calling pause on videoPlayerRef');
-        videoPlayerRef.current?.pause();
-      },
-      restart: () => {
-        console.log('VoiceChat: calling restart on videoPlayerRef');
-        videoPlayerRef.current?.restart();
-      },
-      seekTo: (seconds: number) => {
-        console.log('VoiceChat: calling seekTo on videoPlayerRef', seconds);
-        videoPlayerRef.current?.seekTo(seconds);
-      },
+      play: () => videoPlayerRef.current?.play(),
+      pause: () => videoPlayerRef.current?.pause(),
+      restart: () => videoPlayerRef.current?.restart(),
+      seekTo: (seconds: number) => videoPlayerRef.current?.seekTo(seconds),
       getCurrentTime: () => videoPlayerRef.current?.getCurrentTime() || 0,
       isPaused: () => videoPlayerRef.current?.isPaused() ?? true,
     };
-  }, [videoId, videoReady]);
+  }, [videoId]);
 
   const {
     status,

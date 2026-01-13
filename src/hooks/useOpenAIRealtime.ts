@@ -286,6 +286,14 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             await runFunctionCall(data.name, data.call_id, data.arguments);
           }
 
+          // Handle function calls (some SDKs deliver them as output_item events)
+          if (data.type === "response.output_item.added" || data.type === "response.output_item.done") {
+            const item = data.item;
+            if (item?.type === 'function_call') {
+              await runFunctionCall(item.name, item.call_id, item.arguments);
+            }
+          }
+
           // Handle function calls (canonical: embedded in response.done)
           if (data.type === "response.done") {
             const outputs = data.response?.output;
