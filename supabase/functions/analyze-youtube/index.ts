@@ -18,6 +18,99 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
+async function fetchTranscript(videoId: string): Promise<string | null> {
+  try {
+    // Fetch the video page to get caption tracks
+    const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const response = await fetch(watchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+      }
+    });
+    
+    if (!response.ok) {
+      console.error("Failed to fetch YouTube page:", response.status);
+      return null;
+    }
+    
+    const html = await response.text();
+    
+    // Extract captions URL from the page
+    const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+    if (!captionMatch) {
+      console.log("No captions found for video");
+      return null;
+    }
+    
+    let captionTracks;
+    try {
+      captionTracks = JSON.parse(captionMatch[1]);
+    } catch {
+      console.error("Failed to parse caption tracks");
+      return null;
+    }
+    
+    if (!captionTracks || captionTracks.length === 0) {
+      return null;
+    }
+    
+    // Prefer Portuguese, then auto-generated Portuguese, then any available
+    let selectedTrack = captionTracks.find((t: any) => t.languageCode === 'pt');
+    if (!selectedTrack) {
+      selectedTrack = captionTracks.find((t: any) => t.languageCode?.startsWith('pt'));
+    }
+    if (!selectedTrack) {
+      selectedTrack = captionTracks[0];
+    }
+    
+    const captionUrl = selectedTrack.baseUrl;
+    if (!captionUrl) {
+      return null;
+    }
+    
+    // Fetch the captions XML
+    const captionResponse = await fetch(captionUrl);
+    if (!captionResponse.ok) {
+      console.error("Failed to fetch captions:", captionResponse.status);
+      return null;
+    }
+    
+    const captionXml = await captionResponse.text();
+    
+    // Parse the XML to extract text
+    const textMatches = captionXml.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
+    const texts: string[] = [];
+    
+    for (const match of textMatches) {
+      let text = match[1]
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\n/g, ' ')
+        .trim();
+      
+      if (text) {
+        texts.push(text);
+      }
+    }
+    
+    const transcript = texts.join(' ');
+    
+    // Limit transcript to avoid token limits (roughly 8000 chars)
+    if (transcript.length > 8000) {
+      return transcript.substring(0, 8000) + '...';
+    }
+    
+    return transcript || null;
+  } catch (error) {
+    console.error("Error fetching transcript:", error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -50,8 +143,40 @@ serve(async (req) => {
     }
 
     const videoInfo = await oembedResponse.json();
+    
+    // Fetch transcript
+    console.log("Fetching transcript for video:", videoId);
+    const transcript = await fetchTranscript(videoId);
+    console.log("Transcript found:", transcript ? `${transcript.length} chars` : "none");
 
-    // Use Lovable AI to analyze the video content based on title
+    // Build the analysis prompt
+    let prompt: string;
+    if (transcript) {
+      prompt = `Você é um professor especialista analisando uma vídeo-aula. Analise a TRANSCRIÇÃO REAL do vídeo abaixo e:
+
+1. Identifique os 5 pontos principais abordados
+2. Resuma cada ponto de forma clara e didática
+3. Destaque conceitos-chave que o aluno deve memorizar
+
+Título: "${videoInfo.title}"
+Canal: "${videoInfo.author_name}"
+
+TRANSCRIÇÃO DO VÍDEO:
+${transcript}
+
+Responda em português brasileiro com uma análise estruturada baseada no conteúdo REAL do vídeo.`;
+    } else {
+      prompt = `Você é um professor especialista. Analise este título de vídeo-aula e sugira 5 pontos principais que provavelmente serão abordados:
+
+Título: "${videoInfo.title}"
+Canal: "${videoInfo.author_name}"
+
+NOTA: Não foi possível obter a transcrição deste vídeo. A análise é baseada apenas no título.
+
+Responda em português brasileiro com uma lista numerada dos tópicos principais que o aluno deve prestar atenção nesta aula.`;
+    }
+
+    // Use Lovable AI to analyze
     const aiResponse = await fetch(
       "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
@@ -64,12 +189,7 @@ serve(async (req) => {
           model: "google/gemini-3-flash-preview",
           messages: [{
             role: "user",
-            content: `Você é um professor especialista. Analise este título de vídeo-aula e sugira 5 pontos principais que provavelmente serão abordados:
-
-Título: "${videoInfo.title}"
-Canal: "${videoInfo.author_name}"
-
-Responda em português brasileiro com uma lista numerada dos tópicos principais que o aluno deve prestar atenção nesta aula.`
+            content: prompt
           }]
         }),
       }
@@ -97,6 +217,7 @@ Responda em português brasileiro com uma lista numerada dos tópicos principais
         title: videoInfo.title,
         author: videoInfo.author_name,
         thumbnail: videoInfo.thumbnail_url,
+        hasTranscript: !!transcript,
         analysis
       }),
       {
