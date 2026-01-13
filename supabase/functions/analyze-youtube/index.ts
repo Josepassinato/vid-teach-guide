@@ -122,7 +122,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { youtubeUrl } = await req.json();
+    const { youtubeUrl, manualTranscript } = await req.json();
     
     if (!youtubeUrl) {
       throw new Error("YouTube URL is required");
@@ -144,10 +144,22 @@ serve(async (req) => {
 
     const videoInfo = await oembedResponse.json();
     
-    // Fetch transcript
-    console.log("Fetching transcript for video:", videoId);
-    const transcript = await fetchTranscript(videoId);
-    console.log("Transcript found:", transcript ? `${transcript.length} chars` : "none");
+    // Use manual transcript if provided, otherwise try to fetch automatically
+    let transcript: string | null = null;
+    
+    if (manualTranscript && manualTranscript.trim().length > 50) {
+      console.log("Using manual transcript:", manualTranscript.length, "chars");
+      let cleanTranscript = manualTranscript.trim();
+      // Limit to avoid token limits
+      if (cleanTranscript.length > 12000) {
+        cleanTranscript = cleanTranscript.substring(0, 12000) + '...';
+      }
+      transcript = cleanTranscript;
+    } else {
+      console.log("Fetching transcript for video:", videoId);
+      transcript = await fetchTranscript(videoId);
+      console.log("Transcript found:", transcript ? `${transcript.length} chars` : "none");
+    }
 
     // Build the analysis prompt
     let prompt: string;

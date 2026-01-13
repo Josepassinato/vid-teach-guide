@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Youtube, ExternalLink } from 'lucide-react';
+import { Loader2, Youtube, ExternalLink, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface VideoInfo {
@@ -20,6 +21,8 @@ interface VideoAnalysisProps {
 
 export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
   const [url, setUrl] = useState('');
+  const [manualTranscript, setManualTranscript] = useState('');
+  const [showTranscriptInput, setShowTranscriptInput] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
@@ -32,7 +35,10 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
     
     try {
       const { data, error: fnError } = await supabase.functions.invoke('analyze-youtube', {
-        body: { youtubeUrl: url }
+        body: { 
+          youtubeUrl: url,
+          manualTranscript: manualTranscript.trim() || undefined
+        }
       });
       
       if (fnError) throw new Error(fnError.message);
@@ -63,6 +69,37 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
         <Button onClick={handleAnalyze} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Analisar'}
         </Button>
+      </div>
+
+      {/* Manual Transcript Input */}
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => setShowTranscriptInput(!showTranscriptInput)}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <FileText className="h-4 w-4" />
+          <span>Adicionar transcrição manual</span>
+          {showTranscriptInput ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </button>
+        
+        {showTranscriptInput && (
+          <div className="space-y-2">
+            <Textarea
+              placeholder="Cole aqui a transcrição do vídeo (legendas, descrição detalhada, etc.)..."
+              value={manualTranscript}
+              onChange={(e) => setManualTranscript(e.target.value)}
+              className="min-h-[120px] text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              💡 Dica: Você pode copiar as legendas do YouTube clicando em "..." → "Mostrar transcrição" no vídeo
+            </p>
+          </div>
+        )}
       </div>
       
       {error && (
