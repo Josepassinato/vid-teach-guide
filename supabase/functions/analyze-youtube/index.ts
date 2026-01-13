@@ -24,9 +24,9 @@ serve(async (req) => {
   }
 
   try {
-    const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
-    if (!GOOGLE_API_KEY) {
-      throw new Error("GOOGLE_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     const { youtubeUrl } = await req.json();
@@ -51,37 +51,45 @@ serve(async (req) => {
 
     const videoInfo = await oembedResponse.json();
 
-    // Use Gemini to analyze the video content based on title
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_API_KEY}`,
+    // Use Lovable AI to analyze the video content based on title
+    const aiResponse = await fetch(
+      "https://ai.gateway.lovable.dev/v1/chat/completions",
       {
         method: "POST",
         headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Você é um professor especialista. Analise este título de vídeo-aula e sugira 5 pontos principais que provavelmente serão abordados:
+          model: "google/gemini-3-flash-preview",
+          messages: [{
+            role: "user",
+            content: `Você é um professor especialista. Analise este título de vídeo-aula e sugira 5 pontos principais que provavelmente serão abordados:
 
 Título: "${videoInfo.title}"
 Canal: "${videoInfo.author_name}"
 
 Responda em português brasileiro com uma lista numerada dos tópicos principais que o aluno deve prestar atenção nesta aula.`
-            }]
           }]
         }),
       }
     );
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error("Gemini API error:", geminiResponse.status, errorText);
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error("Lovable AI error:", aiResponse.status, errorText);
+      
+      if (aiResponse.status === 429) {
+        throw new Error("Rate limit exceeded. Please try again later.");
+      }
+      if (aiResponse.status === 402) {
+        throw new Error("AI credits exhausted. Please add funds.");
+      }
       throw new Error("Failed to analyze video");
     }
 
-    const geminiData = await geminiResponse.json();
-    const analysis = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "Não foi possível analisar o vídeo.";
+    const aiData = await aiResponse.json();
+    const analysis = aiData.choices?.[0]?.message?.content || "Não foi possível analisar o vídeo.";
 
     return new Response(
       JSON.stringify({
