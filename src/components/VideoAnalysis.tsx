@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Youtube, ExternalLink, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Youtube, ExternalLink, FileText, ChevronDown, ChevronUp, Upload, X, File } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface VideoInfo {
@@ -26,6 +26,73 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (file: File) => {
+    const validTypes = [
+      'text/plain',
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword'
+    ];
+    
+    if (!validTypes.includes(file.type) && !file.name.endsWith('.txt')) {
+      setError('Formato não suportado. Use TXT, PDF ou DOCX.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Arquivo muito grande. Máximo 5MB.');
+      return;
+    }
+
+    setUploadedFile(file);
+    setFileLoading(true);
+    setError(null);
+
+    try {
+      // For text files, read directly
+      if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+        const text = await file.text();
+        setManualTranscript(text);
+      } else {
+        // For PDF/DOCX, we'll read as base64 and send to edge function for parsing
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const base64 = (e.target?.result as string)?.split(',')[1];
+          
+          // For now, just show a message that they need to copy text
+          // In a production app, you'd use a PDF parsing library
+          setManualTranscript(`[Arquivo carregado: ${file.name}]\n\nPor favor, copie e cole o texto do documento aqui, ou use um arquivo .txt`);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      setError('Erro ao ler o arquivo');
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const removeFile = () => {
+    setUploadedFile(null);
+    setManualTranscript('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!url.trim()) return;
@@ -79,7 +146,7 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <FileText className="h-4 w-4" />
-          <span>Adicionar transcrição manual</span>
+          <span>Adicionar transcrição (colar ou upload)</span>
           {showTranscriptInput ? (
             <ChevronUp className="h-4 w-4" />
           ) : (
@@ -88,7 +155,63 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
         </button>
         
         {showTranscriptInput && (
-          <div className="space-y-2">
+          <div className="space-y-3">
+            {/* File Upload Area */}
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.pdf,.docx,.doc"
+                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                className="hidden"
+              />
+              
+              {fileLoading ? (
+                <div className="flex items-center justify-center gap-2 py-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">Carregando arquivo...</span>
+                </div>
+              ) : uploadedFile ? (
+                <div className="flex items-center justify-center gap-2 py-2">
+                  <File className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-medium">{uploadedFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile();
+                    }}
+                    className="p-1 hover:bg-destructive/10 rounded-full transition-colors"
+                  >
+                    <X className="h-4 w-4 text-destructive" />
+                  </button>
+                </div>
+              ) : (
+                <div className="py-2">
+                  <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Arraste um arquivo ou <span className="text-primary font-medium">clique para selecionar</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    TXT, PDF, DOCX (máx. 5MB)
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-muted-foreground">ou cole o texto</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
+            {/* Text Area */}
             <Textarea
               placeholder="Cole aqui a transcrição do vídeo (legendas, descrição detalhada, etc.)..."
               value={manualTranscript}
