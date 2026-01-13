@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,20 +24,50 @@ interface VoiceChatProps {
 export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
+  const [videoReady, setVideoReady] = useState(false);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   
   const systemInstruction = videoContext 
-    ? `Você é um professor amigável e didático. Você está ajudando o aluno a entender o conteúdo de um vídeo-aula com os seguintes pontos principais:\n\n${videoContext}\n\nVocê tem controle sobre o vídeo e pode dar play, pausar, reiniciar ou pular para momentos específicos quando o aluno pedir. Explique os conceitos de forma clara, use exemplos práticos e responda às dúvidas do aluno. Fale em português brasileiro.`
+    ? `Você é um professor amigável e didático. Você está ajudando o aluno a entender o conteúdo de um vídeo-aula com os seguintes pontos principais:\n\n${videoContext}\n\nVocê tem controle sobre o vídeo e pode dar play, pausar, reiniciar ou pular para momentos específicos quando o aluno pedir. Quando o aluno pedir para controlar o vídeo, USE A FUNÇÃO CORRESPONDENTE imediatamente. Explique os conceitos de forma clara, use exemplos práticos e responda às dúvidas do aluno. Fale em português brasileiro.`
     : "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Use exemplos práticos e linguagem acessível. Fale em português brasileiro.";
   
-  // Create video controls object that will be passed to the hook
-  const videoControls: VideoControls | null = videoPlayerRef.current ? {
-    play: () => videoPlayerRef.current?.play(),
-    pause: () => videoPlayerRef.current?.pause(),
-    restart: () => videoPlayerRef.current?.restart(),
-    seekTo: (seconds: number) => videoPlayerRef.current?.seekTo(seconds),
-    getCurrentTime: () => videoPlayerRef.current?.getCurrentTime() || 0,
-    isPaused: () => videoPlayerRef.current?.isPaused() || true,
+  // Create stable video controls using useCallback
+  const playVideo = useCallback(() => {
+    console.log('playVideo called, ref:', videoPlayerRef.current);
+    videoPlayerRef.current?.play();
+  }, []);
+  
+  const pauseVideo = useCallback(() => {
+    console.log('pauseVideo called, ref:', videoPlayerRef.current);
+    videoPlayerRef.current?.pause();
+  }, []);
+  
+  const restartVideo = useCallback(() => {
+    console.log('restartVideo called, ref:', videoPlayerRef.current);
+    videoPlayerRef.current?.restart();
+  }, []);
+  
+  const seekToVideo = useCallback((seconds: number) => {
+    console.log('seekToVideo called, ref:', videoPlayerRef.current, seconds);
+    videoPlayerRef.current?.seekTo(seconds);
+  }, []);
+  
+  const getCurrentTimeVideo = useCallback(() => {
+    return videoPlayerRef.current?.getCurrentTime() || 0;
+  }, []);
+  
+  const isPausedVideo = useCallback(() => {
+    return videoPlayerRef.current?.isPaused() ?? true;
+  }, []);
+
+  // Create video controls object only when video is ready
+  const videoControls: VideoControls | null = (videoId && videoReady) ? {
+    play: playVideo,
+    pause: pauseVideo,
+    restart: restartVideo,
+    seekTo: seekToVideo,
+    getCurrentTime: getCurrentTimeVideo,
+    isPaused: isPausedVideo,
   } : null;
 
   const {
@@ -51,7 +81,7 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
     sendText
   } = useOpenAIRealtime({
     systemInstruction,
-    videoControls: videoId ? videoControls : null,
+    videoControls,
     onTranscript: (text, role) => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -64,6 +94,20 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
       toast.error(error);
     }
   });
+
+  // Mark video as ready after mount
+  useEffect(() => {
+    if (videoId) {
+      // Give time for the YouTube iframe to load
+      const timer = setTimeout(() => {
+        setVideoReady(true);
+        console.log('Video marked as ready');
+      }, 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setVideoReady(false);
+    }
+  }, [videoId]);
 
   const handleSendText = () => {
     if (!textInput.trim()) return;
