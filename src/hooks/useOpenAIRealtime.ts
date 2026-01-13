@@ -210,17 +210,22 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
+          // Lightweight debug to confirm which event types we are receiving
+          if (typeof data?.type === 'string') {
+            console.log('[realtime:event]', data.type);
+          }
+
           // Handle audio response
           if (data.type === "response.audio.delta" && data.delta) {
             await playAudioChunk(data.delta);
           }
-          
+
           // Handle text transcript from assistant
           if (data.type === "response.audio_transcript.done" && data.transcript) {
             optionsRef.current.onTranscript?.(data.transcript, 'assistant');
           }
-          
+
           // Handle user transcript
           if (data.type === "conversation.item.input_audio_transcription.completed" && data.transcript) {
             optionsRef.current.onTranscript?.(data.transcript, 'user');
@@ -235,10 +240,12 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             try {
               args = argsJson ? JSON.parse(argsJson) : {};
             } catch {
+              // Some realtime responses occasionally produce partial JSON.
+              // For our tools, empty args is fine (except seek).
               args = {};
             }
 
-            console.log('Tool call:', name, args, callId);
+            console.log('[realtime:tool-call]', name, args, callId);
 
             let result: any = { ok: true };
 
@@ -273,35 +280,52 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
               item: {
                 type: "function_call_output",
                 call_id: callId,
-                output: JSON.stringify(result)
-              }
+                output: JSON.stringify(result),
+              },
             }));
 
             // Request a response after function call
             ws.send(JSON.stringify({ type: "response.create" }));
           };
 
-          // Handle function calls (can arrive as standalone events)
+          const tryHandleFunctionCallItem = async (item: any) => {
+            if (!item) return;
+            // Shapes we may see:
+            // - { type:'function_call', name, call_id, arguments }
+            // - { type:'function_call', function:{ name, arguments }, call_id }
+            if (item.type !== 'function_call') return;
+
+            const name = item.name ?? item.function?.name;
+            const callId = item.call_id ?? item.callId;
+            const args = item.arguments ?? item.function?.arguments;
+
+            if (typeof name === 'string' && typeof callId === 'string') {
+              await runFunctionCall(name, callId, args);
+            }
+          };
+
+          // Function calls (standalone event)
           if (data.type === "response.function_call_arguments.done") {
             await runFunctionCall(data.name, data.call_id, data.arguments);
           }
 
-          // Handle function calls (some SDKs deliver them as output_item events)
+          // Function calls delivered as output_item events (some SDK variants)
           if (data.type === "response.output_item.added" || data.type === "response.output_item.done") {
-            const item = data.item;
-            if (item?.type === 'function_call') {
-              await runFunctionCall(item.name, item.call_id, item.arguments);
-            }
+            await tryHandleFunctionCallItem(data.item);
+            await tryHandleFunctionCallItem(data.output_item);
           }
 
-          // Handle function calls (canonical: embedded in response.done)
+          // Function calls delivered as conversation item events (another common variant)
+          if (data.type === "conversation.item.created" || data.type === "conversation.item.updated") {
+            await tryHandleFunctionCallItem(data.item);
+          }
+
+          // Canonical: embedded in response.done
           if (data.type === "response.done") {
             const outputs = data.response?.output;
             if (Array.isArray(outputs)) {
               for (const item of outputs) {
-                if (item?.type === 'function_call') {
-                  await runFunctionCall(item.name, item.call_id, item.arguments);
-                }
+                await tryHandleFunctionCallItem(item);
               }
             }
 
@@ -318,6 +342,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           console.error('Error processing message:', e);
         }
       };
+
       
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
