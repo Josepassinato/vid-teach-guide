@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useGeminiLive } from '@/hooks/useGeminiLive';
+import { useOpenAIRealtime } from '@/hooks/useOpenAIRealtime';
 import { VoiceIndicator } from './VoiceIndicator';
 import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -35,7 +35,7 @@ export function VoiceChat({ videoContext }: VoiceChatProps) {
     startListening,
     stopListening,
     sendText
-  } = useGeminiLive({
+  } = useOpenAIRealtime({
     systemInstruction,
     onTranscript: (text, role) => {
       setMessages(prev => [...prev, {
