@@ -141,12 +141,24 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         play: () => {
           console.log('VideoPlayer: play called');
           runOrQueue(() => {
-            // Unmute when agent triggers play so the user hears audio.
+            // Important: programmatic play (triggered by the agent) is often blocked
+            // if the player is unmuted. So we start muted to guarantee play works,
+            // then we *attempt* to unmute shortly after.
             try {
-              playerRef.current?.unMute();
-              setIsMuted(false);
+              playerRef.current?.mute();
+              setIsMuted(true);
             } catch {}
+
             playerRef.current?.playVideo();
+
+            window.setTimeout(() => {
+              try {
+                playerRef.current?.unMute();
+                setIsMuted(false);
+              } catch {
+                // If the browser blocks unmute, user can click the volume button.
+              }
+            }, 350);
           });
         },
         pause: () => {
@@ -159,11 +171,22 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           console.log('VideoPlayer: restart called');
           runOrQueue(() => {
             playerRef.current?.seekTo(0, true);
+
             try {
-              playerRef.current?.unMute();
-              setIsMuted(false);
+              playerRef.current?.mute();
+              setIsMuted(true);
             } catch {}
+
             playerRef.current?.playVideo();
+
+            window.setTimeout(() => {
+              try {
+                playerRef.current?.unMute();
+                setIsMuted(false);
+              } catch {
+                // If blocked, user can click the volume button.
+              }
+            }, 350);
           });
         },
         seekTo: (seconds: number) => {
