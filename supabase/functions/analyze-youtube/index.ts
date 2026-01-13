@@ -20,91 +20,169 @@ function extractVideoId(url: string): string | null {
 
 async function fetchTranscript(videoId: string): Promise<string | null> {
   try {
-    // Fetch the video page to get caption tracks
+    // Method 1: Try using youtubetranscript.com API (free, no auth)
+    console.log("Attempting to fetch transcript via youtubetranscript.com...");
+    
+    const transcriptApiUrl = `https://youtubetranscript.com/?server_vid2=${videoId}`;
+    const response = await fetch(transcriptApiUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      }
+    });
+    
+    if (response.ok) {
+      const html = await response.text();
+      
+      // Parse the transcript from the response
+      const textMatches = html.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
+      const texts: string[] = [];
+      
+      for (const match of textMatches) {
+        let text = match[1]
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\n/g, ' ')
+          .trim();
+        
+        if (text) {
+          texts.push(text);
+        }
+      }
+      
+      if (texts.length > 0) {
+        const transcript = texts.join(' ');
+        console.log("Transcript found via youtubetranscript.com:", transcript.length, "chars");
+        return transcript.length > 10000 ? transcript.substring(0, 10000) + '...' : transcript;
+      }
+    }
+    
+    // Method 2: Try YouTube's timedtext API directly
+    console.log("Attempting direct timedtext API...");
+    
+    const languages = ['pt', 'pt-BR', 'en', 'a.pt', 'a.en'];
+    
+    for (const lang of languages) {
+      const timedTextUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}`;
+      
+      try {
+        const ttResponse = await fetch(timedTextUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          }
+        });
+        
+        if (ttResponse.ok) {
+          const xml = await ttResponse.text();
+          
+          if (xml && xml.includes('<text')) {
+            const textMatches = xml.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
+            const texts: string[] = [];
+            
+            for (const match of textMatches) {
+              let text = match[1]
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/\n/g, ' ')
+                .trim();
+              
+              if (text) {
+                texts.push(text);
+              }
+            }
+            
+            if (texts.length > 0) {
+              const transcript = texts.join(' ');
+              console.log(`Transcript found via timedtext API (${lang}):`, transcript.length, "chars");
+              return transcript.length > 10000 ? transcript.substring(0, 10000) + '...' : transcript;
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`timedtext API failed for ${lang}:`, e);
+      }
+    }
+    
+    // Method 3: Fallback to scraping YouTube page
+    console.log("Attempting YouTube page scraping...");
+    
     const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const response = await fetch(watchUrl, {
+    const pageResponse = await fetch(watchUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
       }
     });
     
-    if (!response.ok) {
-      console.error("Failed to fetch YouTube page:", response.status);
+    if (!pageResponse.ok) {
+      console.error("Failed to fetch YouTube page:", pageResponse.status);
       return null;
     }
     
-    const html = await response.text();
+    const html = await pageResponse.text();
     
-    // Extract captions URL from the page
-    const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
-    if (!captionMatch) {
-      console.log("No captions found for video");
-      return null;
-    }
-    
-    let captionTracks;
-    try {
-      captionTracks = JSON.parse(captionMatch[1]);
-    } catch {
-      console.error("Failed to parse caption tracks");
-      return null;
-    }
-    
-    if (!captionTracks || captionTracks.length === 0) {
-      return null;
-    }
-    
-    // Prefer Portuguese, then auto-generated Portuguese, then any available
-    let selectedTrack = captionTracks.find((t: any) => t.languageCode === 'pt');
-    if (!selectedTrack) {
-      selectedTrack = captionTracks.find((t: any) => t.languageCode?.startsWith('pt'));
-    }
-    if (!selectedTrack) {
-      selectedTrack = captionTracks[0];
-    }
-    
-    const captionUrl = selectedTrack.baseUrl;
-    if (!captionUrl) {
-      return null;
-    }
-    
-    // Fetch the captions XML
-    const captionResponse = await fetch(captionUrl);
-    if (!captionResponse.ok) {
-      console.error("Failed to fetch captions:", captionResponse.status);
-      return null;
-    }
-    
-    const captionXml = await captionResponse.text();
-    
-    // Parse the XML to extract text
-    const textMatches = captionXml.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
-    const texts: string[] = [];
-    
-    for (const match of textMatches) {
-      let text = match[1]
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/\n/g, ' ')
-        .trim();
-      
-      if (text) {
-        texts.push(text);
+    // Try to extract captions URL from playerCaptionsTracklistRenderer
+    const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/s);
+    if (captionMatch) {
+      try {
+        const captionTracks = JSON.parse(captionMatch[1]);
+        
+        if (captionTracks && captionTracks.length > 0) {
+          // Prefer Portuguese, then any available
+          let selectedTrack = captionTracks.find((t: any) => t.languageCode === 'pt' || t.languageCode === 'pt-BR');
+          if (!selectedTrack) {
+            selectedTrack = captionTracks.find((t: any) => t.languageCode?.startsWith('pt'));
+          }
+          if (!selectedTrack) {
+            selectedTrack = captionTracks[0];
+          }
+          
+          const captionUrl = selectedTrack.baseUrl;
+          if (captionUrl) {
+            console.log("Found caption URL, fetching...");
+            const captionResponse = await fetch(captionUrl);
+            
+            if (captionResponse.ok) {
+              const captionXml = await captionResponse.text();
+              
+              const textMatches = captionXml.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
+              const texts: string[] = [];
+              
+              for (const match of textMatches) {
+                let text = match[1]
+                  .replace(/&amp;/g, '&')
+                  .replace(/&lt;/g, '<')
+                  .replace(/&gt;/g, '>')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&#39;/g, "'")
+                  .replace(/\n/g, ' ')
+                  .trim();
+                
+                if (text) {
+                  texts.push(text);
+                }
+              }
+              
+              if (texts.length > 0) {
+                const transcript = texts.join(' ');
+                console.log("Transcript found via page scraping:", transcript.length, "chars");
+                return transcript.length > 10000 ? transcript.substring(0, 10000) + '...' : transcript;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse caption tracks:", e);
       }
     }
     
-    const transcript = texts.join(' ');
-    
-    // Limit transcript to avoid token limits (roughly 8000 chars)
-    if (transcript.length > 8000) {
-      return transcript.substring(0, 8000) + '...';
-    }
-    
-    return transcript || null;
+    console.log("No transcript found via any method");
+    return null;
   } catch (error) {
     console.error("Error fetching transcript:", error);
     return null;
