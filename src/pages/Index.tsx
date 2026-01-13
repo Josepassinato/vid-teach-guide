@@ -28,7 +28,7 @@ const Index = () => {
           </div>
           <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
             <Sparkles className="h-3 w-3" />
-            <span>Powered by Gemini</span>
+            <span>Powered by OpenAI</span>
           </div>
         </div>
       </header>
@@ -70,7 +70,11 @@ const Index = () => {
           
           {/* Right Panel - Voice Chat */}
           <div className="h-full">
-            <VoiceChat videoContext={videoInfo?.analysis} />
+            <VoiceChat 
+              videoContext={videoInfo?.analysis} 
+              videoId={videoInfo?.videoId}
+              videoTitle={videoInfo?.title}
+            />
           </div>
         </div>
       </main>
