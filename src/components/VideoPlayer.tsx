@@ -112,8 +112,11 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     useImperativeHandle(ref, () => ({
       play: () => {
         console.log('VideoPlayer: play called');
-        // Keep muted to avoid autoplay restrictions when play is triggered by the agent.
-        try { playerRef.current?.mute(); } catch {}
+        // Unmute when agent triggers play so user hears audio
+        try { 
+          playerRef.current?.unMute(); 
+          setIsMuted(false);
+        } catch {}
         playerRef.current?.playVideo();
       },
       pause: () => {
@@ -123,7 +126,11 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       restart: () => {
         console.log('VideoPlayer: restart called');
         playerRef.current?.seekTo(0, true);
-        try { playerRef.current?.mute(); } catch {}
+        // Unmute when agent triggers restart so user hears audio
+        try { 
+          playerRef.current?.unMute(); 
+          setIsMuted(false);
+        } catch {}
         playerRef.current?.playVideo();
       },
       seekTo: (seconds: number) => {

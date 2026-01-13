@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Youtube, ExternalLink, FileText, ChevronDown, ChevronUp, Upload, X, File } from 'lucide-react';
+import { Loader2, Youtube, ExternalLink, FileText, ChevronDown, ChevronUp, Upload, X, File, Mic } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface VideoInfo {
@@ -24,11 +24,100 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
   const [manualTranscript, setManualTranscript] = useState('');
   const [showTranscriptInput, setShowTranscriptInput] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle audio file upload for Whisper transcription
+  const handleAudioUpload = async (file: File) => {
+    const validTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/webm', 'audio/mp4', 'audio/m4a', 'audio/ogg'];
+    const validExtensions = ['.mp3', '.wav', '.webm', '.m4a', '.ogg', '.mp4'];
+    
+    const isValidType = validTypes.includes(file.type) || validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    
+    if (!isValidType) {
+      setError('Formato de áudio não suportado. Use MP3, WAV, WEBM, M4A ou OGG.');
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setError('Arquivo de áudio muito grande. Máximo 25MB.');
+      return;
+    }
+
+    setTranscribing(true);
+    setError(null);
+
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = (e.target?.result as string)?.split(',')[1];
+        
+        if (!base64) {
+          setError('Erro ao ler o arquivo de áudio');
+          setTranscribing(false);
+          return;
+        }
+
+        try {
+          const { data, error: fnError } = await supabase.functions.invoke('transcribe-video', {
+            body: { audioBase64: base64 }
+          });
+
+          if (fnError) throw new Error(fnError.message);
+          if (data.error) throw new Error(data.error);
+
+          if (data.transcript) {
+            setManualTranscript(data.transcript);
+            setShowTranscriptInput(true);
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Erro ao transcrever áudio');
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setError('Erro ao processar arquivo de áudio');
+      setTranscribing(false);
+    }
+  };
+
+  // Try to fetch transcript from YouTube
+  const handleFetchTranscript = async () => {
+    if (!url.trim()) {
+      setError('Cole o link do YouTube primeiro');
+      return;
+    }
+    
+    setTranscribing(true);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('transcribe-video', {
+        body: { youtubeUrl: url }
+      });
+
+      if (fnError) throw new Error(fnError.message);
+      
+      if (data.transcript) {
+        setManualTranscript(data.transcript);
+        setShowTranscriptInput(true);
+      } else if (data.error) {
+        setError(data.suggestion || data.error);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao buscar transcrição');
+    } finally {
+      setTranscribing(false);
+    }
+  };
 
   const handleFileUpload = async (file: File) => {
     const validTypes = [
@@ -221,6 +310,52 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
             <p className="text-xs text-muted-foreground">
               💡 Dica: Você pode copiar as legendas do YouTube clicando em "..." → "Mostrar transcrição" no vídeo
             </p>
+
+            {/* Audio transcription options */}
+            <div className="flex items-center gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleFetchTranscript}
+                disabled={transcribing || !url.trim()}
+                className="flex items-center gap-2"
+              >
+                {transcribing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Youtube className="h-4 w-4" />
+                )}
+                Buscar legendas do YouTube
+              </Button>
+
+              <span className="text-xs text-muted-foreground">ou</span>
+
+              <div>
+                <input
+                  ref={audioInputRef}
+                  type="file"
+                  accept="audio/*,.mp3,.wav,.webm,.m4a,.ogg"
+                  onChange={(e) => e.target.files?.[0] && handleAudioUpload(e.target.files[0])}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => audioInputRef.current?.click()}
+                  disabled={transcribing}
+                  className="flex items-center gap-2"
+                >
+                  {transcribing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                  Transcrever áudio (Whisper)
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </div>
