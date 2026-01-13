@@ -1,11 +1,21 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface VideoControls {
+  play: () => void;
+  pause: () => void;
+  restart: () => void;
+  seekTo: (seconds: number) => void;
+  getCurrentTime: () => number;
+  isPaused: () => boolean;
+}
+
 interface UseOpenAIRealtimeOptions {
   systemInstruction?: string;
   onTranscript?: (text: string, role: 'user' | 'assistant') => void;
   onError?: (error: string) => void;
   onStatusChange?: (status: ConnectionStatus) => void;
+  videoControls?: VideoControls | null;
 }
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -21,6 +31,12 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
+  const videoControlsRef = useRef<VideoControls | null>(null);
+
+  // Keep videoControls ref updated
+  useEffect(() => {
+    videoControlsRef.current = options.videoControls || null;
+  }, [options.videoControls]);
 
   const updateStatus = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
@@ -121,7 +137,41 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       ws.onopen = () => {
         console.log('WebSocket connected to OpenAI');
         
-        // Send session update with configuration
+        // Define tools for video control
+        const tools = [
+          {
+            type: "function",
+            name: "play_video",
+            description: "Inicia ou retoma a reprodução do vídeo. Use quando o aluno pedir para dar play, iniciar, continuar ou reproduzir o vídeo.",
+            parameters: { type: "object", properties: {}, required: [] }
+          },
+          {
+            type: "function",
+            name: "pause_video",
+            description: "Pausa a reprodução do vídeo. Use quando o aluno pedir para pausar, parar ou interromper o vídeo.",
+            parameters: { type: "object", properties: {}, required: [] }
+          },
+          {
+            type: "function",
+            name: "restart_video",
+            description: "Reinicia o vídeo do começo. Use quando o aluno pedir para voltar ao início, reiniciar ou começar de novo.",
+            parameters: { type: "object", properties: {}, required: [] }
+          },
+          {
+            type: "function",
+            name: "seek_video",
+            description: "Pula para um momento específico do vídeo em segundos. Use quando o aluno pedir para ir para um tempo específico.",
+            parameters: {
+              type: "object",
+              properties: {
+                seconds: { type: "number", description: "O tempo em segundos para pular" }
+              },
+              required: ["seconds"]
+            }
+          }
+        ];
+        
+        // Send session update with configuration and tools
         ws.send(JSON.stringify({
           type: "session.update",
           session: {
@@ -138,7 +188,9 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
               threshold: 0.5,
               prefix_padding_ms: 300,
               silence_duration_ms: 500
-            }
+            },
+            tools: tools,
+            tool_choice: "auto"
           }
         }));
         
@@ -162,6 +214,54 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           // Handle user transcript
           if (data.type === "conversation.item.input_audio_transcription.completed" && data.transcript) {
             options.onTranscript?.(data.transcript, 'user');
+          }
+          
+          // Handle function calls for video control
+          if (data.type === "response.function_call_arguments.done") {
+            const functionName = data.name;
+            const args = data.arguments ? JSON.parse(data.arguments) : {};
+            
+            console.log('Function call:', functionName, args);
+            
+            let result = "Ação executada";
+            
+            if (videoControlsRef.current) {
+              switch (functionName) {
+                case "play_video":
+                  videoControlsRef.current.play();
+                  result = "Vídeo iniciado";
+                  break;
+                case "pause_video":
+                  videoControlsRef.current.pause();
+                  result = "Vídeo pausado";
+                  break;
+                case "restart_video":
+                  videoControlsRef.current.restart();
+                  result = "Vídeo reiniciado";
+                  break;
+                case "seek_video":
+                  videoControlsRef.current.seekTo(args.seconds || 0);
+                  result = `Vídeo pulou para ${args.seconds} segundos`;
+                  break;
+              }
+            } else {
+              result = "Nenhum vídeo carregado";
+            }
+            
+            // Send function call output
+            ws.send(JSON.stringify({
+              type: "conversation.item.create",
+              item: {
+                type: "function_call_output",
+                call_id: data.call_id,
+                output: result
+              }
+            }));
+            
+            // Request a response after function call
+            ws.send(JSON.stringify({
+              type: "response.create"
+            }));
           }
           
           // Handle errors
