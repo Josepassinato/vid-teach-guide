@@ -32,6 +32,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
   const videoControlsRef = useRef<VideoControls | null>(null);
+  const processedCallIdsRef = useRef<Set<string>>(new Set());
 
   // Keep videoControls ref updated
   useEffect(() => {
@@ -136,6 +137,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       
       ws.onopen = () => {
         console.log('WebSocket connected to OpenAI');
+        processedCallIdsRef.current.clear();
         
         // Define tools for video control
         const tools = [
@@ -215,65 +217,86 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           if (data.type === "conversation.item.input_audio_transcription.completed" && data.transcript) {
             options.onTranscript?.(data.transcript, 'user');
           }
-          
-          // Handle function calls for video control
-          if (data.type === "response.function_call_arguments.done") {
-            const functionName = data.name;
-            const args = data.arguments ? JSON.parse(data.arguments) : {};
-            
-            console.log('Function call:', functionName, args);
-            
-            let result = "Ação executada";
-            
+
+          const runFunctionCall = async (name: string, callId: string, argsJson?: string) => {
+            if (!callId) return;
+            if (processedCallIdsRef.current.has(callId)) return;
+            processedCallIdsRef.current.add(callId);
+
+            let args: any = {};
+            try {
+              args = argsJson ? JSON.parse(argsJson) : {};
+            } catch {
+              args = {};
+            }
+
+            console.log('Tool call:', name, args, callId);
+
+            let result: any = { ok: true };
+
             if (videoControlsRef.current) {
-              switch (functionName) {
+              switch (name) {
                 case "play_video":
                   videoControlsRef.current.play();
-                  result = "Vídeo iniciado";
+                  result = { ok: true, message: "Vídeo iniciado" };
                   break;
                 case "pause_video":
                   videoControlsRef.current.pause();
-                  result = "Vídeo pausado";
+                  result = { ok: true, message: "Vídeo pausado" };
                   break;
                 case "restart_video":
                   videoControlsRef.current.restart();
-                  result = "Vídeo reiniciado";
+                  result = { ok: true, message: "Vídeo reiniciado" };
                   break;
                 case "seek_video":
-                  videoControlsRef.current.seekTo(args.seconds || 0);
-                  result = `Vídeo pulou para ${args.seconds} segundos`;
+                  videoControlsRef.current.seekTo(Number(args.seconds) || 0);
+                  result = { ok: true, message: `Vídeo pulou para ${Number(args.seconds) || 0} segundos` };
                   break;
+                default:
+                  result = { ok: false, message: `Função desconhecida: ${name}` };
               }
             } else {
-              result = "Nenhum vídeo carregado";
+              result = { ok: false, message: "Nenhum vídeo carregado" };
             }
-            
-            // Send function call output
+
+            // Provide function call output back to the model
             ws.send(JSON.stringify({
               type: "conversation.item.create",
               item: {
                 type: "function_call_output",
-                call_id: data.call_id,
-                output: result
+                call_id: callId,
+                output: JSON.stringify(result)
               }
             }));
-            
+
             // Request a response after function call
-            ws.send(JSON.stringify({
-              type: "response.create"
-            }));
+            ws.send(JSON.stringify({ type: "response.create" }));
+          };
+
+          // Handle function calls (can arrive as standalone events)
+          if (data.type === "response.function_call_arguments.done") {
+            await runFunctionCall(data.name, data.call_id, data.arguments);
           }
-          
+
+          // Handle function calls (canonical: embedded in response.done)
+          if (data.type === "response.done") {
+            const outputs = data.response?.output;
+            if (Array.isArray(outputs)) {
+              for (const item of outputs) {
+                if (item?.type === 'function_call') {
+                  await runFunctionCall(item.name, item.call_id, item.arguments);
+                }
+              }
+            }
+
+            // Don't clear audio here; let playback finish naturally to avoid cutting the last word
+            console.log('Response done, audio queue length:', audioQueueRef.current.length);
+          }
+
           // Handle errors
           if (data.type === "error") {
             console.error('OpenAI Realtime error:', data.error);
             options.onError?.(data.error?.message || 'Unknown error');
-          }
-          
-          // Handle response done - DON'T clear audio queue here, let it finish playing
-          if (data.type === "response.done") {
-            // Audio queue will be cleared naturally when playback completes
-            console.log('Response done, audio queue length:', audioQueueRef.current.length);
           }
         } catch (e) {
           console.error('Error processing message:', e);

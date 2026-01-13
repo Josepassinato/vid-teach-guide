@@ -19,12 +19,12 @@ interface VideoPlayerProps {
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
   ({ videoId, title }, ref) => {
-    const iframeRef = useRef<HTMLIFrameElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [isMuted, setIsMuted] = useState(false);
+    const [isMuted, setIsMuted] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
     const playerRef = useRef<any>(null);
     const [isReady, setIsReady] = useState(false);
+    const timeIntervalRef = useRef<number | null>(null);
 
     useEffect(() => {
       // Load YouTube IFrame API
@@ -36,7 +36,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       }
 
       // Wait for API to load
-      const checkAPI = setInterval(() => {
+      const checkAPI = window.setInterval(() => {
         if (window.YT && window.YT.Player) {
           clearInterval(checkAPI);
           initPlayer();
@@ -45,15 +45,29 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
       return () => {
         clearInterval(checkAPI);
+        if (timeIntervalRef.current) {
+          clearInterval(timeIntervalRef.current);
+          timeIntervalRef.current = null;
+        }
         if (playerRef.current) {
           playerRef.current.destroy();
+          playerRef.current = null;
         }
       };
     }, [videoId]);
 
     const initPlayer = () => {
+      setIsReady(false);
+      setIsPlaying(false);
+
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current);
+        timeIntervalRef.current = null;
+      }
+
       if (playerRef.current) {
         playerRef.current.destroy();
+        playerRef.current = null;
       }
 
       playerRef.current = new window.YT.Player(`youtube-player-${videoId}`, {
@@ -69,6 +83,16 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         events: {
           onReady: () => {
             setIsReady(true);
+
+            // Important: keep the player muted by default so programmatic play works
+            // even when triggered by the agent (browser autoplay policies).
+            try {
+              playerRef.current?.mute();
+              setIsMuted(true);
+            } catch {
+              // ignore
+            }
+
             console.log('YouTube player ready');
           },
           onStateChange: (event: any) => {
@@ -78,7 +102,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       });
 
       // Update current time periodically
-      setInterval(() => {
+      timeIntervalRef.current = window.setInterval(() => {
         if (playerRef.current?.getCurrentTime) {
           setCurrentTime(playerRef.current.getCurrentTime());
         }
@@ -88,6 +112,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     useImperativeHandle(ref, () => ({
       play: () => {
         console.log('VideoPlayer: play called');
+        // Keep muted to avoid autoplay restrictions when play is triggered by the agent.
+        try { playerRef.current?.mute(); } catch {}
         playerRef.current?.playVideo();
       },
       pause: () => {
@@ -97,6 +123,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       restart: () => {
         console.log('VideoPlayer: restart called');
         playerRef.current?.seekTo(0, true);
+        try { playerRef.current?.mute(); } catch {}
         playerRef.current?.playVideo();
       },
       seekTo: (seconds: number) => {
@@ -111,7 +138,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       },
     }));
 
-    const handlePlay = () => playerRef.current?.playVideo();
+    const handlePlay = () => {
+      // Programmatic play may be blocked unless muted; we keep default muted.
+      playerRef.current?.playVideo();
+    };
     const handlePause = () => playerRef.current?.pauseVideo();
     const handleRestart = () => {
       playerRef.current?.seekTo(0, true);
