@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface VideoControls {
   play: () => void;
@@ -246,31 +247,43 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             }
 
             console.log('[realtime:tool-call]', name, args, callId);
+            console.log('[realtime:tool-call] videoControlsRef.current:', videoControlsRef.current ? 'EXISTS' : 'NULL');
 
             let result: any = { ok: true };
 
             if (videoControlsRef.current) {
               switch (name) {
                 case "play_video":
+                  console.log('[realtime:tool-call] Executing play_video');
+                  toast.success('▶️ Dando play no vídeo...');
                   videoControlsRef.current.play();
                   result = { ok: true, message: "Vídeo iniciado" };
                   break;
                 case "pause_video":
+                  console.log('[realtime:tool-call] Executing pause_video');
+                  toast.success('⏸️ Pausando vídeo...');
                   videoControlsRef.current.pause();
                   result = { ok: true, message: "Vídeo pausado" };
                   break;
                 case "restart_video":
+                  console.log('[realtime:tool-call] Executing restart_video');
+                  toast.success('🔄 Reiniciando vídeo...');
                   videoControlsRef.current.restart();
                   result = { ok: true, message: "Vídeo reiniciado" };
                   break;
                 case "seek_video":
+                  console.log('[realtime:tool-call] Executing seek_video to', args.seconds);
+                  toast.success(`⏩ Pulando para ${Number(args.seconds) || 0}s...`);
                   videoControlsRef.current.seekTo(Number(args.seconds) || 0);
                   result = { ok: true, message: `Vídeo pulou para ${Number(args.seconds) || 0} segundos` };
                   break;
                 default:
+                  console.warn('[realtime:tool-call] Unknown function:', name);
                   result = { ok: false, message: `Função desconhecida: ${name}` };
               }
             } else {
+              console.warn('[realtime:tool-call] videoControlsRef.current is NULL - cannot execute', name);
+              toast.error('❌ Nenhum vídeo carregado');
               result = { ok: false, message: "Nenhum vídeo carregado" };
             }
 
