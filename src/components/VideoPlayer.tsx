@@ -131,8 +131,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       }
 
       if (!containerRef.current) {
-        console.warn('VideoPlayer: initPlayer called but containerRef is null');
-        setLoadError('Falha ao inicializar o player do YouTube.');
+        console.log('VideoPlayer: initPlayer called but containerRef is null, will retry...');
+        // Don't set error - let the polling loop retry
         return;
       }
 
