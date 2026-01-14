@@ -33,6 +33,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const timeIntervalRef = useRef<number | null>(null);
     const pendingActionsRef = useRef<Array<() => void>>([]);
     const [userInteracted, setUserInteracted] = useState(false);
+    const userInteractedRef = useRef(false);
 
     useEffect(() => {
       // Load YouTube IFrame API
@@ -208,10 +209,21 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           return !isPlaying;
         },
         unlockPlayback: () => {
-          console.log('VideoPlayer: unlockPlayback called');
-          runOrQueue(() => {
-            if (userInteracted || !playerRef.current) return;
+          console.log('VideoPlayer: unlockPlayback called, userInteracted:', userInteractedRef.current);
+          
+          // Check using ref to avoid stale closures
+          if (userInteractedRef.current) {
+            console.log('VideoPlayer: Already unlocked, skipping');
+            return;
+          }
 
+          runOrQueue(() => {
+            if (userInteractedRef.current || !playerRef.current) {
+              console.log('VideoPlayer: Already unlocked or no player, skipping unlock');
+              return;
+            }
+
+            userInteractedRef.current = true;
             setUserInteracted(true);
 
             // Start playing (muted) then immediately pause to unlock programmatic control
@@ -260,9 +272,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Handle first interaction to unlock programmatic playback
+    // Handle first interaction to unlock programmatic playback (manual click)
     const handleUnlockPlayback = () => {
-      if (!userInteracted && playerRef.current) {
+      if (!userInteractedRef.current && playerRef.current) {
+        userInteractedRef.current = true;
         setUserInteracted(true);
         // Start playing then immediately pause to unlock
         try {
@@ -271,7 +284,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           setTimeout(() => {
             playerRef.current?.pauseVideo();
             playerRef.current?.seekTo(0, true);
-            console.log('VideoPlayer: Playback unlocked by user interaction');
+            console.log('VideoPlayer: Playback unlocked by user interaction (manual click)');
           }, 100);
         } catch (e) {
           console.warn('Failed to unlock playback:', e);

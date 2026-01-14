@@ -290,7 +290,17 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           }
           
           const data = JSON.parse(messageData);
-          console.log('[gemini:event]', JSON.stringify(data).substring(0, 500));
+          
+          // Log more details for debugging tool calls
+          const hasToolCall = data.toolCall || data.functionCall || 
+            data.serverContent?.modelTurn?.parts?.some((p: any) => p.functionCall) ||
+            data.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall);
+          
+          if (hasToolCall) {
+            console.log('[gemini:event] Tool call detected! Full data:', JSON.stringify(data));
+          } else {
+            console.log('[gemini:event]', JSON.stringify(data).substring(0, 500));
+          }
           
           // Handle audio response
           if (data.serverContent?.modelTurn?.parts) {
