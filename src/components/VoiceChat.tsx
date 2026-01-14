@@ -276,6 +276,17 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
     statusRef.current = status;
   }, [sendText, status]);
 
+  // Auto-start vision analysis when agent connects
+  useEffect(() => {
+    if (status === 'connected' && !isVisionActive && isStudentMode) {
+      // Small delay to ensure everything is ready
+      const timer = setTimeout(() => {
+        startAnalysis();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [status, isVisionActive, isStudentMode, startAnalysis]);
+
   // Monitor video time for teaching moments
   useEffect(() => {
     if (status !== 'connected' || !contentPlan || !videoId) {
@@ -365,26 +376,13 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
             Professor IA
           </CardTitle>
           <div className="flex items-center gap-2">
-            {/* Vision/Camera toggle */}
-            <Button
-              size="sm"
-              variant={isVisionActive ? "default" : "ghost"}
-              onClick={() => isVisionActive ? stopAnalysis() : startAnalysis()}
-              className="h-6 px-2 text-xs"
-              title={isVisionActive ? "Desativar câmera" : "Ativar câmera para análise emocional"}
-            >
-              {isVisionActive ? (
-                <>
-                  <Camera className="h-3 w-3 mr-1" />
-                  <span className="hidden sm:inline">Câmera</span>
-                </>
-              ) : (
-                <>
-                  <CameraOff className="h-3 w-3 mr-1" />
-                  <span className="hidden sm:inline">Câmera</span>
-                </>
-              )}
-            </Button>
+            {/* Vision status indicator (auto-enabled when connected) */}
+            {isVisionActive && (
+              <Badge variant="outline" className="text-[10px] border-green-500 text-green-600">
+                <Camera className="h-2.5 w-2.5 mr-1" />
+                <span className="hidden sm:inline">Visão ativa</span>
+              </Badge>
+            )}
             
             {/* Current emotion indicator */}
             {currentEmotion && isVisionActive && (
