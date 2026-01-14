@@ -166,6 +166,7 @@ const Index = () => {
               videoContext={videoInfo?.transcript || videoInfo?.analysis} 
               videoId={videoInfo?.videoId}
               videoTitle={videoInfo?.title}
+              videoTranscript={videoInfo?.transcript}
             />
           </div>
         </div>

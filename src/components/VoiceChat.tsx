@@ -1,11 +1,13 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
+import { useContentManager, TeachingMoment, ContentPlan } from '@/hooks/useContentManager';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
-import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Message {
@@ -19,18 +21,50 @@ interface VoiceChatProps {
   videoContext?: string;
   videoId?: string;
   videoTitle?: string;
+  videoTranscript?: string | null;
 }
 
-export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
   const [debugInfo, setDebugInfo] = useState({ playerReady: false, lastAction: '' });
+  const [activeMoment, setActiveMoment] = useState<TeachingMoment | null>(null);
+  const [showContentPlan, setShowContentPlan] = useState(false);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
+  const timeCheckIntervalRef = useRef<number | null>(null);
+  const lastCheckedMomentRef = useRef<number>(-1);
   
-  // Build system instruction with video context
-  const systemInstruction = videoContext 
-    ? `Você é um professor amigável e didático. Você está ajudando o aluno a entender o conteúdo de uma vídeo-aula.
+  // Content Manager for teaching moments
+  const {
+    isLoading: isAnalyzingContent,
+    contentPlan,
+    analyzeContent,
+    checkForTeachingMoment,
+    generateTeacherInstructions,
+    resetMoments,
+  } = useContentManager({
+    onPlanReady: (plan) => {
+      console.log('[ContentManager] Plan ready:', plan);
+    },
+    onError: (error) => {
+      console.error('[ContentManager] Error:', error);
+    },
+  });
+
+  // Analyze content when video changes
+  useEffect(() => {
+    if (videoId && (videoTranscript || videoContext)) {
+      analyzeContent(videoTranscript || null, videoTitle || '', videoContext);
+      lastCheckedMomentRef.current = -1;
+      setActiveMoment(null);
+    }
+  }, [videoId, videoTranscript, videoContext, videoTitle, analyzeContent]);
+
+  // Build system instruction with video context and content plan
+  const buildSystemInstruction = useCallback(() => {
+    let instruction = videoContext 
+      ? `Você é um professor amigável e didático. Você está ajudando o aluno a entender o conteúdo de uma vídeo-aula.
 
 CONTEXTO DO VÍDEO (baseie suas respostas APENAS neste conteúdo):
 ${videoContext}
@@ -44,7 +78,30 @@ INSTRUÇÕES IMPORTANTES:
 6. Fale em português brasileiro de forma clara e didática
 
 Título do vídeo: ${videoTitle || 'Não informado'}`
-    : "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Use exemplos práticos e linguagem acessível. Fale em português brasileiro.";
+      : "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Use exemplos práticos e linguagem acessível. Fale em português brasileiro.";
+
+    // Add content plan context if available
+    if (contentPlan) {
+      instruction += `
+
+PLANO DE ENSINO (Momentos-chave para aprofundamento):
+${contentPlan.teaching_moments.map((m, i) => `
+${i + 1}. [${Math.floor(m.timestamp_seconds / 60)}:${(m.timestamp_seconds % 60).toString().padStart(2, '0')}] ${m.topic}
+   - Insight: ${m.key_insight}
+   - Perguntas sugeridas: ${m.questions_to_ask.join('; ')}
+`).join('')}
+
+IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMENTO DE APROFUNDAMENTO", você DEVE:
+1. Pausar o vídeo imediatamente
+2. Explorar o conceito fazendo as perguntas sugeridas
+3. Aguardar o aluno responder antes de continuar
+4. Só dar play no vídeo quando o aluno disser que está pronto para continuar`;
+    }
+
+    return instruction;
+  }, [videoContext, videoTitle, contentPlan]);
+
+  const systemInstruction = buildSystemInstruction();
 
   // Check player ref status periodically for debug panel
   useEffect(() => {
@@ -114,6 +171,50 @@ Título do vídeo: ${videoTitle || 'Não informado'}`
     }
   });
 
+  // Monitor video time for teaching moments
+  useEffect(() => {
+    if (status !== 'connected' || !contentPlan || !videoId) {
+      if (timeCheckIntervalRef.current) {
+        clearInterval(timeCheckIntervalRef.current);
+        timeCheckIntervalRef.current = null;
+      }
+      return;
+    }
+
+    timeCheckIntervalRef.current = window.setInterval(() => {
+      const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
+      const isPaused = videoPlayerRef.current?.isPaused() ?? true;
+      
+      // Only check for moments when video is playing
+      if (!isPaused && contentPlan) {
+        const moment = checkForTeachingMoment(currentTime);
+        
+        if (moment && lastCheckedMomentRef.current !== contentPlan.teaching_moments.indexOf(moment)) {
+          lastCheckedMomentRef.current = contentPlan.teaching_moments.indexOf(moment);
+          setActiveMoment(moment);
+          
+          // Pause the video
+          videoPlayerRef.current?.pause();
+          
+          // Send teaching moment instruction to the AI
+          const instruction = generateTeacherInstructions(moment);
+          sendText(instruction);
+          
+          toast.info(`🎯 Momento de aprofundamento: ${moment.topic}`, {
+            duration: 5000,
+          });
+        }
+      }
+    }, 1000);
+
+    return () => {
+      if (timeCheckIntervalRef.current) {
+        clearInterval(timeCheckIntervalRef.current);
+        timeCheckIntervalRef.current = null;
+      }
+    };
+  }, [status, contentPlan, videoId, checkForTeachingMoment, generateTeacherInstructions, sendText]);
+
   const handleSendText = () => {
     if (!textInput.trim()) return;
     sendText(textInput);
@@ -126,6 +227,10 @@ Título do vídeo: ${videoTitle || 'Não informado'}`
     } else {
       startListening();
     }
+  };
+
+  const dismissActiveMoment = () => {
+    setActiveMoment(null);
   };
 
   const getStatusColor = () => {
@@ -154,7 +259,25 @@ Título do vídeo: ${videoTitle || 'Não informado'}`
             <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
             Professor IA
           </CardTitle>
-          <span className="text-[10px] sm:text-xs text-muted-foreground">{getStatusText()}</span>
+          <div className="flex items-center gap-2">
+            {contentPlan && (
+              <Button
+                size="sm"
+                variant={showContentPlan ? "secondary" : "ghost"}
+                onClick={() => setShowContentPlan(!showContentPlan)}
+                className="h-6 px-2 text-xs"
+              >
+                <BookOpen className="h-3 w-3 mr-1" />
+                {contentPlan.teaching_moments.length} momentos
+              </Button>
+            )}
+            {isAnalyzingContent && (
+              <Badge variant="outline" className="text-xs animate-pulse">
+                Analisando...
+              </Badge>
+            )}
+            <span className="text-[10px] sm:text-xs text-muted-foreground">{getStatusText()}</span>
+          </div>
         </div>
       </CardHeader>
       
@@ -242,6 +365,55 @@ Título do vídeo: ${videoTitle || 'Não informado'}`
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Content Plan Panel */}
+        {showContentPlan && contentPlan && (
+          <div className="bg-muted/30 rounded-lg p-3 border space-y-2 flex-shrink-0 max-h-48 overflow-y-auto">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Target className="h-4 w-4 text-primary" />
+              Plano de Ensino
+            </div>
+            {contentPlan.teaching_moments.map((moment, index) => (
+              <div 
+                key={index}
+                className={`p-2 rounded text-xs border ${
+                  activeMoment === moment ? 'bg-primary/10 border-primary' : 'bg-background'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="outline" className="text-[10px]">
+                    {Math.floor(moment.timestamp_seconds / 60)}:{(moment.timestamp_seconds % 60).toString().padStart(2, '0')}
+                  </Badge>
+                  <span className="font-medium">{moment.topic}</span>
+                </div>
+                <p className="text-muted-foreground">{moment.key_insight}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Active Teaching Moment Alert */}
+        {activeMoment && (
+          <div className="bg-primary/10 border border-primary rounded-lg p-3 flex-shrink-0 animate-pulse">
+            <div className="flex items-start gap-2">
+              <Lightbulb className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm">{activeMoment.topic}</span>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs"
+                    onClick={dismissActiveMoment}
+                  >
+                    ✓ Entendi
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{activeMoment.key_insight}</p>
+              </div>
+            </div>
           </div>
         )}
         

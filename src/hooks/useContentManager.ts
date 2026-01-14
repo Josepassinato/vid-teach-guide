@@ -1,0 +1,147 @@
+import { useState, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export interface TeachingMoment {
+  timestamp_seconds: number;
+  topic: string;
+  key_insight: string;
+  questions_to_ask: string[];
+  discussion_points: string[];
+}
+
+export interface ContentPlan {
+  teaching_moments: TeachingMoment[];
+  summary: string;
+}
+
+interface UseContentManagerOptions {
+  onPlanReady?: (plan: ContentPlan) => void;
+  onError?: (error: string) => void;
+}
+
+export function useContentManager(options: UseContentManagerOptions = {}) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [contentPlan, setContentPlan] = useState<ContentPlan | null>(null);
+  const [currentMomentIndex, setCurrentMomentIndex] = useState<number>(-1);
+
+  const analyzeContent = useCallback(async (
+    transcript: string | null,
+    title: string,
+    analysis?: string
+  ) => {
+    if (!transcript && !analysis) {
+      options.onError?.('Nenhum conteúdo disponível para análise');
+      return null;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('content-manager', {
+        body: { transcript, title, analysis }
+      });
+
+      if (error) throw error;
+
+      const plan: ContentPlan = data;
+      setContentPlan(plan);
+      setCurrentMomentIndex(-1);
+      options.onPlanReady?.(plan);
+      
+      toast.success(`📚 Plano de aula criado: ${plan.teaching_moments.length} momentos-chave identificados`);
+      
+      return plan;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao analisar conteúdo';
+      options.onError?.(errorMessage);
+      toast.error(errorMessage);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [options]);
+
+  const getCurrentMoment = useCallback((): TeachingMoment | null => {
+    if (!contentPlan || currentMomentIndex < 0 || currentMomentIndex >= contentPlan.teaching_moments.length) {
+      return null;
+    }
+    return contentPlan.teaching_moments[currentMomentIndex];
+  }, [contentPlan, currentMomentIndex]);
+
+  const getNextMoment = useCallback((): TeachingMoment | null => {
+    if (!contentPlan) return null;
+    
+    const nextIndex = currentMomentIndex + 1;
+    if (nextIndex < contentPlan.teaching_moments.length) {
+      return contentPlan.teaching_moments[nextIndex];
+    }
+    return null;
+  }, [contentPlan, currentMomentIndex]);
+
+  const advanceToNextMoment = useCallback(() => {
+    if (!contentPlan) return null;
+    
+    const nextIndex = currentMomentIndex + 1;
+    if (nextIndex < contentPlan.teaching_moments.length) {
+      setCurrentMomentIndex(nextIndex);
+      return contentPlan.teaching_moments[nextIndex];
+    }
+    return null;
+  }, [contentPlan, currentMomentIndex]);
+
+  const resetMoments = useCallback(() => {
+    setCurrentMomentIndex(-1);
+  }, []);
+
+  const checkForTeachingMoment = useCallback((currentTimeSeconds: number): TeachingMoment | null => {
+    if (!contentPlan) return null;
+    
+    // Find if we've reached any teaching moment (within 3 seconds tolerance)
+    for (let i = currentMomentIndex + 1; i < contentPlan.teaching_moments.length; i++) {
+      const moment = contentPlan.teaching_moments[i];
+      const timeDiff = currentTimeSeconds - moment.timestamp_seconds;
+      
+      // If we're within 3 seconds after the timestamp
+      if (timeDiff >= 0 && timeDiff <= 3) {
+        setCurrentMomentIndex(i);
+        return moment;
+      }
+    }
+    
+    return null;
+  }, [contentPlan, currentMomentIndex]);
+
+  const generateTeacherInstructions = useCallback((moment: TeachingMoment): string => {
+    return `
+🎯 MOMENTO DE APROFUNDAMENTO - ${moment.topic}
+
+INSTRUÇÃO PARA O PROFESSOR IA:
+Pause o vídeo AGORA e explore este conceito com o aluno.
+
+INSIGHT PRINCIPAL:
+${moment.key_insight}
+
+PERGUNTAS PARA FAZER AO ALUNO:
+${moment.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+PONTOS DE DISCUSSÃO:
+${moment.discussion_points.map((p) => `• ${p}`).join('\n')}
+
+Após explorar este momento, pergunte ao aluno se está pronto para continuar o vídeo.
+`;
+  }, []);
+
+  return {
+    isLoading,
+    contentPlan,
+    currentMomentIndex,
+    analyzeContent,
+    getCurrentMoment,
+    getNextMoment,
+    advanceToNextMoment,
+    resetMoments,
+    checkForTeachingMoment,
+    generateTeacherInstructions,
+  };
+}
