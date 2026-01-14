@@ -240,6 +240,7 @@ export type Database = {
           options: Json
           question: string
           question_order: number | null
+          timestamp_seconds: number | null
           updated_at: string
           video_id: string
         }
@@ -251,6 +252,7 @@ export type Database = {
           options?: Json
           question: string
           question_order?: number | null
+          timestamp_seconds?: number | null
           updated_at?: string
           video_id: string
         }
@@ -262,6 +264,7 @@ export type Database = {
           options?: Json
           question?: string
           question_order?: number | null
+          timestamp_seconds?: number | null
           updated_at?: string
           video_id?: string
         }
