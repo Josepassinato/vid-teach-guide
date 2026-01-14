@@ -7,10 +7,13 @@ import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
 import { useContentManager, TeachingMoment, ContentPlan } from '@/hooks/useContentManager';
 import { useStudentMemory } from '@/hooks/useStudentMemory';
 import { useVisionAnalysis, EmotionAnalysis } from '@/hooks/useVisionAnalysis';
+import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
+import { MiniQuiz, MiniQuizQuestion } from './MiniQuiz';
 import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Camera, CameraOff, Brain, Heart } from 'lucide-react';
 import { toast } from 'sonner';
+import { AnimatePresence } from 'framer-motion';
 
 interface Message {
   id: string;
@@ -37,10 +40,20 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   const [showContentPlan, setShowContentPlan] = useState(false);
   const [showStudentInfo, setShowStudentInfo] = useState(false);
   const [memoryContext, setMemoryContext] = useState<string>('');
+  const [activeQuiz, setActiveQuiz] = useState<TimestampQuiz | null>(null);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
   const analyzedVideoRef = useRef<string | null>(null);
+  
+  // Generate student ID
+  const [studentId] = useState(() => {
+    const stored = localStorage.getItem('studentId');
+    if (stored) return stored;
+    const newId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('studentId', newId);
+    return newId;
+  });
   
   // Student Memory for long-term learning
   const {
@@ -110,6 +123,15 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
     },
   });
 
+  // Timestamp-based quizzes
+  const {
+    quizzes: timestampQuizzes,
+    loadQuizzes,
+    getQuizForTimestamp,
+    markQuizTriggered,
+    recordAttempt,
+  } = useTimestampQuizzes({ videoId, studentId });
+
   // Load pre-configured moments or analyze content when video changes
   useEffect(() => {
     if (videoId && analyzedVideoRef.current !== videoId) {
@@ -118,8 +140,11 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
       analyzeContent(videoTranscript || null, videoTitle || '', videoContext, preConfiguredMoments);
       lastCheckedMomentRef.current = -1;
       setActiveMoment(null);
+      setActiveQuiz(null);
+      // Load timestamp quizzes
+      loadQuizzes();
     }
-  }, [videoId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent]);
+  }, [videoId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent, loadQuizzes]);
 
   // Load memory context when profile is ready
   useEffect(() => {
@@ -224,8 +249,25 @@ Quando receber "🎯 MOMENTO DE APROFUNDAMENTO":
 5. Só dê play quando o aluno estiver pronto: "Bora continuar?"`;
     }
 
+    // Add quiz instructions
+    if (timestampQuizzes.length > 0) {
+      instruction += `
+
+MINI QUIZZES (Perguntas interativas):
+- Durante a aula, em momentos específicos, um quiz aparecerá na tela
+- Quando receber "🎯 MINI QUIZ!", você deve:
+  1. Ler a pergunta de forma clara e pausada
+  2. Ler cada opção (A, B, C, D) uma por uma
+  3. Dizer algo como "Pensa aí! Você tem alguns segundos..."
+  4. O sistema vai revelar a resposta automaticamente
+- Depois que o sistema informar o resultado ([SISTEMA]):
+  - Se acertou: Celebre! "Isso aí! Mandou bem!"
+  - Se errou: Seja encorajador e explique brevemente
+  - Continue a aula naturalmente`;
+    }
+
     return instruction;
-  }, [videoContext, videoTitle, contentPlan, memoryContext]);
+  }, [videoContext, videoTitle, contentPlan, memoryContext, timestampQuizzes.length]);
 
   const systemInstruction = buildSystemInstruction();
 
@@ -320,9 +362,9 @@ Quando receber "🎯 MOMENTO DE APROFUNDAMENTO":
     }
   }, [status, isStudentMode, isVisionActive, isListening, startAnalysis, startListening]);
 
-  // Monitor video time for teaching moments
+  // Monitor video time for teaching moments and quizzes
   useEffect(() => {
-    if (status !== 'connected' || !contentPlan || !videoId) {
+    if (status !== 'connected' || !videoId) {
       if (timeCheckIntervalRef.current) {
         clearInterval(timeCheckIntervalRef.current);
         timeCheckIntervalRef.current = null;
@@ -334,24 +376,53 @@ Quando receber "🎯 MOMENTO DE APROFUNDAMENTO":
       const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
       const isPaused = videoPlayerRef.current?.isPaused() ?? true;
       
-      // Only check for moments when video is playing
-      if (!isPaused && contentPlan) {
-        const moment = checkForTeachingMoment(currentTime);
-        
-        if (moment && lastCheckedMomentRef.current !== contentPlan.teaching_moments.indexOf(moment)) {
-          lastCheckedMomentRef.current = contentPlan.teaching_moments.indexOf(moment);
-          setActiveMoment(moment);
-          
-          // Pause the video
+      // Only check when video is playing and no quiz is active
+      if (!isPaused && !activeQuiz) {
+        // Check for timestamp quizzes first
+        const quiz = getQuizForTimestamp(currentTime);
+        if (quiz) {
+          markQuizTriggered(quiz.id);
+          setActiveQuiz(quiz);
           videoPlayerRef.current?.pause();
           
-          // Send teaching moment instruction to the AI
-          const instruction = generateTeacherInstructions(moment);
-          sendText(instruction);
+          // Tell the agent to announce the quiz
+          const quizInstruction = `🎯 MINI QUIZ! Hora de testar o conhecimento do aluno!
           
-          toast.info(`🎯 Momento de aprofundamento: ${moment.topic}`, {
-            duration: 5000,
-          });
+Pergunta: "${quiz.question}"
+
+Opções:
+${quiz.options.map((opt, i) => `${String.fromCharCode(65 + i)}) ${opt}`).join('\n')}
+
+INSTRUÇÕES:
+1. Leia a pergunta de forma clara e pausada
+2. Leia cada opção (A, B, C, D)
+3. Diga "Você tem alguns segundos para pensar!"
+4. Aguarde - o sistema vai revelar a resposta automaticamente na tela`;
+          
+          sendText(quizInstruction);
+          toast.info('📝 Mini Quiz!', { duration: 3000 });
+          return;
+        }
+
+        // Check for teaching moments
+        if (contentPlan) {
+          const moment = checkForTeachingMoment(currentTime);
+          
+          if (moment && lastCheckedMomentRef.current !== contentPlan.teaching_moments.indexOf(moment)) {
+            lastCheckedMomentRef.current = contentPlan.teaching_moments.indexOf(moment);
+            setActiveMoment(moment);
+            
+            // Pause the video
+            videoPlayerRef.current?.pause();
+            
+            // Send teaching moment instruction to the AI
+            const instruction = generateTeacherInstructions(moment);
+            sendText(instruction);
+            
+            toast.info(`🎯 Momento de aprofundamento: ${moment.topic}`, {
+              duration: 5000,
+            });
+          }
         }
       }
     }, 1000);
@@ -362,7 +433,30 @@ Quando receber "🎯 MOMENTO DE APROFUNDAMENTO":
         timeCheckIntervalRef.current = null;
       }
     };
-  }, [status, contentPlan, videoId, checkForTeachingMoment, generateTeacherInstructions, sendText]);
+  }, [status, contentPlan, videoId, activeQuiz, checkForTeachingMoment, generateTeacherInstructions, sendText, getQuizForTimestamp, markQuizTriggered]);
+
+  // Handle quiz completion
+  const handleQuizComplete = useCallback((selectedIndex: number, isCorrect: boolean) => {
+    if (!activeQuiz) return;
+    
+    // Record the attempt
+    recordAttempt(activeQuiz.id, selectedIndex, isCorrect);
+    
+    // Tell the agent the result
+    const resultText = isCorrect 
+      ? `[SISTEMA] O aluno acertou o quiz! A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Parabenize o aluno e continue a aula.`
+      : selectedIndex === -1
+        ? `[SISTEMA] O tempo do quiz acabou sem resposta. A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique brevemente por que essa era a resposta certa e continue.`
+        : `[SISTEMA] O aluno errou o quiz. Ele escolheu "${activeQuiz.options[selectedIndex]}" mas a correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique por que a resposta correta é a certa, de forma encorajadora, e continue.`;
+    
+    sendText(resultText);
+    setActiveQuiz(null);
+    
+    // Resume video after a delay
+    setTimeout(() => {
+      videoPlayerRef.current?.play();
+    }, 2000);
+  }, [activeQuiz, recordAttempt, sendText]);
 
   const handleSendText = () => {
     if (!textInput.trim()) return;
@@ -475,14 +569,37 @@ Quando receber "🎯 MOMENTO DE APROFUNDAMENTO":
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden px-3 sm:px-6 pb-3 sm:pb-6">
-        {/* Video Player */}
+        {/* Video Player with Quiz Overlay */}
         {videoId && (
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 relative">
             <VideoPlayer 
               ref={videoPlayerRef} 
               videoId={videoId} 
               title={videoTitle}
             />
+            
+            {/* Mini Quiz Overlay */}
+            <AnimatePresence>
+              {activeQuiz && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20 p-4">
+                  <div className="w-full max-w-md">
+                    <MiniQuiz
+                      question={{
+                        id: activeQuiz.id,
+                        question: activeQuiz.question,
+                        options: activeQuiz.options,
+                        correctIndex: activeQuiz.correctIndex,
+                        explanation: activeQuiz.explanation,
+                      }}
+                      onComplete={handleQuizComplete}
+                      revealDelay={10}
+                      autoAdvanceDelay={5}
+                    />
+                  </div>
+                </div>
+              )}
+            </AnimatePresence>
+            
             <div className="flex items-center justify-between mt-1.5 sm:mt-2">
               <p className="text-[10px] sm:text-xs text-muted-foreground">
                 💡 Diga "dê play", "pause" ou "reinicie o vídeo"
