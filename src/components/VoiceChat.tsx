@@ -38,6 +38,7 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   const [showContentPlan, setShowContentPlan] = useState(false);
   const [showStudentInfo, setShowStudentInfo] = useState(false);
   const [memoryContext, setMemoryContext] = useState<string>('');
+  const [currentTime, setCurrentTime] = useState(0);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
@@ -313,12 +314,13 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
     }
 
     timeCheckIntervalRef.current = window.setInterval(() => {
-      const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
+      const time = videoPlayerRef.current?.getCurrentTime() || 0;
+      setCurrentTime(time);
       const isPaused = videoPlayerRef.current?.isPaused() ?? true;
       
       // Only check for moments when video is playing
       if (!isPaused && contentPlan) {
-        const moment = checkForTeachingMoment(currentTime);
+        const moment = checkForTeachingMoment(time);
         
         if (moment && lastCheckedMomentRef.current !== contentPlan.teaching_moments.indexOf(moment)) {
           lastCheckedMomentRef.current = contentPlan.teaching_moments.indexOf(moment);
@@ -462,16 +464,59 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden px-3 sm:px-6 pb-3 sm:pb-6">
-        {/* Video Player */}
+        {/* Video Player - Full Width */}
         {videoId && (
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 space-y-2">
             <VideoPlayer 
               ref={videoPlayerRef} 
               videoId={videoId} 
               title={videoTitle}
               onReady={() => setIsVideoReady(true)}
             />
-            <div className="flex items-center justify-between mt-1.5 sm:mt-2">
+            
+            {/* Teaching Moments Timeline */}
+            {contentPlan && contentPlan.teaching_moments.length > 0 && (
+              <div className="bg-muted/40 rounded-lg p-2 border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-medium">Momentos de aprofundamento</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {contentPlan.teaching_moments.map((moment, index) => {
+                    const mins = Math.floor(moment.timestamp_seconds / 60);
+                    const secs = moment.timestamp_seconds % 60;
+                    const isActive = activeMoment === moment;
+                    const isPast = currentTime > moment.timestamp_seconds;
+                    
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] border cursor-pointer transition-colors ${
+                          isActive 
+                            ? 'bg-primary text-primary-foreground border-primary animate-pulse' 
+                            : isPast 
+                              ? 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300'
+                              : 'bg-background border-muted-foreground/20 hover:border-primary/50'
+                        }`}
+                        onClick={() => {
+                          videoPlayerRef.current?.seekTo(Math.max(0, moment.timestamp_seconds - 5));
+                        }}
+                        title={`${moment.topic}: ${moment.key_insight}`}
+                      >
+                        <span className="font-mono font-medium">
+                          {mins}:{secs.toString().padStart(2, '0')}
+                        </span>
+                        <span className="hidden sm:inline max-w-24 truncate">
+                          {moment.topic}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between">
               <p className="text-[10px] sm:text-xs text-muted-foreground">
                 💡 Diga "dê play", "pause" ou "reinicie o vídeo"
               </p>
@@ -487,7 +532,7 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
             
             {/* Debug Panel */}
             {showDebug && (
-              <div className="mt-2 p-2 bg-muted/50 rounded text-xs space-y-2 border">
+              <div className="p-2 bg-muted/50 rounded text-xs space-y-2 border">
                 <div className="font-medium">🔧 Debug Panel</div>
                 <div className="grid grid-cols-2 gap-1">
                   <span className="text-muted-foreground">Status:</span>
