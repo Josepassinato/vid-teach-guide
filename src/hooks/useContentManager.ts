@@ -25,11 +25,38 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
   const [contentPlan, setContentPlan] = useState<ContentPlan | null>(null);
   const [currentMomentIndex, setCurrentMomentIndex] = useState<number>(-1);
 
+  // Load pre-configured teaching moments from database
+  const loadPreConfiguredMoments = useCallback((moments: TeachingMoment[]) => {
+    if (moments && moments.length > 0) {
+      const plan: ContentPlan = {
+        teaching_moments: moments,
+        summary: 'Momentos de ensino pré-configurados',
+      };
+      setContentPlan(plan);
+      setCurrentMomentIndex(-1);
+      options.onPlanReady?.(plan);
+      return plan;
+    }
+    return null;
+  }, [options]);
+
+  // Analyze content via AI (fallback if no pre-configured moments)
   const analyzeContent = useCallback(async (
     transcript: string | null,
     title: string,
-    analysis?: string
+    analysis?: string,
+    preConfiguredMoments?: TeachingMoment[] | null
   ) => {
+    // If we have pre-configured moments, use them instead of generating
+    if (preConfiguredMoments && preConfiguredMoments.length > 0) {
+      const plan = loadPreConfiguredMoments(preConfiguredMoments);
+      if (plan) {
+        toast.success(`📚 ${plan.teaching_moments.length} momentos de ensino carregados`);
+        return plan;
+      }
+    }
+
+    // No pre-configured moments, need transcript to generate
     if (!transcript && !analysis) {
       options.onError?.('Nenhum conteúdo disponível para análise');
       return null;
@@ -60,7 +87,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [options]);
+  }, [options, loadPreConfiguredMoments]);
 
   const getCurrentMoment = useCallback((): TeachingMoment | null => {
     if (!contentPlan || currentMomentIndex < 0 || currentMomentIndex >= contentPlan.teaching_moments.length) {
@@ -125,8 +152,8 @@ ${moment.key_insight}
 PERGUNTAS PARA FAZER AO ALUNO:
 ${moment.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n')}
 
-PONTOS DE DISCUSSÃO:
-${moment.discussion_points.map((p) => `• ${p}`).join('\n')}
+${moment.discussion_points?.length > 0 ? `PONTOS DE DISCUSSÃO:
+${moment.discussion_points.map((p) => `• ${p}`).join('\n')}` : ''}
 
 Após explorar este momento, pergunte ao aluno se está pronto para continuar o vídeo.
 `;
@@ -136,6 +163,7 @@ Após explorar este momento, pergunte ao aluno se está pronto para continuar o 
     isLoading,
     contentPlan,
     currentMomentIndex,
+    loadPreConfiguredMoments,
     analyzeContent,
     getCurrentMoment,
     getNextMoment,

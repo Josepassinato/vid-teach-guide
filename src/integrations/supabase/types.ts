@@ -108,7 +108,9 @@ export type Database = {
           description: string | null
           duration_minutes: number | null
           id: string
+          is_configured: boolean | null
           lesson_order: number | null
+          teaching_moments: Json | null
           thumbnail_url: string | null
           title: string
           transcript: string | null
@@ -121,7 +123,9 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           id?: string
+          is_configured?: boolean | null
           lesson_order?: number | null
+          teaching_moments?: Json | null
           thumbnail_url?: string | null
           title: string
           transcript?: string | null
@@ -134,7 +138,9 @@ export type Database = {
           description?: string | null
           duration_minutes?: number | null
           id?: string
+          is_configured?: boolean | null
           lesson_order?: number | null
+          teaching_moments?: Json | null
           thumbnail_url?: string | null
           title?: string
           transcript?: string | null

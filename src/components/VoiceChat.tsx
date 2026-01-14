@@ -24,10 +24,11 @@ interface VoiceChatProps {
   videoId?: string;
   videoTitle?: string;
   videoTranscript?: string | null;
+  preConfiguredMoments?: TeachingMoment[] | null;
   isStudentMode?: boolean;
 }
 
-export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, isStudentMode = false }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, preConfiguredMoments, isStudentMode = false }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
@@ -104,14 +105,15 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
     },
   });
 
-  // Analyze content when video changes
+  // Load pre-configured moments or analyze content when video changes
   useEffect(() => {
-    if (videoId && (videoTranscript || videoContext)) {
-      analyzeContent(videoTranscript || null, videoTitle || '', videoContext);
+    if (videoId) {
+      // Use pre-configured moments if available, otherwise analyze
+      analyzeContent(videoTranscript || null, videoTitle || '', videoContext, preConfiguredMoments);
       lastCheckedMomentRef.current = -1;
       setActiveMoment(null);
     }
-  }, [videoId, videoTranscript, videoContext, videoTitle, analyzeContent]);
+  }, [videoId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent]);
 
   // Load memory context when profile is ready
   useEffect(() => {
