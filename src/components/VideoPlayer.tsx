@@ -1,4 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 
@@ -19,84 +20,40 @@ export interface VideoPlayerRef {
 interface VideoPlayerProps {
   videoId: string;
   title?: string;
-  onReady?: () => void;
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  ({ videoId, title, onReady }, ref) => {
+  ({ videoId, title }, ref) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
     const playerRef = useRef<any>(null);
-    const containerRef = useRef<HTMLDivElement | null>(null);
     const [isReady, setIsReady] = useState(false);
-    const [loadError, setLoadError] = useState<string | null>(null);
     const isReadyRef = useRef(false);
     const timeIntervalRef = useRef<number | null>(null);
     const pendingActionsRef = useRef<Array<() => void>>([]);
     const [userInteracted, setUserInteracted] = useState(false);
     const userInteractedRef = useRef(false);
-    const initTimeoutRef = useRef<number | null>(null);
 
     useEffect(() => {
-      let cancelled = false;
-
-      setLoadError(null);
-
-      const safeInit = () => {
-        if (cancelled) return;
-        if (!containerRef.current) {
-          console.log('VideoPlayer: container not ready yet');
-          // We'll retry via the polling loop below.
-          return;
-        }
-        initPlayer();
-      };
-
-      // Load YouTube IFrame API (only once)
-      if (!document.getElementById('youtube-iframe-api')) {
+      // Load YouTube IFrame API
+      if (!window.YT) {
         const tag = document.createElement('script');
-        tag.id = 'youtube-iframe-api';
         tag.src = 'https://www.youtube.com/iframe_api';
-        tag.async = true;
-        tag.onerror = () => {
-          console.warn('VideoPlayer: failed to load YouTube IFrame API');
-          setLoadError('Não foi possível carregar o player do YouTube.');
-        };
         const firstScriptTag = document.getElementsByTagName('script')[0];
         firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
       }
 
-      // If API already exists, init immediately.
-      if (window.YT && window.YT.Player) {
-        safeInit();
-      }
-
-      // Wait for API to load (polling fallback)
+      // Wait for API to load
       const checkAPI = window.setInterval(() => {
         if (window.YT && window.YT.Player) {
-          // Try to init; if the container isn't mounted yet, keep polling.
-          safeInit();
-          if (isReadyRef.current) {
-            clearInterval(checkAPI);
-          }
+          clearInterval(checkAPI);
+          initPlayer();
         }
       }, 100);
 
-      // Safety timeout in case the API is blocked (adblock/network)
-      initTimeoutRef.current = window.setTimeout(() => {
-        if (!isReadyRef.current) {
-          setLoadError('O YouTube não respondeu. Verifique bloqueador de anúncios/rede e tente novamente.');
-        }
-      }, 12000);
-
       return () => {
-        cancelled = true;
         clearInterval(checkAPI);
-        if (initTimeoutRef.current) {
-          clearTimeout(initTimeoutRef.current);
-          initTimeoutRef.current = null;
-        }
         if (timeIntervalRef.current) {
           clearInterval(timeIntervalRef.current);
           timeIntervalRef.current = null;
@@ -114,9 +71,6 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       setIsReady(false);
       isReadyRef.current = false;
       setIsPlaying(false);
-      setUserInteracted(false);
-      userInteractedRef.current = false;
-      setLoadError(null);
 
       if (timeIntervalRef.current) {
         clearInterval(timeIntervalRef.current);
@@ -130,79 +84,47 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         playerRef.current = null;
       }
 
-      if (!containerRef.current) {
-        console.log('VideoPlayer: initPlayer called but containerRef is null, will retry...');
-        // Don't set error - let the polling loop retry
-        return;
-      }
+      playerRef.current = new window.YT.Player(`youtube-player-${videoId}`, {
+        videoId: videoId,
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          enablejsapi: 1,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: () => {
+            setIsReady(true);
+            isReadyRef.current = true;
 
-      // Clear previous iframe (helps when switching videos / re-initializing)
-      containerRef.current.innerHTML = '';
+            // Keep muted by default so the first programmatic play isn't blocked.
+            // (We unmute when the agent explicitly plays/restarts.)
+            try {
+              playerRef.current?.mute();
+              setIsMuted(true);
+            } catch {
+              // ignore
+            }
 
-      try {
-        playerRef.current = new window.YT.Player(containerRef.current, {
-          videoId: videoId,
-          playerVars: {
-            autoplay: 0,
-            controls: 0,
-            modestbranding: 1,
-            rel: 0,
-            enablejsapi: 1,
-            origin: window.location.origin,
-          },
-          events: {
-            onReady: () => {
-              setIsReady(true);
-              isReadyRef.current = true;
-              setLoadError(null);
-
-              if (initTimeoutRef.current) {
-                clearTimeout(initTimeoutRef.current);
-                initTimeoutRef.current = null;
-              }
-
-              // Keep muted by default so the first programmatic play isn't blocked.
-              // (We unmute when the agent explicitly plays/restarts.)
+            // Flush any queued actions that happened before the iframe was ready
+            const queued = pendingActionsRef.current.splice(0);
+            for (const fn of queued) {
               try {
-                playerRef.current?.mute();
-                setIsMuted(true);
-              } catch {
-                // ignore
+                fn();
+              } catch (e) {
+                console.warn('VideoPlayer: queued action failed', e);
               }
+            }
 
-              // Notify parent
-              try {
-                onReady?.();
-              } catch {
-                // ignore
-              }
-
-              // Flush any queued actions that happened before the iframe was ready
-              const queued = pendingActionsRef.current.splice(0);
-              for (const fn of queued) {
-                try {
-                  fn();
-                } catch (e) {
-                  console.warn('VideoPlayer: queued action failed', e);
-                }
-              }
-
-              console.log('YouTube player ready');
-            },
-            onStateChange: (event: any) => {
-              setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
-            },
-            onError: (event: any) => {
-              console.warn('VideoPlayer: YT error', event?.data);
-              setLoadError('Erro ao carregar o vídeo do YouTube.');
-            },
+            console.log('YouTube player ready');
           },
-        });
-      } catch (e) {
-        console.warn('VideoPlayer: failed to init YT player', e);
-        setLoadError('Falha ao inicializar o player do YouTube.');
-        return;
-      }
+          onStateChange: (event: any) => {
+            setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
+          },
+        },
+      });
 
       // Update current time periodically
       timeIntervalRef.current = window.setInterval(() => {
@@ -287,38 +209,42 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           return !isPlaying;
         },
         unlockPlayback: () => {
-          console.log('VideoPlayer: unlockPlayback called, userInteracted:', userInteractedRef.current, 'isReady:', isReadyRef.current);
-
-          if (userInteractedRef.current) return;
-
-          // IMPORTANT: This must run during a real user gesture.
-          // If the player isn't ready yet, we do nothing and keep the overlay,
-          // so the user can still click it once it appears.
-          if (!playerRef.current || !isReadyRef.current) {
-            console.log('VideoPlayer: unlockPlayback skipped (player not ready yet)');
+          console.log('VideoPlayer: unlockPlayback called, userInteracted:', userInteractedRef.current);
+          
+          // Check using ref to avoid stale closures
+          if (userInteractedRef.current) {
+            console.log('VideoPlayer: Already unlocked, skipping');
             return;
           }
 
+          // Set immediately to prevent double-calls
           userInteractedRef.current = true;
           setUserInteracted(true);
 
-          // Start playing (muted) then immediately pause to unlock programmatic control
-          try {
-            playerRef.current.mute();
-            setIsMuted(true);
-            playerRef.current.playVideo();
-            window.setTimeout(() => {
-              try {
-                playerRef.current?.pauseVideo();
-                playerRef.current?.seekTo(0, true);
-                console.log('VideoPlayer: Playback unlocked by user interaction');
-              } catch (e) {
-                console.warn('Failed to finalize unlock playback:', e);
-              }
-            }, 100);
-          } catch (e) {
-            console.warn('Failed to unlock playback:', e);
-          }
+          runOrQueue(() => {
+            if (!playerRef.current) {
+              console.log('VideoPlayer: No player, skipping unlock');
+              return;
+            }
+
+            // Start playing (muted) then immediately pause to unlock programmatic control
+            try {
+              playerRef.current.mute();
+              setIsMuted(true);
+              playerRef.current.playVideo();
+              window.setTimeout(() => {
+                try {
+                  playerRef.current?.pauseVideo();
+                  playerRef.current?.seekTo(0, true);
+                  console.log('VideoPlayer: Playback unlocked by user interaction');
+                } catch (e) {
+                  console.warn('Failed to finalize unlock playback:', e);
+                }
+              }, 100);
+            } catch (e) {
+              console.warn('Failed to unlock playback:', e);
+            }
+          });
         },
       };
     }, [isPlaying]);
@@ -368,22 +294,15 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     };
 
     return (
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-          <div ref={containerRef} className="absolute inset-0 w-full h-full" />
+      <Card className="overflow-hidden">
+        <div className="relative aspect-video bg-black">
+          <div id={`youtube-player-${videoId}`} className="absolute inset-0" />
           
-          {loadError ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 px-4 text-center">
-              <p className="text-sm text-foreground">{loadError}</p>
-              <Button size="sm" variant="secondary" onClick={initPlayer}>
-                Tentar novamente
-              </Button>
-            </div>
-          ) : !isReady ? (
+          {!isReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
               <div className="animate-pulse text-muted-foreground">Carregando player...</div>
             </div>
-          ) : null}
+          )}
           
           {/* Unlock overlay - requires user click to enable programmatic control */}
           {isReady && !userInteracted && (
@@ -430,7 +349,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             <p className="text-xs sm:text-sm font-medium mt-1.5 sm:mt-2 line-clamp-1">{title}</p>
           )}
         </div>
-      </div>
+      </Card>
     );
   }
 );

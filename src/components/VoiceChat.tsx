@@ -1,4 +1,3 @@
-// VoiceChat component with AI teacher and video controls
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,12 +33,10 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
   const [debugInfo, setDebugInfo] = useState({ playerReady: false, lastAction: '' });
-  const [isVideoReady, setIsVideoReady] = useState(false);
   const [activeMoment, setActiveMoment] = useState<TeachingMoment | null>(null);
   const [showContentPlan, setShowContentPlan] = useState(false);
   const [showStudentInfo, setShowStudentInfo] = useState(false);
   const [memoryContext, setMemoryContext] = useState<string>('');
-  const [currentTime, setCurrentTime] = useState(0);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
@@ -62,23 +59,18 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   const statusRef = useRef<string>('disconnected');
 
   // Vision Analysis for emotional detection
-  // Ref to store latest emotion for sending with user interactions
-  const latestEmotionRef = useRef<EmotionAnalysis | null>(null);
-
   const {
     isActive: isVisionActive,
     currentEmotion,
     hasPermission: cameraPermission,
     startAnalysis,
     stopAnalysis,
-    captureAndAnalyze,
   } = useVisionAnalysis({
-    analysisInterval: 15000, // Background analysis every 15 seconds (just for UI indicator)
+    analysisInterval: 10000, // Analyze every 10 seconds
     onEmotionDetected: async (analysis) => {
       console.log('[VisionAnalysis] Emotion detected:', analysis);
-      latestEmotionRef.current = analysis;
       
-      // Record observation to memory (silently, without sending to agent)
+      // Record observation to memory
       recordObservation({
         observation_type: 'emotion',
         observation_data: analysis,
@@ -87,6 +79,14 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
         context: videoTitle || 'Interação com professor',
         video_id: videoId,
       });
+
+      // If engagement is low or student seems confused/frustrated, notify the AI
+      if (analysis.engagement_level === 'low' || 
+          ['confuso', 'frustrado', 'entediado', 'cansado'].includes(analysis.emotion)) {
+        if (statusRef.current === 'connected' && sendTextRef.current) {
+          sendTextRef.current(`[SISTEMA - OBSERVAÇÃO DO ALUNO] Estado emocional detectado: ${analysis.emotion}. Engajamento: ${analysis.engagement_level}. ${analysis.details}. Sugestões: ${analysis.suggestions?.join(', ') || 'Nenhuma'}`);
+        }
+      }
     },
     onError: (error) => {
       console.error('[VisionAnalysis] Error:', error);
@@ -112,7 +112,6 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
 
   // Load pre-configured moments or analyze content when video changes
   useEffect(() => {
-    setIsVideoReady(false);
     if (videoId && analyzedVideoRef.current !== videoId) {
       analyzedVideoRef.current = videoId;
       // Use pre-configured moments if available, otherwise analyze
@@ -258,17 +257,7 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
   } = useGeminiLive({
     systemInstruction,
     videoControls,
-    onTranscript: async (text, role) => {
-      // When user speaks, capture fresh emotion and send context to agent
-      if (role === 'user' && isVisionActive && statusRef.current === 'connected') {
-        const freshAnalysis = await captureAndAnalyze();
-        if (freshAnalysis) {
-          latestEmotionRef.current = freshAnalysis;
-          // Send emotion context silently before user message is processed
-          sendTextRef.current?.(`[CONTEXTO VISUAL] Estado: ${freshAnalysis.emotion}, Engajamento: ${freshAnalysis.engagement_level}. ${freshAnalysis.details}`);
-        }
-      }
-      
+    onTranscript: (text, role) => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         text,
@@ -304,19 +293,7 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
     }
   }, [status, isStudentMode, isVisionActive, isListening, startAnalysis, startListening]);
 
-  // Update video currentTime for UI (always runs when video exists)
-  useEffect(() => {
-    if (!videoId) return;
-    
-    const timeUpdateInterval = window.setInterval(() => {
-      const time = videoPlayerRef.current?.getCurrentTime() || 0;
-      setCurrentTime(time);
-    }, 1000);
-
-    return () => clearInterval(timeUpdateInterval);
-  }, [videoId]);
-
-  // Monitor video time for teaching moments (only when connected)
+  // Monitor video time for teaching moments
   useEffect(() => {
     if (status !== 'connected' || !contentPlan || !videoId) {
       if (timeCheckIntervalRef.current) {
@@ -327,12 +304,12 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
     }
 
     timeCheckIntervalRef.current = window.setInterval(() => {
-      const time = videoPlayerRef.current?.getCurrentTime() || 0;
+      const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
       const isPaused = videoPlayerRef.current?.isPaused() ?? true;
       
       // Only check for moments when video is playing
       if (!isPaused && contentPlan) {
-        const moment = checkForTeachingMoment(time);
+        const moment = checkForTeachingMoment(currentTime);
         
         if (moment && lastCheckedMomentRef.current !== contentPlan.teaching_moments.indexOf(moment)) {
           lastCheckedMomentRef.current = contentPlan.teaching_moments.indexOf(moment);
@@ -367,16 +344,11 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
   };
 
   const handleStartClass = useCallback(() => {
-    // One-click student flow: only unlock when the YouTube player is ready;
-    // otherwise the browser may block it (and the agent can't control the video).
-    if (!isVideoReady) {
-      toast.info('Aguarde o vídeo carregar antes de iniciar a aula');
-      return;
-    }
-
+    // One-click student flow: use this user gesture to unlock YouTube programmatic playback
+    // (removes the "Clique para habilitar" overlay).
     videoPlayerRef.current?.unlockPlayback?.();
     connect();
-  }, [connect, isVideoReady]);
+  }, [connect]);
 
   const toggleListening = () => {
     if (isListening) {
@@ -476,98 +448,15 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden px-3 sm:px-6 pb-3 sm:pb-6">
-        {/* Video Player - Full Width */}
+        {/* Video Player */}
         {videoId && (
-          <div className="flex-shrink-0 space-y-2">
+          <div className="flex-shrink-0">
             <VideoPlayer 
               ref={videoPlayerRef} 
               videoId={videoId} 
               title={videoTitle}
-              onReady={() => setIsVideoReady(true)}
             />
-            
-            {/* Teaching Moments Timeline - Visible markers for pause points */}
-            {contentPlan && contentPlan.teaching_moments.length > 0 && (
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 bg-amber-100 dark:bg-amber-900/50 rounded">
-                    <Target className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-                      Momentos de Pausa
-                    </span>
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                      O professor vai pausar o vídeo nestes pontos para reforçar o aprendizado
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-1.5">
-                  {contentPlan.teaching_moments.map((moment, index) => {
-                    const mins = Math.floor(moment.timestamp_seconds / 60);
-                    const secs = moment.timestamp_seconds % 60;
-                    const isActive = activeMoment === moment;
-                    const isPast = currentTime > moment.timestamp_seconds;
-                    
-                    return (
-                      <div
-                        key={index}
-                        className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-all ${
-                          isActive 
-                            ? 'bg-primary text-primary-foreground border-primary shadow-md animate-pulse' 
-                            : isPast 
-                              ? 'bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700'
-                              : 'bg-white dark:bg-card border-amber-200 dark:border-amber-700/50 hover:border-primary hover:shadow-sm'
-                        }`}
-                        onClick={() => {
-                          videoPlayerRef.current?.seekTo(Math.max(0, moment.timestamp_seconds - 5));
-                        }}
-                        title={`Clique para ir para ${mins}:${secs.toString().padStart(2, '0')}`}
-                      >
-                        {/* Time badge */}
-                        <div className={`flex-shrink-0 px-2 py-0.5 rounded font-mono text-xs font-bold ${
-                          isActive 
-                            ? 'bg-white/20 text-white' 
-                            : isPast 
-                              ? 'bg-green-500 text-white'
-                              : 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300'
-                        }`}>
-                          ⏱️ {mins}:{secs.toString().padStart(2, '0')}
-                        </div>
-                        
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-xs font-medium truncate ${
-                            isActive ? 'text-white' : isPast ? 'text-green-700 dark:text-green-300' : 'text-foreground'
-                          }`}>
-                            {moment.topic}
-                          </div>
-                          <div className={`text-[10px] truncate ${
-                            isActive ? 'text-white/80' : 'text-muted-foreground'
-                          }`}>
-                            {moment.key_insight}
-                          </div>
-                        </div>
-                        
-                        {/* Status indicator */}
-                        <div className="flex-shrink-0">
-                          {isPast ? (
-                            <span className="text-green-600 dark:text-green-400 text-[10px]">✓</span>
-                          ) : isActive ? (
-                            <Lightbulb className="h-4 w-4 text-white animate-bounce" />
-                          ) : (
-                            <span className="text-amber-500 text-[10px]">⏸</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mt-1.5 sm:mt-2">
               <p className="text-[10px] sm:text-xs text-muted-foreground">
                 💡 Diga "dê play", "pause" ou "reinicie o vídeo"
               </p>
@@ -583,7 +472,7 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
             
             {/* Debug Panel */}
             {showDebug && (
-              <div className="p-2 bg-muted/50 rounded text-xs space-y-2 border">
+              <div className="mt-2 p-2 bg-muted/50 rounded text-xs space-y-2 border">
                 <div className="font-medium">🔧 Debug Panel</div>
                 <div className="grid grid-cols-2 gap-1">
                   <span className="text-muted-foreground">Status:</span>
@@ -784,13 +673,9 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
         <div className="space-y-2 sm:space-y-3 pt-2 border-t flex-shrink-0">
           <div className="flex gap-2">
             {status === 'disconnected' || status === 'error' ? (
-              <Button
-                onClick={handleStartClass}
-                disabled={!isVideoReady}
-                className="flex-1 h-10 sm:h-11 text-sm sm:text-base"
-              >
+              <Button onClick={handleStartClass} className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
                 <Phone className="h-4 w-4 mr-2" />
-                {isVideoReady ? 'Iniciar Aula' : 'Carregando vídeo...'}
+                Iniciar Aula
               </Button>
             ) : status === 'connecting' ? (
               <Button disabled className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
