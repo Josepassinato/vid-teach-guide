@@ -43,6 +43,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
   // Keep videoControls ref updated
   useEffect(() => {
+    console.log('[GeminiLive] videoControls updated:', options.videoControls ? 'EXISTS' : 'NULL');
     videoControlsRef.current = options.videoControls || null;
   }, [options.videoControls]);
 
@@ -289,7 +290,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           }
           
           const data = JSON.parse(messageData);
-          console.log('[gemini:event]', data);
+          console.log('[gemini:event]', JSON.stringify(data).substring(0, 500));
           
           // Handle audio response
           if (data.serverContent?.modelTurn?.parts) {
@@ -300,17 +301,35 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
               if (part.text) {
                 optionsRef.current.onTranscript?.(part.text, 'assistant');
               }
-              // Handle function calls
+              // Handle function calls in parts
               if (part.functionCall) {
+                console.log('[gemini:tool] Found functionCall in part:', part.functionCall);
                 handleToolCall(part.functionCall);
               }
             }
           }
           
-          // Handle tool calls in toolCall field
+          // Handle tool calls in toolCall field (alternative format)
           if (data.toolCall?.functionCalls) {
+            console.log('[gemini:tool] Found functionCalls in toolCall:', data.toolCall.functionCalls);
             for (const fc of data.toolCall.functionCalls) {
               handleToolCall(fc);
+            }
+          }
+          
+          // Handle tool calls directly on data (another alternative format)
+          if (data.functionCall) {
+            console.log('[gemini:tool] Found functionCall on data:', data.functionCall);
+            handleToolCall(data.functionCall);
+          }
+          
+          // Handle tool calls in candidates format
+          if (data.candidates?.[0]?.content?.parts) {
+            for (const part of data.candidates[0].content.parts) {
+              if (part.functionCall) {
+                console.log('[gemini:tool] Found functionCall in candidates:', part.functionCall);
+                handleToolCall(part.functionCall);
+              }
             }
           }
           
