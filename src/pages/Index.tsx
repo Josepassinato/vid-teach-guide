@@ -15,18 +15,18 @@ const Index = () => {
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="p-2 rounded-xl gradient-primary">
-            <GraduationCap className="h-6 w-6 text-white" />
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center gap-2 sm:gap-3">
+          <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl gradient-primary">
+            <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
           </div>
-          <div>
-            <h1 className="text-xl font-bold">Professor IA</h1>
-            <p className="text-xs text-muted-foreground">Aprenda com voz em tempo real</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-bold truncate">Professor IA</h1>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Aprenda com voz em tempo real</p>
           </div>
-          <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
             <Sparkles className="h-3 w-3" />
             <span>Powered by OpenAI</span>
           </div>
@@ -34,23 +34,23 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
-        <div className="grid lg:grid-cols-2 gap-6 h-[calc(100vh-120px)]">
+      <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-6 overflow-hidden">
+        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 sm:gap-6 h-full max-h-[calc(100vh-80px)] sm:max-h-[calc(100vh-100px)] lg:max-h-[calc(100vh-120px)]">
           {/* Left Panel - Video Analysis */}
-          <div className="space-y-4 overflow-auto">
-            <div className="bg-card rounded-xl p-6 shadow-soft">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <span className="text-2xl">📹</span>
+          <div className="space-y-3 sm:space-y-4 overflow-auto flex-shrink-0 lg:flex-shrink lg:overflow-auto">
+            <div className="bg-card rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-soft">
+              <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+                <span className="text-xl sm:text-2xl">📹</span>
                 Adicionar Vídeo-Aula
               </h2>
               <VideoAnalysis onVideoAnalyzed={setVideoInfo} />
             </div>
             
             {!videoInfo && (
-              <div className="bg-muted/50 rounded-xl p-8 text-center">
-                <div className="text-4xl mb-3">🎓</div>
-                <h3 className="font-medium mb-2">Como funciona</h3>
-                <ol className="text-sm text-muted-foreground text-left max-w-md mx-auto space-y-2">
+              <div className="bg-muted/50 rounded-lg sm:rounded-xl p-4 sm:p-8 text-center">
+                <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">🎓</div>
+                <h3 className="font-medium mb-2 text-sm sm:text-base">Como funciona</h3>
+                <ol className="text-xs sm:text-sm text-muted-foreground text-left max-w-md mx-auto space-y-1.5 sm:space-y-2">
                   <li className="flex gap-2">
                     <span className="font-semibold text-primary">1.</span>
                     Cole o link de um vídeo-aula do YouTube
@@ -69,7 +69,7 @@ const Index = () => {
           </div>
           
           {/* Right Panel - Voice Chat */}
-          <div className="h-full">
+          <div className="flex-1 min-h-0 lg:h-full">
             <VoiceChat 
               videoContext={videoInfo?.analysis} 
               videoId={videoInfo?.videoId}

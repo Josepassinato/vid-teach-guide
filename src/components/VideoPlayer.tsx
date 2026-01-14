@@ -241,33 +241,33 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         </div>
         
         {/* Custom Controls */}
-        <div className="p-3 bg-card border-t">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+        <div className="p-2 sm:p-3 bg-card border-t">
+          <div className="flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2">
               {isPlaying ? (
-                <Button size="sm" variant="outline" onClick={handlePause}>
-                  <Pause className="h-4 w-4" />
+                <Button size="sm" variant="outline" onClick={handlePause} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                  <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={handlePlay}>
-                  <Play className="h-4 w-4" />
+                <Button size="sm" variant="outline" onClick={handlePlay} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                  <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </Button>
               )}
-              <Button size="sm" variant="ghost" onClick={handleRestart}>
-                <RotateCcw className="h-4 w-4" />
+              <Button size="sm" variant="ghost" onClick={handleRestart} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
-              <Button size="sm" variant="ghost" onClick={handleMute}>
-                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              <Button size="sm" variant="ghost" onClick={handleMute} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                {isMuted ? <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
               </Button>
             </div>
             
-            <span className="text-sm text-muted-foreground font-mono">
+            <span className="text-xs sm:text-sm text-muted-foreground font-mono">
               {formatTime(currentTime)}
             </span>
           </div>
           
           {title && (
-            <p className="text-sm font-medium mt-2 line-clamp-1">{title}</p>
+            <p className="text-xs sm:text-sm font-medium mt-1.5 sm:mt-2 line-clamp-1">{title}</p>
           )}
         </div>
       </Card>
