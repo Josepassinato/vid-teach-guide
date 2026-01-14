@@ -38,10 +38,10 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-6 overflow-hidden">
-        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 sm:gap-6 h-full max-h-[calc(100vh-80px)] sm:max-h-[calc(100vh-100px)] lg:max-h-[calc(100vh-120px)]">
+      <main className="flex-1 container mx-auto px-3 sm:px-4 py-4 sm:py-6 overflow-y-auto">
+        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 sm:gap-6 lg:h-[calc(100vh-120px)]">
           {/* Left Panel - Video Analysis */}
-          <div className="space-y-3 sm:space-y-4 overflow-auto flex-shrink-0 lg:flex-shrink lg:overflow-auto">
+          <div className="space-y-3 sm:space-y-4 lg:overflow-auto">
             <div className="bg-card rounded-lg sm:rounded-xl p-4 sm:p-6 shadow-soft">
               <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 flex items-center gap-2">
                 <span className="text-xl sm:text-2xl">📹</span>
@@ -73,7 +73,7 @@ const Index = () => {
           </div>
           
           {/* Right Panel - Voice Chat */}
-          <div className="flex-1 min-h-0 lg:h-full">
+          <div className="min-h-[400px] lg:h-full">
             <VoiceChat 
               videoContext={videoInfo?.analysis} 
               videoId={videoInfo?.videoId}
