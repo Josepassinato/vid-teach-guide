@@ -1,11 +1,22 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export interface VideoControls {
+  play: () => void;
+  pause: () => void;
+  restart: () => void;
+  seekTo: (seconds: number) => void;
+  getCurrentTime: () => number;
+  isPaused: () => boolean;
+}
 
 interface UseGeminiLiveOptions {
   systemInstruction?: string;
   onTranscript?: (text: string, role: 'user' | 'assistant') => void;
   onError?: (error: string) => void;
   onStatusChange?: (status: ConnectionStatus) => void;
+  videoControls?: VideoControls | null;
 }
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -21,11 +32,24 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
+  const videoControlsRef = useRef<VideoControls | null>(null);
+  const processedCallIdsRef = useRef<Set<string>>(new Set());
+
+  // Store callbacks in refs to avoid dependency issues
+  const optionsRef = useRef(options);
+  useEffect(() => {
+    optionsRef.current = options;
+  });
+
+  // Keep videoControls ref updated
+  useEffect(() => {
+    videoControlsRef.current = options.videoControls || null;
+  }, [options.videoControls]);
 
   const updateStatus = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
-    options.onStatusChange?.(newStatus);
-  }, [options.onStatusChange]);
+    optionsRef.current.onStatusChange?.(newStatus);
+  }, []);
 
   const playQueue = useCallback(async (ctx: AudioContext) => {
     while (audioQueueRef.current.length > 0) {
@@ -95,47 +119,148 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     setIsListening(false);
   }, []);
 
+  const handleToolCall = useCallback((functionCall: any) => {
+    const name = functionCall.name;
+    const callId = functionCall.id || `call_${Date.now()}`;
+    const args = functionCall.args || {};
+
+    if (processedCallIdsRef.current.has(callId)) return;
+    processedCallIdsRef.current.add(callId);
+
+    console.log('[gemini:tool-call]', name, args, callId);
+    console.log('[gemini:tool-call] videoControlsRef.current:', videoControlsRef.current ? 'EXISTS' : 'NULL');
+
+    let result: any = { ok: true };
+
+    if (videoControlsRef.current) {
+      switch (name) {
+        case "play_video":
+          console.log('[gemini:tool-call] Executing play_video');
+          toast.success('▶️ Dando play no vídeo...');
+          videoControlsRef.current.play();
+          result = { ok: true, message: "Vídeo iniciado" };
+          break;
+        case "pause_video":
+          console.log('[gemini:tool-call] Executing pause_video');
+          toast.success('⏸️ Pausando vídeo...');
+          videoControlsRef.current.pause();
+          result = { ok: true, message: "Vídeo pausado" };
+          break;
+        case "restart_video":
+          console.log('[gemini:tool-call] Executing restart_video');
+          toast.success('🔄 Reiniciando vídeo...');
+          videoControlsRef.current.restart();
+          result = { ok: true, message: "Vídeo reiniciado" };
+          break;
+        case "seek_video":
+          console.log('[gemini:tool-call] Executing seek_video to', args.seconds);
+          toast.success(`⏩ Pulando para ${Number(args.seconds) || 0}s...`);
+          videoControlsRef.current.seekTo(Number(args.seconds) || 0);
+          result = { ok: true, message: `Vídeo pulou para ${Number(args.seconds) || 0} segundos` };
+          break;
+        default:
+          console.warn('[gemini:tool-call] Unknown function:', name);
+          result = { ok: false, message: `Função desconhecida: ${name}` };
+      }
+    } else {
+      console.warn('[gemini:tool-call] videoControlsRef.current is NULL - cannot execute', name);
+      toast.error('❌ Nenhum vídeo carregado');
+      result = { ok: false, message: "Nenhum vídeo carregado" };
+    }
+
+    // Send tool response back to Gemini
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        toolResponse: {
+          functionResponses: [{
+            id: callId,
+            name: name,
+            response: result
+          }]
+        }
+      }));
+    }
+  }, []);
+
   const connect = useCallback(async () => {
     try {
       updateStatus('connecting');
       
-      // Get ephemeral token
+      const currentOptions = optionsRef.current;
+      
+      // Get API key from edge function
       const { data, error } = await supabase.functions.invoke('gemini-token', {
-        body: { systemInstruction: options.systemInstruction }
+        body: { systemInstruction: currentOptions.systemInstruction }
       });
       
       if (error || !data?.token) {
         throw new Error(error?.message || 'Failed to get token');
       }
       
-      // Connect to Gemini Live API
+      // Connect to Gemini Live API with Gemini 2.5
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.token}`;
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected to Gemini');
+        processedCallIdsRef.current.clear();
         
-        // Send setup message with Gemini 2.0 Flash Live (supports Live API)
+        // Define tools for video control
+        const tools = [{
+          functionDeclarations: [
+            {
+              name: "play_video",
+              description: "Inicia ou retoma a reprodução do vídeo. Use quando o aluno pedir para dar play, iniciar, continuar ou reproduzir o vídeo."
+            },
+            {
+              name: "pause_video",
+              description: "Pausa a reprodução do vídeo. Use quando o aluno pedir para pausar, parar ou interromper o vídeo."
+            },
+            {
+              name: "restart_video",
+              description: "Reinicia o vídeo do começo. Use quando o aluno pedir para voltar ao início, reiniciar ou começar de novo."
+            },
+            {
+              name: "seek_video",
+              description: "Pula para um momento específico do vídeo em segundos. Use quando o aluno pedir para ir para um tempo específico.",
+              parameters: {
+                type: "object",
+                properties: {
+                  seconds: { 
+                    type: "number", 
+                    description: "O tempo em segundos para pular" 
+                  }
+                },
+                required: ["seconds"]
+              }
+            }
+          ]
+        }];
+        
+        // Send setup message with Gemini 2.5 Flash
+        // Using Aoede voice - natural, warm female voice perfect for teaching
+        // Other options: Charon (deep male), Fenrir (energetic), Kore (warm female), Puck (playful)
         ws.send(JSON.stringify({
           setup: {
-            model: "models/gemini-2.0-flash-live-001",
+            model: "models/gemini-2.5-flash-preview-native-audio-dialog",
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: "Puck"
+                    voiceName: "Aoede"
                   }
                 }
               }
             },
             systemInstruction: {
               parts: [{
-                text: options.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro."
+                text: currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro."
               }]
-            }
+            },
+            tools: tools
           }
         }));
         
@@ -145,6 +270,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       ws.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log('[gemini:event]', data);
           
           // Handle audio response
           if (data.serverContent?.modelTurn?.parts) {
@@ -153,8 +279,19 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
                 await playAudioChunk(part.inlineData.data);
               }
               if (part.text) {
-                options.onTranscript?.(part.text, 'assistant');
+                optionsRef.current.onTranscript?.(part.text, 'assistant');
               }
+              // Handle function calls
+              if (part.functionCall) {
+                handleToolCall(part.functionCall);
+              }
+            }
+          }
+          
+          // Handle tool calls in toolCall field
+          if (data.toolCall?.functionCalls) {
+            for (const fc of data.toolCall.functionCalls) {
+              handleToolCall(fc);
             }
           }
           
@@ -164,6 +301,11 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
             isPlayingRef.current = false;
             setIsSpeaking(false);
           }
+
+          // Handle setup complete
+          if (data.setupComplete) {
+            console.log('[gemini] Setup complete');
+          }
         } catch (e) {
           console.error('Error processing message:', e);
         }
@@ -172,7 +314,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         updateStatus('error');
-        options.onError?.('Connection error');
+        optionsRef.current.onError?.('Connection error');
       };
       
       ws.onclose = () => {
@@ -184,9 +326,9 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     } catch (error) {
       console.error('Connection error:', error);
       updateStatus('error');
-      options.onError?.(error instanceof Error ? error.message : 'Connection failed');
+      optionsRef.current.onError?.(error instanceof Error ? error.message : 'Connection failed');
     }
-  }, [options.systemInstruction, updateStatus, playAudioChunk, stopListening, options.onTranscript, options.onError]);
+  }, [updateStatus, playAudioChunk, stopListening, handleToolCall]);
 
   const disconnect = useCallback(() => {
     stopListening();
@@ -204,7 +346,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
   const startListening = useCallback(async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      options.onError?.('Not connected');
+      optionsRef.current.onError?.('Not connected');
       return;
     }
     
@@ -263,13 +405,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       
     } catch (error) {
       console.error('Microphone error:', error);
-      options.onError?.('Could not access microphone');
+      optionsRef.current.onError?.('Could not access microphone');
     }
-  }, [options.onError]);
+  }, []);
 
   const sendText = useCallback((text: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      options.onError?.('Not connected');
+      optionsRef.current.onError?.('Not connected');
       return;
     }
     
@@ -283,8 +425,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       }
     }));
     
-    options.onTranscript?.(text, 'user');
-  }, [options.onError, options.onTranscript]);
+    optionsRef.current.onTranscript?.(text, 'user');
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
