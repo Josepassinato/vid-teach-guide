@@ -72,21 +72,28 @@ const Student = () => {
   });
   useEffect(() => {
     const loadSavedVideos = async () => {
+      console.log('[Student] Loading saved videos...');
       try {
         const { data, error } = await supabase
           .from('videos')
           .select('*')
           .order('lesson_order', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+          console.error('[Student] Error loading videos:', error);
+          throw error;
+        }
+        
+        console.log('[Student] Videos loaded:', data?.length || 0);
         setSavedVideos(data || []);
         
         // Auto-select first lesson
         if (data && data.length > 0) {
+          console.log('[Student] Auto-selecting first video:', data[0].title);
           selectVideo(data[0], 0);
         }
       } catch (err) {
-        console.error('Error loading saved videos:', err);
+        console.error('[Student] Error loading saved videos:', err);
       } finally {
         setIsLoadingVideos(false);
       }
@@ -96,10 +103,19 @@ const Student = () => {
   }, []);
 
   const selectVideo = (video: SavedVideo, index: number) => {
+    console.log('[Student] Selecting video:', {
+      id: video.id,
+      title: video.title,
+      hasTranscript: !!video.transcript,
+      teachingMomentsCount: Array.isArray(video.teaching_moments) ? video.teaching_moments.length : 0
+    });
+    
     // Parse teaching moments from JSON
     const moments = Array.isArray(video.teaching_moments) 
       ? video.teaching_moments as TeachingMoment[]
       : null;
+    
+    console.log('[Student] Parsed teaching moments:', moments?.length || 0);
     
     setSelectedVideo({
       videoId: video.youtube_id,

@@ -47,8 +47,16 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
     analysis?: string,
     preConfiguredMoments?: TeachingMoment[] | null
   ) => {
+    console.log('[ContentManager] analyzeContent called:', {
+      hasTranscript: !!transcript,
+      title,
+      hasAnalysis: !!analysis,
+      preConfiguredMomentsCount: preConfiguredMoments?.length || 0
+    });
+
     // If we have pre-configured moments, use them instead of generating
     if (preConfiguredMoments && preConfiguredMoments.length > 0) {
+      console.log('[ContentManager] Using pre-configured moments');
       const plan = loadPreConfiguredMoments(preConfiguredMoments);
       if (plan) {
         toast.success(`📚 ${plan.teaching_moments.length} momentos de ensino carregados`);
@@ -58,10 +66,11 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
 
     // No pre-configured moments, need transcript to generate
     if (!transcript && !analysis) {
-      // Silently skip - no content to analyze
+      console.log('[ContentManager] No content to analyze, skipping');
       return null;
     }
 
+    console.log('[ContentManager] Calling AI to generate teaching moments...');
     setIsLoading(true);
     
     try {
@@ -70,6 +79,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       });
 
       if (error) {
+        console.error('[ContentManager] Edge function error:', error);
         // Check if it's a rate limit error - fail silently
         if (error.message?.includes('429') || error.message?.includes('rate limit')) {
           console.warn('[ContentManager] Rate limited, skipping AI analysis');
@@ -78,6 +88,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
         throw error;
       }
 
+      console.log('[ContentManager] AI response received:', data);
       const plan: ContentPlan = data;
       setContentPlan(plan);
       setCurrentMomentIndex(-1);
@@ -87,8 +98,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       
       return plan;
     } catch (error) {
-      // Fail silently for most errors - pre-configured moments are preferred anyway
-      console.warn('[ContentManager] AI analysis failed:', error);
+      console.error('[ContentManager] AI analysis failed:', error);
       return null;
     } finally {
       setIsLoading(false);

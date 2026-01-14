@@ -184,18 +184,23 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
   const connect = useCallback(async () => {
     try {
+      console.log('[GeminiLive] Starting connection...');
       updateStatus('connecting');
       
       const currentOptions = optionsRef.current;
       
       // Get API key from edge function
+      console.log('[GeminiLive] Requesting token from edge function...');
       const { data, error } = await supabase.functions.invoke('gemini-token', {
         body: { systemInstruction: currentOptions.systemInstruction }
       });
       
       if (error || !data?.token) {
+        console.error('[GeminiLive] Token error:', error);
         throw new Error(error?.message || 'Failed to get token');
       }
+      
+      console.log('[GeminiLive] Token received, connecting to WebSocket...');
       
       // Connect to Gemini Live API with Gemini 2.5
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.token}`;
@@ -312,19 +317,19 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       };
       
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('[GeminiLive] WebSocket error:', error);
         updateStatus('error');
         optionsRef.current.onError?.('Connection error');
       };
       
-      ws.onclose = () => {
-        console.log('WebSocket closed');
+      ws.onclose = (event) => {
+        console.log('[GeminiLive] WebSocket closed:', { code: event.code, reason: event.reason });
         updateStatus('disconnected');
         stopListening();
       };
       
     } catch (error) {
-      console.error('Connection error:', error);
+      console.error('[GeminiLive] Connection error:', error);
       updateStatus('error');
       optionsRef.current.onError?.(error instanceof Error ? error.message : 'Connection failed');
     }
