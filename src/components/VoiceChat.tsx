@@ -41,10 +41,13 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   const [showStudentInfo, setShowStudentInfo] = useState(false);
   const [memoryContext, setMemoryContext] = useState<string>('');
   const [activeQuiz, setActiveQuiz] = useState<TimestampQuiz | null>(null);
+  const [agentMode, setAgentMode] = useState<'idle' | 'intro' | 'teaching' | 'playing'>('idle');
+  const [pendingReconnect, setPendingReconnect] = useState<{type: 'moment' | 'quiz', data: any} | null>(null);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
   const analyzedVideoRef = useRef<string | null>(null);
+  const introCompletedRef = useRef<boolean>(false);
   
   // Generate student ID
   const [studentId] = useState(() => {
@@ -358,26 +361,69 @@ MINI QUIZZES (Perguntas interativas):
     statusRef.current = status;
   }, [sendText, status]);
 
-  // Auto-start vision analysis when agent connects
-  // Auto-start everything when agent connects (vision + microphone)
+  // Handle agent connection events - process pending actions
   useEffect(() => {
-    if (status === 'connected' && isStudentMode) {
-      // Small delay to ensure everything is ready, then start vision and microphone
-      const timer = setTimeout(() => {
-        if (!isVisionActive) {
-          startAnalysis();
-        }
-        if (!isListening) {
-          startListening();
-        }
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [status, isStudentMode, isVisionActive, isListening, startAnalysis, startListening]);
+    if (status === 'connected') {
+      // Start microphone when connected
+      if (!isListening) {
+        startListening();
+      }
+      
+      // Process any pending reconnect actions
+      if (pendingReconnect) {
+        const { type, data } = pendingReconnect;
+        setPendingReconnect(null);
+        
+        if (type === 'moment') {
+          setActiveMoment(data);
+          const instruction = generateTeacherInstructions(data);
+          setTimeout(() => sendText(instruction), 500);
+          toast.info(`🎯 Momento de aprofundamento: ${data.topic}`, { duration: 5000 });
+        } else if (type === 'quiz') {
+          setActiveQuiz(data);
+          const quizInstruction = `🎯 MINI QUIZ! Hora de testar o conhecimento do aluno!
+          
+Pergunta: "${data.question}"
 
-  // Monitor video time for teaching moments and quizzes
+Opções:
+${data.options.map((opt: string, i: number) => `${String.fromCharCode(65 + i)}) ${opt}`).join('\n')}
+
+INSTRUÇÕES:
+1. Leia a pergunta de forma clara e pausada
+2. Leia cada opção (A, B, C, D)
+3. Diga "Você tem alguns segundos para pensar!"
+4. Aguarde - o sistema vai revelar a resposta automaticamente na tela`;
+          setTimeout(() => sendText(quizInstruction), 500);
+          toast.info('📝 Mini Quiz!', { duration: 3000 });
+        }
+      }
+      
+      // Handle intro mode - agent starts class
+      if (agentMode === 'intro' && !introCompletedRef.current) {
+        introCompletedRef.current = true;
+        // After intro speech, start video and disconnect to save tokens
+        const introTimeout = setTimeout(() => {
+          if (statusRef.current === 'connected') {
+            sendText('[SISTEMA] Sua introdução foi ótima! Agora vou começar o vídeo. Você será reconectado nos momentos de pausa para interagir com o aluno.');
+            setTimeout(() => {
+              videoPlayerRef.current?.play();
+              setAgentMode('playing');
+              // Disconnect after a brief moment to let the goodbye play
+              setTimeout(() => {
+                disconnect();
+              }, 3000);
+            }, 2000);
+          }
+        }, 15000); // Give 15 seconds for intro
+        
+        return () => clearTimeout(introTimeout);
+      }
+    }
+  }, [status, pendingReconnect, agentMode, isListening, startListening, sendText, generateTeacherInstructions, disconnect]);
+
+  // Monitor video time for teaching moments and quizzes (works even when disconnected)
   useEffect(() => {
-    if (status !== 'connected' || !videoId) {
+    if (!videoId) {
       if (timeCheckIntervalRef.current) {
         clearInterval(timeCheckIntervalRef.current);
         timeCheckIntervalRef.current = null;
@@ -390,17 +436,19 @@ MINI QUIZZES (Perguntas interativas):
       const isPaused = videoPlayerRef.current?.isPaused() ?? true;
       
       // Only check when video is playing and no quiz is active
-      if (!isPaused && !activeQuiz) {
+      if (!isPaused && !activeQuiz && agentMode === 'playing') {
         // Check for timestamp quizzes first
         const quiz = getQuizForTimestamp(currentTime);
         if (quiz) {
           markQuizTriggered(quiz.id);
-          setActiveQuiz(quiz);
           videoPlayerRef.current?.pause();
+          setAgentMode('teaching');
           
-          // Tell the agent to announce the quiz
-          const quizInstruction = `🎯 MINI QUIZ! Hora de testar o conhecimento do aluno!
-          
+          // If agent is connected, send instruction. Otherwise, reconnect first.
+          if (status === 'connected') {
+            setActiveQuiz(quiz);
+            const quizInstruction = `🎯 MINI QUIZ! Hora de testar o conhecimento do aluno!
+            
 Pergunta: "${quiz.question}"
 
 Opções:
@@ -411,9 +459,13 @@ INSTRUÇÕES:
 2. Leia cada opção (A, B, C, D)
 3. Diga "Você tem alguns segundos para pensar!"
 4. Aguarde - o sistema vai revelar a resposta automaticamente na tela`;
-          
-          sendText(quizInstruction);
-          toast.info('📝 Mini Quiz!', { duration: 3000 });
+            sendText(quizInstruction);
+            toast.info('📝 Mini Quiz!', { duration: 3000 });
+          } else {
+            // Queue the quiz and reconnect
+            setPendingReconnect({ type: 'quiz', data: quiz });
+            connect();
+          }
           return;
         }
 
@@ -423,18 +475,20 @@ INSTRUÇÕES:
           
           if (moment && lastCheckedMomentRef.current !== contentPlan.teaching_moments.indexOf(moment)) {
             lastCheckedMomentRef.current = contentPlan.teaching_moments.indexOf(moment);
-            setActiveMoment(moment);
-            
-            // Pause the video
             videoPlayerRef.current?.pause();
+            setAgentMode('teaching');
             
-            // Send teaching moment instruction to the AI
-            const instruction = generateTeacherInstructions(moment);
-            sendText(instruction);
-            
-            toast.info(`🎯 Momento de aprofundamento: ${moment.topic}`, {
-              duration: 5000,
-            });
+            // If agent is connected, send instruction. Otherwise, reconnect first.
+            if (status === 'connected') {
+              setActiveMoment(moment);
+              const instruction = generateTeacherInstructions(moment);
+              sendText(instruction);
+              toast.info(`🎯 Momento de aprofundamento: ${moment.topic}`, { duration: 5000 });
+            } else {
+              // Queue the moment and reconnect
+              setPendingReconnect({ type: 'moment', data: moment });
+              connect();
+            }
           }
         }
       }
@@ -446,7 +500,7 @@ INSTRUÇÕES:
         timeCheckIntervalRef.current = null;
       }
     };
-  }, [status, contentPlan, videoId, activeQuiz, checkForTeachingMoment, generateTeacherInstructions, sendText, getQuizForTimestamp, markQuizTriggered]);
+  }, [status, contentPlan, videoId, activeQuiz, agentMode, checkForTeachingMoment, generateTeacherInstructions, sendText, getQuizForTimestamp, markQuizTriggered, connect]);
 
   // Handle quiz completion
   const handleQuizComplete = useCallback((selectedIndex: number, isCorrect: boolean) => {
@@ -457,19 +511,28 @@ INSTRUÇÕES:
     
     // Tell the agent the result
     const resultText = isCorrect 
-      ? `[SISTEMA] O aluno acertou o quiz! A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Parabenize o aluno e continue a aula.`
+      ? `[SISTEMA] O aluno acertou o quiz! A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Parabenize brevemente e diga que vamos continuar o vídeo.`
       : selectedIndex === -1
-        ? `[SISTEMA] O tempo do quiz acabou sem resposta. A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique brevemente por que essa era a resposta certa e continue.`
-        : `[SISTEMA] O aluno errou o quiz. Ele escolheu "${activeQuiz.options[selectedIndex]}" mas a correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique por que a resposta correta é a certa, de forma encorajadora, e continue.`;
+        ? `[SISTEMA] O tempo do quiz acabou sem resposta. A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique em uma frase e diga que vamos continuar.`
+        : `[SISTEMA] O aluno errou o quiz. A correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique brevemente de forma encorajadora e diga que vamos continuar.`;
     
-    sendText(resultText);
+    if (status === 'connected') {
+      sendText(resultText);
+    }
     setActiveQuiz(null);
     
-    // Resume video after a delay
+    // Resume video and disconnect after feedback
     setTimeout(() => {
       videoPlayerRef.current?.play();
+      setAgentMode('playing');
+      // Disconnect to save tokens while video plays
+      setTimeout(() => {
+        if (statusRef.current === 'connected') {
+          disconnect();
+        }
+      }, 5000); // Give time for agent to finish speaking
     }, 2000);
-  }, [activeQuiz, recordAttempt, sendText]);
+  }, [activeQuiz, recordAttempt, sendText, status, disconnect]);
 
   const handleSendText = () => {
     if (!textInput.trim()) return;
@@ -479,10 +542,25 @@ INSTRUÇÕES:
 
   const handleStartClass = useCallback(() => {
     // One-click student flow: use this user gesture to unlock YouTube programmatic playback
-    // (removes the "Clique para habilitar" overlay).
     videoPlayerRef.current?.unlockPlayback?.();
+    introCompletedRef.current = false;
+    setAgentMode('intro');
     connect();
   }, [connect]);
+
+  // Handle dismissing teaching moment - resume video and disconnect
+  const handleDismissMoment = useCallback(() => {
+    setActiveMoment(null);
+    videoPlayerRef.current?.play();
+    setAgentMode('playing');
+    // Disconnect to save tokens
+    setTimeout(() => {
+      if (statusRef.current === 'connected') {
+        sendText('[SISTEMA] O aluno quer continuar o vídeo. Diga "Bora continuar!" e vamos retomar.');
+        setTimeout(() => disconnect(), 3000);
+      }
+    }, 500);
+  }, [disconnect, sendText]);
 
   const toggleListening = () => {
     if (isListening) {
@@ -493,24 +571,28 @@ INSTRUÇÕES:
   };
 
   const dismissActiveMoment = () => {
-    setActiveMoment(null);
+    handleDismissMoment();
   };
 
   const getStatusColor = () => {
+    if (agentMode === 'playing' && status === 'disconnected') return 'bg-google-blue';
     switch (status) {
-      case 'connected': return 'bg-green-500';
-      case 'connecting': return 'bg-yellow-500';
-      case 'error': return 'bg-red-500';
+      case 'connected': return 'bg-google-green';
+      case 'connecting': return 'bg-google-yellow';
+      case 'error': return 'bg-google-red';
       default: return 'bg-muted';
     }
   };
 
   const getStatusText = () => {
+    if (agentMode === 'playing' && status === 'disconnected') return '▶️ Assistindo';
+    if (agentMode === 'intro') return '👋 Introdução';
+    if (agentMode === 'teaching') return '🎓 Ensinando';
     switch (status) {
-      case 'connected': return 'Conectado';
+      case 'connected': return 'Professor ativo';
       case 'connecting': return 'Conectando...';
       case 'error': return 'Erro de conexão';
-      default: return 'Desconectado';
+      default: return 'Aguardando';
     }
   };
 
