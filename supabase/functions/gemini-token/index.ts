@@ -28,7 +28,7 @@ serve(async (req) => {
       JSON.stringify({ 
         token: GOOGLE_API_KEY,
         expiresAt: expireTime,
-        model: "gemini-1.5-pro-latest",
+        model: "gemini-2.5-flash-preview-native-audio-dialog",
         systemInstruction: systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Quando o aluno mencionar um vídeo ou conteúdo, analise e explique os pontos principais de forma acessível. Fale em português brasileiro.",
       }),
       {
