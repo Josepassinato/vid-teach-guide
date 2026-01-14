@@ -249,7 +249,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         // Other options: Charon (deep male), Fenrir (energetic), Kore (warm female), Puck (playful)
         ws.send(JSON.stringify({
           setup: {
-            model: "models/gemini-2.0-flash-live-001",
+            model: "models/gemini-2.0-flash-exp",
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
