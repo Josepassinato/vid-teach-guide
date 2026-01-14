@@ -18,9 +18,59 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
-async function fetchTranscript(videoId: string): Promise<string | null> {
+async function fetchTranscriptViaYouTubeAPI(videoId: string, apiKey: string): Promise<string | null> {
   try {
-    // Method 1: Try fetching YouTube page and extracting captions URL directly
+    console.log("Attempting YouTube Data API for video:", videoId);
+    
+    // Step 1: Get caption track list
+    const captionsListUrl = `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${apiKey}`;
+    const captionsResponse = await fetch(captionsListUrl);
+    
+    if (!captionsResponse.ok) {
+      const errorText = await captionsResponse.text();
+      console.log("YouTube API captions list failed:", captionsResponse.status, errorText);
+      return null;
+    }
+    
+    const captionsData = await captionsResponse.json();
+    console.log("YouTube API found captions:", captionsData.items?.length || 0);
+    
+    if (!captionsData.items || captionsData.items.length === 0) {
+      console.log("No captions available via YouTube API");
+      return null;
+    }
+    
+    // Prefer Portuguese, then English, then any
+    let selectedCaption = captionsData.items.find((c: any) => 
+      c.snippet.language === 'pt' || c.snippet.language === 'pt-BR'
+    );
+    if (!selectedCaption) {
+      selectedCaption = captionsData.items.find((c: any) => 
+        c.snippet.language?.startsWith('pt')
+      );
+    }
+    if (!selectedCaption) {
+      selectedCaption = captionsData.items.find((c: any) => 
+        c.snippet.language === 'en' || c.snippet.language?.startsWith('en')
+      );
+    }
+    if (!selectedCaption) {
+      selectedCaption = captionsData.items[0];
+    }
+    
+    console.log("Selected caption track:", selectedCaption.snippet.language, selectedCaption.id);
+    
+    // Note: Downloading caption tracks requires OAuth, so we fall back to other methods
+    // But having the caption info confirms the video HAS captions
+    return null; // Will try scraping next with confirmation that captions exist
+  } catch (error) {
+    console.error("YouTube API error:", error);
+    return null;
+  }
+}
+
+async function fetchTranscriptViaScraping(videoId: string): Promise<string | null> {
+  try {
     console.log("Attempting YouTube page scraping for video:", videoId);
     
     const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
@@ -28,78 +78,105 @@ async function fetchTranscript(videoId: string): Promise<string | null> {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       }
     });
     
-    if (pageResponse.ok) {
-      const html = await pageResponse.text();
-      
-      // Try to extract captions URL from playerCaptionsTracklistRenderer
-      const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/s);
-      if (captionMatch) {
-        try {
-          const captionTracks = JSON.parse(captionMatch[1]);
+    if (!pageResponse.ok) {
+      console.log("Failed to fetch YouTube page:", pageResponse.status);
+      return null;
+    }
+    
+    const html = await pageResponse.text();
+    
+    // Try to extract captions URL from playerCaptionsTracklistRenderer
+    const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/s);
+    if (captionMatch) {
+      try {
+        const captionTracks = JSON.parse(captionMatch[1]);
+        
+        if (captionTracks && captionTracks.length > 0) {
+          console.log("Found caption tracks via scraping:", captionTracks.length);
           
-          if (captionTracks && captionTracks.length > 0) {
-            console.log("Found caption tracks:", captionTracks.length);
+          // Prefer Portuguese, then English, then any available
+          let selectedTrack = captionTracks.find((t: any) => t.languageCode === 'pt' || t.languageCode === 'pt-BR');
+          if (!selectedTrack) {
+            selectedTrack = captionTracks.find((t: any) => t.languageCode?.startsWith('pt'));
+          }
+          if (!selectedTrack) {
+            selectedTrack = captionTracks.find((t: any) => t.languageCode === 'en' || t.languageCode?.startsWith('en'));
+          }
+          if (!selectedTrack) {
+            selectedTrack = captionTracks[0];
+          }
+          
+          const captionUrl = selectedTrack.baseUrl;
+          if (captionUrl) {
+            console.log("Fetching captions from URL for language:", selectedTrack.languageCode);
+            const captionResponse = await fetch(captionUrl);
             
-            // Prefer Portuguese, then English, then any available
-            let selectedTrack = captionTracks.find((t: any) => t.languageCode === 'pt' || t.languageCode === 'pt-BR');
-            if (!selectedTrack) {
-              selectedTrack = captionTracks.find((t: any) => t.languageCode?.startsWith('pt'));
-            }
-            if (!selectedTrack) {
-              selectedTrack = captionTracks.find((t: any) => t.languageCode === 'en' || t.languageCode?.startsWith('en'));
-            }
-            if (!selectedTrack) {
-              selectedTrack = captionTracks[0];
-            }
-            
-            const captionUrl = selectedTrack.baseUrl;
-            if (captionUrl) {
-              console.log("Fetching captions from URL for language:", selectedTrack.languageCode);
-              const captionResponse = await fetch(captionUrl);
+            if (captionResponse.ok) {
+              const captionXml = await captionResponse.text();
+              const transcript = parseTranscriptXml(captionXml);
               
-              if (captionResponse.ok) {
-                const captionXml = await captionResponse.text();
-                
-                const textMatches = captionXml.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
-                const texts: string[] = [];
-                
-                for (const match of textMatches) {
-                  let text = match[1]
-                    .replace(/&amp;/g, '&')
-                    .replace(/&lt;/g, '<')
-                    .replace(/&gt;/g, '>')
-                    .replace(/&quot;/g, '"')
-                    .replace(/&#39;/g, "'")
-                    .replace(/\n/g, ' ')
-                    .trim();
-                  
-                  if (text) {
-                    texts.push(text);
-                  }
-                }
-                
-                if (texts.length > 0) {
-                  const transcript = texts.join(' ');
-                  console.log("Transcript extracted from YouTube page:", transcript.length, "chars");
-                  if (transcript.length > 200) {
-                    return transcript.length > 12000 ? transcript.substring(0, 12000) + '...' : transcript;
-                  }
-                }
+              if (transcript && transcript.length > 200) {
+                console.log("Transcript extracted via scraping:", transcript.length, "chars");
+                return transcript.length > 15000 ? transcript.substring(0, 15000) + '...' : transcript;
               }
             }
           }
-        } catch (e) {
-          console.error("Failed to parse caption tracks:", e);
         }
+      } catch (e) {
+        console.error("Failed to parse caption tracks:", e);
       }
     }
     
-    // Method 2: Try using youtubetranscript.com API
-    console.log("Attempting to fetch transcript via youtubetranscript.com...");
+    return null;
+  } catch (error) {
+    console.error("Scraping error:", error);
+    return null;
+  }
+}
+
+async function fetchTranscriptViaTimedText(videoId: string): Promise<string | null> {
+  console.log("Attempting direct timedtext API...");
+  
+  const languages = ['pt', 'pt-BR', 'en', 'a.pt', 'a.en'];
+  
+  for (const lang of languages) {
+    const timedTextUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}`;
     
+    try {
+      const ttResponse = await fetch(timedTextUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        }
+      });
+      
+      if (ttResponse.ok) {
+        const xml = await ttResponse.text();
+        
+        if (xml && xml.includes('<text')) {
+          const transcript = parseTranscriptXml(xml);
+          
+          if (transcript && transcript.length > 200) {
+            console.log(`Transcript found via timedtext API (${lang}):`, transcript.length, "chars");
+            return transcript.length > 15000 ? transcript.substring(0, 15000) + '...' : transcript;
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`timedtext API failed for ${lang}:`, e);
+    }
+  }
+  
+  return null;
+}
+
+async function fetchTranscriptViaThirdParty(videoId: string): Promise<string | null> {
+  console.log("Attempting third-party transcript service...");
+  
+  try {
     const transcriptApiUrl = `https://youtubetranscript.com/?server_vid2=${videoId}`;
     const response = await fetch(transcriptApiUrl, {
       headers: {
@@ -109,92 +186,64 @@ async function fetchTranscript(videoId: string): Promise<string | null> {
     
     if (response.ok) {
       const html = await response.text();
+      const transcript = parseTranscriptXml(html);
       
-      // Parse the transcript from the response
-      const textMatches = html.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
-      const texts: string[] = [];
-      
-      for (const match of textMatches) {
-        let text = match[1]
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/\n/g, ' ')
-          .trim();
-        
-        if (text) {
-          texts.push(text);
-        }
-      }
-      
-      if (texts.length > 0) {
-        const transcript = texts.join(' ');
-        console.log("Transcript found via youtubetranscript.com:", transcript.length, "chars");
-        if (transcript.length > 200) {
-          return transcript.length > 12000 ? transcript.substring(0, 12000) + '...' : transcript;
-        }
+      if (transcript && transcript.length > 200) {
+        console.log("Transcript found via third-party:", transcript.length, "chars");
+        return transcript.length > 15000 ? transcript.substring(0, 15000) + '...' : transcript;
       }
     }
-    
-    // Method 3: Try YouTube's timedtext API directly
-    console.log("Attempting direct timedtext API...");
-    
-    const languages = ['pt', 'pt-BR', 'en', 'a.pt', 'a.en'];
-    
-    for (const lang of languages) {
-      const timedTextUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=${lang}`;
-      
-      try {
-        const ttResponse = await fetch(timedTextUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          }
-        });
-        
-        if (ttResponse.ok) {
-          const xml = await ttResponse.text();
-          
-          if (xml && xml.includes('<text')) {
-            const textMatches = xml.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
-            const texts: string[] = [];
-            
-            for (const match of textMatches) {
-              let text = match[1]
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&quot;/g, '"')
-                .replace(/&#39;/g, "'")
-                .replace(/\n/g, ' ')
-                .trim();
-              
-              if (text) {
-                texts.push(text);
-              }
-            }
-            
-            if (texts.length > 0) {
-              const transcript = texts.join(' ');
-              console.log(`Transcript found via timedtext API (${lang}):`, transcript.length, "chars");
-              if (transcript.length > 200) {
-                return transcript.length > 12000 ? transcript.substring(0, 12000) + '...' : transcript;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.log(`timedtext API failed for ${lang}:`, e);
-      }
-    }
-    
-    console.log("No usable transcript found via any method");
-    return null;
-  } catch (error) {
-    console.error("Error fetching transcript:", error);
-    return null;
+  } catch (e) {
+    console.log("Third-party service failed:", e);
   }
+  
+  return null;
+}
+
+function parseTranscriptXml(xml: string): string {
+  const textMatches = xml.matchAll(/<text[^>]*>([^<]*)<\/text>/g);
+  const texts: string[] = [];
+  
+  for (const match of textMatches) {
+    let text = match[1]
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\n/g, ' ')
+      .trim();
+    
+    if (text) {
+      texts.push(text);
+    }
+  }
+  
+  return texts.join(' ');
+}
+
+async function fetchTranscript(videoId: string, googleApiKey?: string): Promise<string | null> {
+  // Try multiple methods in order of reliability
+  
+  // Method 1: YouTube Data API (to check if captions exist)
+  if (googleApiKey) {
+    await fetchTranscriptViaYouTubeAPI(videoId, googleApiKey);
+  }
+  
+  // Method 2: Direct page scraping (most reliable for getting actual transcript)
+  let transcript = await fetchTranscriptViaScraping(videoId);
+  if (transcript) return transcript;
+  
+  // Method 3: Timedtext API
+  transcript = await fetchTranscriptViaTimedText(videoId);
+  if (transcript) return transcript;
+  
+  // Method 4: Third-party service
+  transcript = await fetchTranscriptViaThirdParty(videoId);
+  if (transcript) return transcript;
+  
+  console.log("No usable transcript found via any method");
+  return null;
 }
 
 serve(async (req) => {
@@ -204,6 +253,8 @@ serve(async (req) => {
 
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
+    
     if (!OPENAI_API_KEY) {
       throw new Error("OPENAI_API_KEY is not configured");
     }
@@ -243,7 +294,7 @@ serve(async (req) => {
       transcript = cleanTranscript;
     } else {
       console.log("Fetching transcript for video:", videoId);
-      transcript = await fetchTranscript(videoId);
+      transcript = await fetchTranscript(videoId, GOOGLE_API_KEY);
       console.log("Transcript found:", transcript ? `${transcript.length} chars` : "none");
     }
 
