@@ -28,8 +28,22 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
   const [debugInfo, setDebugInfo] = useState({ playerReady: false, lastAction: '' });
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   
+  // Build system instruction with video context
   const systemInstruction = videoContext 
-    ? `Você é um professor amigável e didático. Você está ajudando o aluno a entender o conteúdo de um vídeo-aula com os seguintes pontos principais:\n\n${videoContext}\n\nVocê tem controle sobre o vídeo e pode dar play, pausar, reiniciar ou pular para momentos específicos quando o aluno pedir. Quando o aluno pedir para controlar o vídeo, USE A FUNÇÃO CORRESPONDENTE imediatamente (play_video, pause_video, restart_video, seek_video). Fale em português brasileiro.`
+    ? `Você é um professor amigável e didático. Você está ajudando o aluno a entender o conteúdo de uma vídeo-aula.
+
+CONTEXTO DO VÍDEO (baseie suas respostas APENAS neste conteúdo):
+${videoContext}
+
+INSTRUÇÕES IMPORTANTES:
+1. SEMPRE baseie suas respostas no conteúdo REAL do vídeo acima
+2. NUNCA invente informações que não estejam no contexto fornecido
+3. Se o aluno perguntar algo que não está no contexto, diga que não há essa informação no vídeo
+4. Você pode controlar o vídeo: dê play, pause, reinicie ou pule para momentos específicos
+5. Quando o aluno pedir para controlar o vídeo, USE A FUNÇÃO correspondente imediatamente (play_video, pause_video, restart_video, seek_video)
+6. Fale em português brasileiro de forma clara e didática
+
+Título do vídeo: ${videoTitle || 'Não informado'}`
     : "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Use exemplos práticos e linguagem acessível. Fale em português brasileiro.";
 
   // Check player ref status periodically for debug panel
