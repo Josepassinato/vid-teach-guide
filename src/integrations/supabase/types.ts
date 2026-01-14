@@ -145,6 +145,136 @@ export type Database = {
         }
         Relationships: []
       }
+      student_quiz_attempts: {
+        Row: {
+          attempted_at: string
+          id: string
+          is_correct: boolean
+          quiz_id: string
+          selected_option_index: number
+          student_id: string
+          video_id: string
+        }
+        Insert: {
+          attempted_at?: string
+          id?: string
+          is_correct: boolean
+          quiz_id: string
+          selected_option_index: number
+          student_id: string
+          video_id: string
+        }
+        Update: {
+          attempted_at?: string
+          id?: string
+          is_correct?: boolean
+          quiz_id?: string
+          selected_option_index?: number
+          student_id?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_quiz_attempts_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "video_quizzes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_quiz_attempts_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_quiz_results: {
+        Row: {
+          completed_at: string
+          correct_answers: number
+          id: string
+          passed: boolean
+          score_percentage: number
+          student_id: string
+          total_questions: number
+          video_id: string
+        }
+        Insert: {
+          completed_at?: string
+          correct_answers?: number
+          id?: string
+          passed?: boolean
+          score_percentage?: number
+          student_id: string
+          total_questions?: number
+          video_id: string
+        }
+        Update: {
+          completed_at?: string
+          correct_answers?: number
+          id?: string
+          passed?: boolean
+          score_percentage?: number
+          student_id?: string
+          total_questions?: number
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_quiz_results_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_quizzes: {
+        Row: {
+          correct_option_index: number
+          created_at: string
+          explanation: string | null
+          id: string
+          options: Json
+          question: string
+          question_order: number | null
+          updated_at: string
+          video_id: string
+        }
+        Insert: {
+          correct_option_index: number
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          options?: Json
+          question: string
+          question_order?: number | null
+          updated_at?: string
+          video_id: string
+        }
+        Update: {
+          correct_option_index?: number
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          options?: Json
+          question?: string
+          question_order?: number | null
+          updated_at?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_quizzes_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       videos: {
         Row: {
           analysis: string | null
