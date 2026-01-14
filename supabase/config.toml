@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.transcribe-video]
 verify_jwt = false
+
+[functions.admin-videos]
+verify_jwt = false
+
+[functions.content-manager]
+verify_jwt = false
