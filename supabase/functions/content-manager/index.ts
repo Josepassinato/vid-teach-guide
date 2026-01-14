@@ -70,6 +70,8 @@ Retorne APENAS um JSON válido no seguinte formato:
   "summary": "Breve resumo dos pontos principais do vídeo"
 }`;
 
+    console.log("[content-manager] Calling AI gateway for:", title);
+    
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -77,17 +79,18 @@ Retorne APENAS um JSON válido no seguinte formato:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        response_format: { type: "json_object" },
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("[content-manager] AI gateway error:", response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -107,31 +110,45 @@ Retorne APENAS um JSON válido no seguinte formato:
 
     const aiResponse = await response.json();
     const content = aiResponse.choices?.[0]?.message?.content || "";
+    
+    console.log("[content-manager] AI response length:", content.length);
 
     // Parse the JSON from the response
     let teachingData;
     try {
+      if (!content || content.trim() === "") {
+        throw new Error("Empty AI response");
+      }
+      
       // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         teachingData = JSON.parse(jsonMatch[0]);
+        console.log("[content-manager] Parsed teaching moments:", teachingData.teaching_moments?.length || 0);
       } else {
         throw new Error("No JSON found in response");
       }
     } catch (parseError) {
-      console.error("Failed to parse AI response:", content);
-      // Return a fallback structure
+      console.error("[content-manager] Failed to parse AI response:", parseError, "Content preview:", content.substring(0, 200));
+      // Return a fallback structure with realistic timestamps
       teachingData = {
         teaching_moments: [
           {
-            timestamp_seconds: 60,
-            topic: "Início da aula",
-            key_insight: "Conceito introdutório",
-            questions_to_ask: ["O que você entendeu até agora?", "Tem alguma dúvida sobre o conceito apresentado?"],
-            discussion_points: ["Relação com conhecimentos prévios", "Aplicações práticas"]
+            timestamp_seconds: 30,
+            topic: "Introdução do conceito",
+            key_insight: "Compreender o contexto e objetivo da aula",
+            questions_to_ask: ["O que você entendeu até agora?", "Como isso se relaciona com o que você já sabe?"],
+            discussion_points: ["Conexões com experiências anteriores", "Expectativas para a aula"]
+          },
+          {
+            timestamp_seconds: 90,
+            topic: "Conceito principal",
+            key_insight: "Consolidar o entendimento do tópico central",
+            questions_to_ask: ["Pode explicar com suas palavras?", "Onde você aplicaria isso?"],
+            discussion_points: ["Exemplos práticos", "Desafios comuns"]
           }
         ],
-        summary: "Conteúdo educacional para discussão"
+        summary: "Momentos-chave para aprofundamento gerados automaticamente"
       };
     }
 

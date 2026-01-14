@@ -454,7 +454,8 @@ INSTRUÇÕES:
       const isPaused = videoPlayerRef.current?.isPaused() ?? true;
       
       // Only check when video is playing and no quiz is active
-      if (!isPaused && !activeQuiz && agentMode === 'playing') {
+      // Check in both 'playing' and 'idle' modes to catch pauses even without formal class start
+      if (!isPaused && !activeQuiz && (agentMode === 'playing' || agentMode === 'idle')) {
         // Check for timestamp quizzes first
         const quiz = getQuizForTimestamp(currentTime);
         if (quiz) {
