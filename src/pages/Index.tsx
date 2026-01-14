@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { VideoAnalysis } from '@/components/VideoAnalysis';
 import { VoiceChat } from '@/components/VoiceChat';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { GraduationCap, Sparkles } from 'lucide-react';
 
 interface VideoInfo {
@@ -26,9 +27,12 @@ const Index = () => {
             <h1 className="text-lg sm:text-xl font-bold truncate">Professor IA</h1>
             <p className="text-[10px] sm:text-xs text-muted-foreground">Aprenda com voz em tempo real</p>
           </div>
-          <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
-            <Sparkles className="h-3 w-3" />
-            <span>Powered by OpenAI</span>
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
+              <Sparkles className="h-3 w-3" />
+              <span>Powered by OpenAI</span>
+            </div>
+            <ThemeToggle />
           </div>
         </div>
       </header>
