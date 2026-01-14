@@ -30,17 +30,27 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const [currentTime, setCurrentTime] = useState(0);
     const playerRef = useRef<any>(null);
     const [isReady, setIsReady] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const isReadyRef = useRef(false);
     const timeIntervalRef = useRef<number | null>(null);
     const pendingActionsRef = useRef<Array<() => void>>([]);
     const [userInteracted, setUserInteracted] = useState(false);
     const userInteractedRef = useRef(false);
+    const initTimeoutRef = useRef<number | null>(null);
 
     useEffect(() => {
-      // Load YouTube IFrame API
-      if (!window.YT) {
+      setLoadError(null);
+
+      // Load YouTube IFrame API (only once)
+      if (!document.getElementById('youtube-iframe-api')) {
         const tag = document.createElement('script');
+        tag.id = 'youtube-iframe-api';
         tag.src = 'https://www.youtube.com/iframe_api';
+        tag.async = true;
+        tag.onerror = () => {
+          console.warn('VideoPlayer: failed to load YouTube IFrame API');
+          setLoadError('Não foi possível carregar o player do YouTube.');
+        };
         const firstScriptTag = document.getElementsByTagName('script')[0];
         firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
       }
@@ -53,8 +63,19 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         }
       }, 100);
 
+      // Safety timeout in case the API is blocked (adblock/network)
+      initTimeoutRef.current = window.setTimeout(() => {
+        if (!isReadyRef.current) {
+          setLoadError('O YouTube não respondeu. Verifique bloqueador de anúncios/rede e tente novamente.');
+        }
+      }, 12000);
+
       return () => {
         clearInterval(checkAPI);
+        if (initTimeoutRef.current) {
+          clearTimeout(initTimeoutRef.current);
+          initTimeoutRef.current = null;
+        }
         if (timeIntervalRef.current) {
           clearInterval(timeIntervalRef.current);
           timeIntervalRef.current = null;
@@ -74,6 +95,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       setIsPlaying(false);
       setUserInteracted(false);
       userInteractedRef.current = false;
+      setLoadError(null);
 
       if (timeIntervalRef.current) {
         clearInterval(timeIntervalRef.current);
@@ -87,54 +109,70 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         playerRef.current = null;
       }
 
-      playerRef.current = new window.YT.Player(`youtube-player-${videoId}`, {
-        videoId: videoId,
-        playerVars: {
-          autoplay: 0,
-          controls: 0,
-          modestbranding: 1,
-          rel: 0,
-          enablejsapi: 1,
-          origin: window.location.origin,
-        },
-        events: {
-          onReady: () => {
-            setIsReady(true);
-            isReadyRef.current = true;
+      try {
+        playerRef.current = new window.YT.Player(`youtube-player-${videoId}`, {
+          videoId: videoId,
+          playerVars: {
+            autoplay: 0,
+            controls: 0,
+            modestbranding: 1,
+            rel: 0,
+            enablejsapi: 1,
+            origin: window.location.origin,
+          },
+          events: {
+            onReady: () => {
+              setIsReady(true);
+              isReadyRef.current = true;
+              setLoadError(null);
 
-            // Keep muted by default so the first programmatic play isn't blocked.
-            // (We unmute when the agent explicitly plays/restarts.)
-            try {
-              playerRef.current?.mute();
-              setIsMuted(true);
-            } catch {
-              // ignore
-            }
-
-            // Notify parent
-            try {
-              onReady?.();
-            } catch {
-              // ignore
-            }
-
-            // Flush any queued actions that happened before the iframe was ready
-            const queued = pendingActionsRef.current.splice(0);
-            for (const fn of queued) {
-              try {
-                fn();
-              } catch (e) {
-                console.warn('VideoPlayer: queued action failed', e);
+              if (initTimeoutRef.current) {
+                clearTimeout(initTimeoutRef.current);
+                initTimeoutRef.current = null;
               }
-            }
 
-            console.log('YouTube player ready');
+              // Keep muted by default so the first programmatic play isn't blocked.
+              // (We unmute when the agent explicitly plays/restarts.)
+              try {
+                playerRef.current?.mute();
+                setIsMuted(true);
+              } catch {
+                // ignore
+              }
+
+              // Notify parent
+              try {
+                onReady?.();
+              } catch {
+                // ignore
+              }
+
+              // Flush any queued actions that happened before the iframe was ready
+              const queued = pendingActionsRef.current.splice(0);
+              for (const fn of queued) {
+                try {
+                  fn();
+                } catch (e) {
+                  console.warn('VideoPlayer: queued action failed', e);
+                }
+              }
+
+              console.log('YouTube player ready');
+            },
+            onStateChange: (event: any) => {
+              setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
+            },
+            onError: (event: any) => {
+              console.warn('VideoPlayer: YT error', event?.data);
+              setLoadError('Erro ao carregar o vídeo do YouTube.');
+            },
           },
-          onStateChange: (event: any) => {
-            setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
-          },
-        },
-      });
+        });
+      } catch (e) {
+        console.warn('VideoPlayer: failed to init YT player', e);
+        setLoadError('Falha ao inicializar o player do YouTube.');
+        return;
+      }
 
       // Update current time periodically
       timeIntervalRef.current = window.setInterval(() => {
@@ -304,11 +342,18 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         <div className="relative aspect-video bg-black">
           <div id={`youtube-player-${videoId}`} className="absolute inset-0" />
           
-          {!isReady && (
+          {loadError ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 px-4 text-center">
+              <p className="text-sm text-foreground">{loadError}</p>
+              <Button size="sm" variant="secondary" onClick={initPlayer}>
+                Tentar novamente
+              </Button>
+            </div>
+          ) : !isReady ? (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
               <div className="animate-pulse text-muted-foreground">Carregando player...</div>
             </div>
-          )}
+          ) : null}
           
           {/* Unlock overlay - requires user click to enable programmatic control */}
           {isReady && !userInteracted && (
