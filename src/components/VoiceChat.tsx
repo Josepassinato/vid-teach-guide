@@ -40,6 +40,7 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
+  const analyzedVideoRef = useRef<string | null>(null);
   
   // Student Memory for long-term learning
   const {
@@ -107,7 +108,8 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
 
   // Load pre-configured moments or analyze content when video changes
   useEffect(() => {
-    if (videoId) {
+    if (videoId && analyzedVideoRef.current !== videoId) {
+      analyzedVideoRef.current = videoId;
       // Use pre-configured moments if available, otherwise analyze
       analyzeContent(videoTranscript || null, videoTitle || '', videoContext, preConfiguredMoments);
       lastCheckedMomentRef.current = -1;
