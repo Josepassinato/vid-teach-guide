@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      student_lesson_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_completed: boolean | null
+          last_position_seconds: number | null
+          student_id: string
+          updated_at: string
+          video_id: string
+          watch_time_seconds: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean | null
+          last_position_seconds?: number | null
+          student_id: string
+          updated_at?: string
+          video_id: string
+          watch_time_seconds?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean | null
+          last_position_seconds?: number | null
+          student_id?: string
+          updated_at?: string
+          video_id?: string
+          watch_time_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_lesson_progress_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_observations: {
         Row: {
           confidence_level: number | null

@@ -4,11 +4,12 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Target } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TeachingMoment } from '@/hooks/useContentManager';
-
+import { useStudentProgress } from '@/hooks/useStudentProgress';
+import { toast } from 'sonner';
 interface SavedVideo {
   id: string;
   youtube_id: string;
@@ -44,6 +45,19 @@ const Student = () => {
   const [showVideoList, setShowVideoList] = useState(true);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
 
+  // Student progress tracking
+  const {
+    stats,
+    isLessonCompleted,
+    markLessonComplete,
+    refreshProgress,
+  } = useStudentProgress({
+    onProgressUpdate: (newStats) => {
+      if (newStats.progressPercentage === 100) {
+        toast.success('🎉 Parabéns! Você completou todas as aulas!');
+      }
+    }
+  });
   useEffect(() => {
     const loadSavedVideos = async () => {
       try {
@@ -109,6 +123,15 @@ const Student = () => {
     }
   };
 
+  const handleMarkComplete = async () => {
+    const currentVideo = savedVideos[currentLessonIndex];
+    if (currentVideo) {
+      await markLessonComplete(currentVideo.id);
+      toast.success('✅ Aula marcada como concluída!');
+      refreshProgress();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -159,10 +182,19 @@ const Student = () => {
             <ThemeToggle />
           </div>
           
-          {/* Progress bar */}
-          {savedVideos.length > 0 && (
-            <div className="mt-2">
-              <Progress value={((currentLessonIndex + 1) / savedVideos.length) * 100} className="h-1" />
+          {/* Progress Stats */}
+          {stats.totalLessons > 0 && (
+            <div className="mt-2 flex items-center gap-3">
+              <Progress value={stats.progressPercentage} className="h-2 flex-1" />
+              <div className="flex items-center gap-2 text-xs">
+                <Badge variant={stats.progressPercentage === 100 ? "default" : "secondary"} className="flex items-center gap-1">
+                  {stats.progressPercentage === 100 ? <Trophy className="h-3 w-3" /> : <Award className="h-3 w-3" />}
+                  {stats.completedLessons}/{stats.totalLessons}
+                </Badge>
+                <span className="text-muted-foreground hidden sm:inline">
+                  {stats.progressPercentage}% concluído
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -205,42 +237,51 @@ const Student = () => {
               </div>
             ) : (
               <div className="space-y-2">
-                {savedVideos.map((video, index) => (
-                  <Card
-                    key={video.id}
-                    className={`cursor-pointer transition-all hover:bg-accent ${
-                      selectedVideo?.videoId === video.youtube_id 
-                        ? 'ring-2 ring-primary bg-accent' 
-                        : ''
-                    }`}
-                    onClick={() => selectVideo(video, index)}
-                  >
-                    <CardContent className="p-2 flex gap-2 items-center">
-                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                        {video.lesson_order}
-                      </div>
-                      <img
-                        src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
-                        alt={video.title}
-                        className="w-12 h-8 object-cover rounded flex-shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium line-clamp-1">{video.title}</p>
-                        <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5">
-                          {video.duration_minutes && (
-                            <span className="flex items-center gap-0.5">
-                              <Clock className="h-2.5 w-2.5" />
-                              {video.duration_minutes} min
-                            </span>
-                          )}
-                          {video.transcript && (
-                            <span className="text-green-600">✓ Transcrição</span>
-                          )}
+                {savedVideos.map((video, index) => {
+                  const completed = isLessonCompleted(video.id);
+                  return (
+                    <Card
+                      key={video.id}
+                      className={`cursor-pointer transition-all hover:bg-accent ${
+                        selectedVideo?.videoId === video.youtube_id 
+                          ? 'ring-2 ring-primary bg-accent' 
+                          : ''
+                      } ${completed ? 'border-green-500/50' : ''}`}
+                      onClick={() => selectVideo(video, index)}
+                    >
+                      <CardContent className="p-2 flex gap-2 items-center">
+                        <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          completed 
+                            ? 'bg-green-500 text-white' 
+                            : 'bg-primary/10 text-primary'
+                        }`}>
+                          {completed ? <CheckCircle className="h-3.5 w-3.5" /> : video.lesson_order}
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                        <img
+                          src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
+                          alt={video.title}
+                          className="w-12 h-8 object-cover rounded flex-shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-xs font-medium line-clamp-1 ${completed ? 'text-green-600' : ''}`}>
+                            {video.title}
+                          </p>
+                          <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5">
+                            {video.duration_minutes && (
+                              <span className="flex items-center gap-0.5">
+                                <Clock className="h-2.5 w-2.5" />
+                                {video.duration_minutes} min
+                              </span>
+                            )}
+                            {completed && (
+                              <span className="text-green-600 font-medium">✓ Concluída</span>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -261,14 +302,43 @@ const Student = () => {
         {/* Main Content Area - Video + Chat */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedVideo ? (
-            <VoiceChat
-              videoContext={selectedVideo.transcript || selectedVideo.analysis}
-              videoId={selectedVideo.videoId}
-              videoTitle={selectedVideo.title}
-              videoTranscript={selectedVideo.transcript}
-              preConfiguredMoments={selectedVideo.teachingMoments}
-              isStudentMode={true}
-            />
+            <>
+              <VoiceChat
+                videoContext={selectedVideo.transcript || selectedVideo.analysis}
+                videoId={selectedVideo.videoId}
+                videoTitle={selectedVideo.title}
+                videoTranscript={selectedVideo.transcript}
+                preConfiguredMoments={selectedVideo.teachingMoments}
+                isStudentMode={true}
+              />
+              {/* Complete Lesson Button */}
+              <div className="border-t bg-card p-3 flex items-center justify-between">
+                <div className="text-xs text-muted-foreground">
+                  {isLessonCompleted(savedVideos[currentLessonIndex]?.id) ? (
+                    <span className="text-green-600 flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4" />
+                      Aula concluída
+                    </span>
+                  ) : (
+                    `Aula ${selectedVideo.lessonNumber} de ${savedVideos.length}`
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {!isLessonCompleted(savedVideos[currentLessonIndex]?.id) && (
+                    <Button size="sm" onClick={handleMarkComplete}>
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Marcar como Concluída
+                    </Button>
+                  )}
+                  {currentLessonIndex < savedVideos.length - 1 && (
+                    <Button size="sm" variant="outline" onClick={goToNextLesson}>
+                      Próxima Aula
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-muted/30">
               <div className="text-center p-8">
