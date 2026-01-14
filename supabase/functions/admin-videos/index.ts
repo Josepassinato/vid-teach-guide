@@ -58,6 +58,8 @@ serve(async (req) => {
             description: video.description || null,
             duration_minutes: video.duration_minutes || null,
             lesson_order: video.lesson_order || 1,
+            teaching_moments: video.teaching_moments || [],
+            is_configured: video.is_configured || false,
             thumbnail_url: video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`,
           })
           .select()
@@ -84,6 +86,8 @@ serve(async (req) => {
         if (video.duration_minutes !== undefined) updateData.duration_minutes = video.duration_minutes;
         if (video.lesson_order !== undefined) updateData.lesson_order = video.lesson_order;
         if (video.thumbnail_url !== undefined) updateData.thumbnail_url = video.thumbnail_url;
+        if (video.teaching_moments !== undefined) updateData.teaching_moments = video.teaching_moments;
+        if (video.is_configured !== undefined) updateData.is_configured = video.is_configured;
 
         const { data, error } = await supabase
           .from("videos")

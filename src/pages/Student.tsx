@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, CheckCircle, Circle, PlayCircle, Clock, BookOpen } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { TeachingMoment } from '@/hooks/useContentManager';
 
 interface SavedVideo {
   id: string;
@@ -18,6 +19,8 @@ interface SavedVideo {
   lesson_order: number;
   description: string | null;
   duration_minutes: number | null;
+  teaching_moments: unknown;
+  is_configured: boolean;
 }
 
 interface VideoInfo {
@@ -31,6 +34,7 @@ interface VideoInfo {
   lessonNumber: number;
   description?: string | null;
   duration?: number | null;
+  teachingMoments?: TeachingMoment[] | null;
 }
 
 const Student = () => {
@@ -66,6 +70,11 @@ const Student = () => {
   }, []);
 
   const selectVideo = (video: SavedVideo, index: number) => {
+    // Parse teaching moments from JSON
+    const moments = Array.isArray(video.teaching_moments) 
+      ? video.teaching_moments as TeachingMoment[]
+      : null;
+    
     setSelectedVideo({
       videoId: video.youtube_id,
       title: video.title,
@@ -77,6 +86,7 @@ const Student = () => {
       lessonNumber: video.lesson_order,
       description: video.description,
       duration: video.duration_minutes,
+      teachingMoments: moments,
     });
     setCurrentLessonIndex(index);
     // On mobile, hide the video list after selection
@@ -256,6 +266,7 @@ const Student = () => {
               videoId={selectedVideo.videoId}
               videoTitle={selectedVideo.title}
               videoTranscript={selectedVideo.transcript}
+              preConfiguredMoments={selectedVideo.teachingMoments}
               isStudentMode={true}
             />
           ) : (
