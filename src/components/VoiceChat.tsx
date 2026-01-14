@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useOpenAIRealtime, VideoControls } from '@/hooks/useOpenAIRealtime';
+import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
 import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw } from 'lucide-react';
@@ -98,7 +98,7 @@ Título do vídeo: ${videoTitle || 'Não informado'}`
     startListening,
     stopListening,
     sendText
-  } = useOpenAIRealtime({
+  } = useGeminiLive({
     systemInstruction,
     videoControls,
     onTranscript: (text, role) => {
