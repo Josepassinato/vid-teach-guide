@@ -5,7 +5,7 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TeachingMoment } from '@/hooks/useContentManager';
@@ -234,6 +234,18 @@ const Student = () => {
             >
               <Link to="/aluno/dashboard">
                 <BarChart3 className="h-4 w-4" />
+              </Link>
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs gap-1 text-muted-foreground hover:text-foreground" 
+              asChild
+            >
+              <Link to="/admin">
+                <LogOut className="h-3 w-3" />
+                Admin
               </Link>
             </Button>
             
