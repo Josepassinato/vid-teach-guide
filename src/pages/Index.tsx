@@ -6,7 +6,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Sparkles, Settings, Video } from 'lucide-react';
+import { GraduationCap, Sparkles, Settings, Video, Users } from 'lucide-react';
 
 interface VideoInfo {
   videoId: string;
@@ -83,6 +83,12 @@ const Index = () => {
               <span>Powered by Gemini</span>
             </div>
             <ThemeToggle />
+            <Link to="/aluno">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Área do Aluno</span>
+              </Button>
+            </Link>
             <Link to="/admin">
               <Button variant="ghost" size="icon" className="h-8 w-8">
                 <Settings className="h-4 w-4" />
