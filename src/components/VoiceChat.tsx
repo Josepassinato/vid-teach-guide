@@ -1,3 +1,4 @@
+// VoiceChat component with AI teacher and video controls
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
