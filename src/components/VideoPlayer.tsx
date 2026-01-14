@@ -296,7 +296,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     return (
       <Card className="overflow-hidden">
         <div className="relative aspect-video bg-black">
-          <div id={`youtube-player-${videoId}`} className="absolute inset-0" />
+          <div id={`youtube-player-${videoId}`} className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
           
           {!isReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
