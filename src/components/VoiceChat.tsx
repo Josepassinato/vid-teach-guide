@@ -486,14 +486,24 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
               onReady={() => setIsVideoReady(true)}
             />
             
-            {/* Teaching Moments Timeline */}
+            {/* Teaching Moments Timeline - Visible markers for pause points */}
             {contentPlan && contentPlan.teaching_moments.length > 0 && (
-              <div className="bg-muted/40 rounded-lg p-2 border">
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
                 <div className="flex items-center gap-2 mb-2">
-                  <Target className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs font-medium">Momentos de aprofundamento</span>
+                  <div className="p-1 bg-amber-100 dark:bg-amber-900/50 rounded">
+                    <Target className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                      Momentos de Pausa
+                    </span>
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                      O professor vai pausar o vídeo nestes pontos para reforçar o aprendizado
+                    </p>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                
+                <div className="space-y-1.5">
                   {contentPlan.teaching_moments.map((moment, index) => {
                     const mins = Math.floor(moment.timestamp_seconds / 60);
                     const secs = moment.timestamp_seconds % 60;
@@ -503,24 +513,53 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
                     return (
                       <div
                         key={index}
-                        className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] border cursor-pointer transition-colors ${
+                        className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-all ${
                           isActive 
-                            ? 'bg-primary text-primary-foreground border-primary animate-pulse' 
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md animate-pulse' 
                             : isPast 
-                              ? 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300'
-                              : 'bg-background border-muted-foreground/20 hover:border-primary/50'
+                              ? 'bg-green-100 dark:bg-green-900/40 border-green-300 dark:border-green-700'
+                              : 'bg-white dark:bg-card border-amber-200 dark:border-amber-700/50 hover:border-primary hover:shadow-sm'
                         }`}
                         onClick={() => {
                           videoPlayerRef.current?.seekTo(Math.max(0, moment.timestamp_seconds - 5));
                         }}
-                        title={`${moment.topic}: ${moment.key_insight}`}
+                        title={`Clique para ir para ${mins}:${secs.toString().padStart(2, '0')}`}
                       >
-                        <span className="font-mono font-medium">
-                          {mins}:{secs.toString().padStart(2, '0')}
-                        </span>
-                        <span className="hidden sm:inline max-w-24 truncate">
-                          {moment.topic}
-                        </span>
+                        {/* Time badge */}
+                        <div className={`flex-shrink-0 px-2 py-0.5 rounded font-mono text-xs font-bold ${
+                          isActive 
+                            ? 'bg-white/20 text-white' 
+                            : isPast 
+                              ? 'bg-green-500 text-white'
+                              : 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300'
+                        }`}>
+                          ⏱️ {mins}:{secs.toString().padStart(2, '0')}
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-xs font-medium truncate ${
+                            isActive ? 'text-white' : isPast ? 'text-green-700 dark:text-green-300' : 'text-foreground'
+                          }`}>
+                            {moment.topic}
+                          </div>
+                          <div className={`text-[10px] truncate ${
+                            isActive ? 'text-white/80' : 'text-muted-foreground'
+                          }`}>
+                            {moment.key_insight}
+                          </div>
+                        </div>
+                        
+                        {/* Status indicator */}
+                        <div className="flex-shrink-0">
+                          {isPast ? (
+                            <span className="text-green-600 dark:text-green-400 text-[10px]">✓</span>
+                          ) : isActive ? (
+                            <Lightbulb className="h-4 w-4 text-white animate-bounce" />
+                          ) : (
+                            <span className="text-amber-500 text-[10px]">⏸</span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
