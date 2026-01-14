@@ -8,6 +8,7 @@ import Admin from "./pages/Admin";
 import Student from "./pages/Student";
 import StudentDashboard from "./pages/StudentDashboard";
 import NotFound from "./pages/NotFound";
+import DebugPanel from "./components/DebugPanel";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        <DebugPanel />
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
