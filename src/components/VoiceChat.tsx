@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
 import { useContentManager, TeachingMoment, ContentPlan } from '@/hooks/useContentManager';
+import { useStudentMemory } from '@/hooks/useStudentMemory';
+import { useVisionAnalysis, EmotionAnalysis } from '@/hooks/useVisionAnalysis';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
-import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb } from 'lucide-react';
+import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Camera, CameraOff, Brain, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Message {
@@ -31,10 +33,59 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript }
   const [debugInfo, setDebugInfo] = useState({ playerReady: false, lastAction: '' });
   const [activeMoment, setActiveMoment] = useState<TeachingMoment | null>(null);
   const [showContentPlan, setShowContentPlan] = useState(false);
+  const [showStudentInfo, setShowStudentInfo] = useState(false);
+  const [memoryContext, setMemoryContext] = useState<string>('');
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
   
+  // Student Memory for long-term learning
+  const {
+    profile: studentProfile,
+    recordObservation,
+    updateProfile,
+    buildMemoryContext,
+  } = useStudentMemory({
+    onProfileLoaded: (profile) => {
+      console.log('[StudentMemory] Profile loaded:', profile.student_id);
+    },
+  });
+
+  // Vision Analysis for emotional detection
+  const {
+    isActive: isVisionActive,
+    currentEmotion,
+    hasPermission: cameraPermission,
+    startAnalysis,
+    stopAnalysis,
+  } = useVisionAnalysis({
+    analysisInterval: 10000, // Analyze every 10 seconds
+    onEmotionDetected: async (analysis) => {
+      console.log('[VisionAnalysis] Emotion detected:', analysis);
+      
+      // Record observation to memory
+      recordObservation({
+        observation_type: 'emotion',
+        observation_data: analysis,
+        emotional_state: analysis.emotion,
+        confidence_level: analysis.confidence,
+        context: videoTitle || 'Interação com professor',
+        video_id: videoId,
+      });
+
+      // If engagement is low or student seems confused/frustrated, notify the AI
+      if (analysis.engagement_level === 'low' || 
+          ['confuso', 'frustrado', 'entediado', 'cansado'].includes(analysis.emotion)) {
+        if (status === 'connected') {
+          sendText(`[SISTEMA - OBSERVAÇÃO DO ALUNO] Estado emocional detectado: ${analysis.emotion}. Engajamento: ${analysis.engagement_level}. ${analysis.details}. Sugestões: ${analysis.suggestions?.join(', ') || 'Nenhuma'}`);
+        }
+      }
+    },
+    onError: (error) => {
+      console.error('[VisionAnalysis] Error:', error);
+    },
+  });
+
   // Content Manager for teaching moments
   const {
     isLoading: isAnalyzingContent,
@@ -61,7 +112,16 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript }
     }
   }, [videoId, videoTranscript, videoContext, videoTitle, analyzeContent]);
 
-  // Build system instruction with video context and content plan
+  // Load memory context when profile is ready
+  useEffect(() => {
+    if (studentProfile) {
+      buildMemoryContext().then(ctx => {
+        setMemoryContext(ctx);
+      });
+    }
+  }, [studentProfile, buildMemoryContext]);
+
+  // Build system instruction with video context, content plan, and student memory
   const buildSystemInstruction = useCallback(() => {
     let instruction = videoContext 
       ? `Você é um professor amigável e didático. Você está ajudando o aluno a entender o conteúdo de uma vídeo-aula.
@@ -79,6 +139,24 @@ INSTRUÇÕES IMPORTANTES:
 
 Título do vídeo: ${videoTitle || 'Não informado'}`
       : "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Use exemplos práticos e linguagem acessível. Fale em português brasileiro.";
+
+    // Add student memory context
+    if (memoryContext) {
+      instruction += `
+
+${memoryContext}
+
+INSTRUÇÕES DE RELACIONAMENTO COM O ALUNO:
+1. Use as informações sobre o aluno para personalizar sua abordagem
+2. Se o aluno tem pontos fortes, reforce-os e faça conexões com novos conteúdos
+3. Se o aluno tem áreas a melhorar, seja paciente e explique de formas diferentes
+4. Adapte seu estilo de ensino ao estilo de aprendizagem do aluno (visual, auditivo, cinestésico)
+5. Quando receber uma mensagem [SISTEMA - OBSERVAÇÃO DO ALUNO], ajuste sua abordagem:
+   - Se o aluno parecer confuso: Pause e pergunte "Está tudo bem? Quer que eu explique de outra forma?"
+   - Se o aluno parecer entediado: Traga um exemplo prático ou faça uma pergunta interessante
+   - Se o aluno parecer frustrado: Seja encorajador e simplifique a explicação
+   - Se o aluno parecer cansado: Sugira uma pausa ou resuma os pontos principais`;
+    }
 
     // Add content plan context if available
     if (contentPlan) {
@@ -99,7 +177,7 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
     }
 
     return instruction;
-  }, [videoContext, videoTitle, contentPlan]);
+  }, [videoContext, videoTitle, contentPlan, memoryContext]);
 
   const systemInstruction = buildSystemInstruction();
 
@@ -260,6 +338,56 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
             Professor IA
           </CardTitle>
           <div className="flex items-center gap-2">
+            {/* Vision/Camera toggle */}
+            <Button
+              size="sm"
+              variant={isVisionActive ? "default" : "ghost"}
+              onClick={() => isVisionActive ? stopAnalysis() : startAnalysis()}
+              className="h-6 px-2 text-xs"
+              title={isVisionActive ? "Desativar câmera" : "Ativar câmera para análise emocional"}
+            >
+              {isVisionActive ? (
+                <>
+                  <Camera className="h-3 w-3 mr-1" />
+                  <span className="hidden sm:inline">Câmera</span>
+                </>
+              ) : (
+                <>
+                  <CameraOff className="h-3 w-3 mr-1" />
+                  <span className="hidden sm:inline">Câmera</span>
+                </>
+              )}
+            </Button>
+            
+            {/* Current emotion indicator */}
+            {currentEmotion && isVisionActive && (
+              <Badge 
+                variant="outline" 
+                className={`text-[10px] ${
+                  currentEmotion.engagement_level === 'high' ? 'border-green-500 text-green-600' :
+                  currentEmotion.engagement_level === 'low' ? 'border-red-500 text-red-600' :
+                  'border-yellow-500 text-yellow-600'
+                }`}
+              >
+                <Heart className="h-2.5 w-2.5 mr-1" />
+                {currentEmotion.emotion}
+              </Badge>
+            )}
+            
+            {/* Student memory indicator */}
+            {studentProfile && (
+              <Button
+                size="sm"
+                variant={showStudentInfo ? "secondary" : "ghost"}
+                onClick={() => setShowStudentInfo(!showStudentInfo)}
+                className="h-6 px-2 text-xs"
+                title="Ver informações do aluno"
+              >
+                <Brain className="h-3 w-3 mr-1" />
+                <span className="hidden sm:inline">Memória</span>
+              </Button>
+            )}
+            
             {contentPlan && (
               <Button
                 size="sm"
@@ -363,6 +491,47 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
                     <RotateCcw className="h-3 w-3 mr-1" /> Test Restart
                   </Button>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Student Info Panel */}
+        {showStudentInfo && studentProfile && (
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg p-3 border space-y-2 flex-shrink-0">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Brain className="h-4 w-4 text-primary" />
+              Memória do Aluno
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Interações:</span>
+                <span className="ml-1 font-medium">{studentProfile.interaction_count}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Tempo de estudo:</span>
+                <span className="ml-1 font-medium">{studentProfile.total_study_time_minutes} min</span>
+              </div>
+              {studentProfile.learning_style && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Estilo:</span>
+                  <span className="ml-1 font-medium">{studentProfile.learning_style}</span>
+                </div>
+              )}
+            </div>
+            {studentProfile.emotional_patterns?.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1 border-t">
+                {studentProfile.emotional_patterns.slice(0, 4).map((pattern, idx) => (
+                  <Badge key={idx} variant="outline" className="text-[10px]">
+                    {pattern.emotion} ({pattern.count}x)
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {studentProfile.strengths?.length > 0 && (
+              <div className="text-xs pt-1 border-t">
+                <span className="text-muted-foreground">Pontos fortes:</span>
+                <span className="ml-1">{studentProfile.strengths.join(', ')}</span>
               </div>
             )}
           </div>
