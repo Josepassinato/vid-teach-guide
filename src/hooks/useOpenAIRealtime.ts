@@ -183,12 +183,14 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         ];
         
         // Send session update with configuration and tools
+        // Using "shimmer" voice - warm, expressive female voice ideal for teaching
+        // Other natural options: "nova" (warm female), "echo" (deep male), "fable" (British accent)
         ws.send(JSON.stringify({
           type: "session.update",
           session: {
             modalities: ["text", "audio"],
             instructions: currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro.",
-            voice: "alloy",
+            voice: "shimmer",
             input_audio_format: "pcm16",
             output_audio_format: "pcm16",
             input_audio_transcription: {
@@ -196,9 +198,9 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             },
             turn_detection: {
               type: "server_vad",
-              threshold: 0.8,
-              prefix_padding_ms: 500,
-              silence_duration_ms: 1000
+              threshold: 0.7,
+              prefix_padding_ms: 400,
+              silence_duration_ms: 800
             },
             tools: tools,
             tool_choice: "auto"
