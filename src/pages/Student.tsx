@@ -4,11 +4,12 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TeachingMoment } from '@/hooks/useContentManager';
 import { useStudentProgress } from '@/hooks/useStudentProgress';
+import { LessonQuiz } from '@/components/LessonQuiz';
 import { toast } from 'sonner';
 interface SavedVideo {
   id: string;
@@ -44,6 +45,16 @@ const Student = () => {
   const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
   const [showVideoList, setShowVideoList] = useState(true);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
+  const [showQuiz, setShowQuiz] = useState(false);
+  
+  // Generate a simple student ID (in a real app this would come from auth)
+  const [studentId] = useState(() => {
+    const stored = localStorage.getItem('studentId');
+    if (stored) return stored;
+    const newId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('studentId', newId);
+    return newId;
+  });
 
   // Student progress tracking
   const {
@@ -129,6 +140,17 @@ const Student = () => {
       await markLessonComplete(currentVideo.id);
       toast.success('✅ Aula marcada como concluída!');
       refreshProgress();
+      setShowQuiz(false);
+    }
+  };
+
+  const handleOpenQuiz = () => {
+    setShowQuiz(true);
+  };
+
+  const handleQuizComplete = async (passed: boolean) => {
+    if (passed) {
+      await handleMarkComplete();
     }
   };
 
@@ -311,6 +333,18 @@ const Student = () => {
                 preConfiguredMoments={selectedVideo.teachingMoments}
                 isStudentMode={true}
               />
+              {/* Quiz Section */}
+              {showQuiz && savedVideos[currentLessonIndex] && (
+                <div className="border-t bg-card/50 p-4">
+                  <LessonQuiz
+                    videoId={savedVideos[currentLessonIndex].id}
+                    studentId={studentId}
+                    onQuizComplete={handleQuizComplete}
+                    passingScore={70}
+                  />
+                </div>
+              )}
+
               {/* Complete Lesson Button */}
               <div className="border-t bg-card p-3 flex items-center justify-between">
                 <div className="text-xs text-muted-foreground">
@@ -324,10 +358,10 @@ const Student = () => {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {!isLessonCompleted(savedVideos[currentLessonIndex]?.id) && (
-                    <Button size="sm" onClick={handleMarkComplete}>
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Marcar como Concluída
+                  {!isLessonCompleted(savedVideos[currentLessonIndex]?.id) && !showQuiz && (
+                    <Button size="sm" variant="outline" onClick={handleOpenQuiz}>
+                      <ClipboardCheck className="h-4 w-4 mr-1" />
+                      Fazer Quiz
                     </Button>
                   )}
                   {currentLessonIndex < savedVideos.length - 1 && (
