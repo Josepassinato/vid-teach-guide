@@ -1,7 +1,8 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Volume1 } from 'lucide-react';
 
 export interface VideoPlayerRef {
   play: () => void;
@@ -243,10 +244,32 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const handleMute = () => {
       if (isMuted) {
         playerRef.current?.unMute();
+        playerRef.current?.setVolume(volume);
       } else {
         playerRef.current?.mute();
       }
       setIsMuted(!isMuted);
+    };
+
+    const handleVolumeChange = (value: number[]) => {
+      const newVolume = value[0];
+      setVolume(newVolume);
+      if (playerRef.current) {
+        playerRef.current.setVolume(newVolume);
+        if (newVolume === 0) {
+          playerRef.current.mute();
+          setIsMuted(true);
+        } else if (isMuted) {
+          playerRef.current.unMute();
+          setIsMuted(false);
+        }
+      }
+    };
+
+    const getVolumeIcon = () => {
+      if (isMuted || volume === 0) return <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" />;
+      if (volume < 50) return <Volume1 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />;
+      return <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />;
     };
 
     const formatTime = (seconds: number) => {
@@ -317,9 +340,20 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
               <Button size="sm" variant="ghost" onClick={handleRestart} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
                 <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
-              <Button size="sm" variant="ghost" onClick={handleMute} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
-                {isMuted ? <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-              </Button>
+              
+              {/* Volume Control */}
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Button size="sm" variant="ghost" onClick={handleMute} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                  {getVolumeIcon()}
+                </Button>
+                <Slider
+                  value={[isMuted ? 0 : volume]}
+                  onValueChange={handleVolumeChange}
+                  max={100}
+                  step={5}
+                  className="w-16 sm:w-24"
+                />
+              </div>
             </div>
             
             <span className="text-xs sm:text-sm text-muted-foreground font-mono">
