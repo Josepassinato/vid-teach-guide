@@ -202,8 +202,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       
       console.log('[GeminiLive] Token received, connecting to WebSocket...');
       
-      // Connect to Gemini Live API with Gemini 2.5
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.token}`;
+      // Connect to Gemini Live API
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${data.token}`;
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
