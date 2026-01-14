@@ -60,18 +60,23 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   const statusRef = useRef<string>('disconnected');
 
   // Vision Analysis for emotional detection
+  // Ref to store latest emotion for sending with user interactions
+  const latestEmotionRef = useRef<EmotionAnalysis | null>(null);
+
   const {
     isActive: isVisionActive,
     currentEmotion,
     hasPermission: cameraPermission,
     startAnalysis,
     stopAnalysis,
+    captureAndAnalyze,
   } = useVisionAnalysis({
-    analysisInterval: 10000, // Analyze every 10 seconds
+    analysisInterval: 15000, // Background analysis every 15 seconds (just for UI indicator)
     onEmotionDetected: async (analysis) => {
       console.log('[VisionAnalysis] Emotion detected:', analysis);
+      latestEmotionRef.current = analysis;
       
-      // Record observation to memory
+      // Record observation to memory (silently, without sending to agent)
       recordObservation({
         observation_type: 'emotion',
         observation_data: analysis,
@@ -80,14 +85,6 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
         context: videoTitle || 'Interação com professor',
         video_id: videoId,
       });
-
-      // If engagement is low or student seems confused/frustrated, notify the AI
-      if (analysis.engagement_level === 'low' || 
-          ['confuso', 'frustrado', 'entediado', 'cansado'].includes(analysis.emotion)) {
-        if (statusRef.current === 'connected' && sendTextRef.current) {
-          sendTextRef.current(`[SISTEMA - OBSERVAÇÃO DO ALUNO] Estado emocional detectado: ${analysis.emotion}. Engajamento: ${analysis.engagement_level}. ${analysis.details}. Sugestões: ${analysis.suggestions?.join(', ') || 'Nenhuma'}`);
-        }
-      }
     },
     onError: (error) => {
       console.error('[VisionAnalysis] Error:', error);
@@ -259,7 +256,17 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
   } = useGeminiLive({
     systemInstruction,
     videoControls,
-    onTranscript: (text, role) => {
+    onTranscript: async (text, role) => {
+      // When user speaks, capture fresh emotion and send context to agent
+      if (role === 'user' && isVisionActive && statusRef.current === 'connected') {
+        const freshAnalysis = await captureAndAnalyze();
+        if (freshAnalysis) {
+          latestEmotionRef.current = freshAnalysis;
+          // Send emotion context silently before user message is processed
+          sendTextRef.current?.(`[CONTEXTO VISUAL] Estado: ${freshAnalysis.emotion}, Engajamento: ${freshAnalysis.engagement_level}. ${freshAnalysis.details}`);
+        }
+      }
+      
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         text,
