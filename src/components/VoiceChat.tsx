@@ -303,7 +303,19 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
     }
   }, [status, isStudentMode, isVisionActive, isListening, startAnalysis, startListening]);
 
-  // Monitor video time for teaching moments
+  // Update video currentTime for UI (always runs when video exists)
+  useEffect(() => {
+    if (!videoId) return;
+    
+    const timeUpdateInterval = window.setInterval(() => {
+      const time = videoPlayerRef.current?.getCurrentTime() || 0;
+      setCurrentTime(time);
+    }, 1000);
+
+    return () => clearInterval(timeUpdateInterval);
+  }, [videoId]);
+
+  // Monitor video time for teaching moments (only when connected)
   useEffect(() => {
     if (status !== 'connected' || !contentPlan || !videoId) {
       if (timeCheckIntervalRef.current) {
@@ -315,7 +327,6 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
 
     timeCheckIntervalRef.current = window.setInterval(() => {
       const time = videoPlayerRef.current?.getCurrentTime() || 0;
-      setCurrentTime(time);
       const isPaused = videoPlayerRef.current?.isPaused() ?? true;
       
       // Only check for moments when video is playing
