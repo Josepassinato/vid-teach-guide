@@ -410,6 +410,10 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
+          // @ts-ignore - experimental features for better noise resistance
+          suppressLocalAudioPlayback: true,
+          voiceIsolation: true,
         } 
       });
       
