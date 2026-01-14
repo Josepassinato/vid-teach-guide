@@ -105,7 +105,10 @@ export type Database = {
         Row: {
           analysis: string | null
           created_at: string
+          description: string | null
+          duration_minutes: number | null
           id: string
+          lesson_order: number | null
           thumbnail_url: string | null
           title: string
           transcript: string | null
@@ -115,7 +118,10 @@ export type Database = {
         Insert: {
           analysis?: string | null
           created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
           id?: string
+          lesson_order?: number | null
           thumbnail_url?: string | null
           title: string
           transcript?: string | null
@@ -125,7 +131,10 @@ export type Database = {
         Update: {
           analysis?: string | null
           created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
           id?: string
+          lesson_order?: number | null
           thumbnail_url?: string | null
           title?: string
           transcript?: string | null

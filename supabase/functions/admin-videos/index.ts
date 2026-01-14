@@ -34,7 +34,7 @@ serve(async (req) => {
         const { data, error } = await supabase
           .from("videos")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("lesson_order", { ascending: true });
 
         if (error) throw error;
         return new Response(
@@ -55,6 +55,9 @@ serve(async (req) => {
             title: video.title,
             transcript: video.transcript || null,
             analysis: video.analysis || null,
+            description: video.description || null,
+            duration_minutes: video.duration_minutes || null,
+            lesson_order: video.lesson_order || 1,
             thumbnail_url: video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`,
           })
           .select()
@@ -62,7 +65,7 @@ serve(async (req) => {
 
         if (error) throw error;
         return new Response(
-          JSON.stringify({ video: data, message: "Vídeo adicionado com sucesso" }),
+          JSON.stringify({ video: data, message: "Aula adicionada com sucesso" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -72,21 +75,26 @@ serve(async (req) => {
           throw new Error("id é obrigatório para atualização");
         }
 
+        // Build update object with only provided fields
+        const updateData: Record<string, unknown> = {};
+        if (video.title !== undefined) updateData.title = video.title;
+        if (video.transcript !== undefined) updateData.transcript = video.transcript;
+        if (video.analysis !== undefined) updateData.analysis = video.analysis;
+        if (video.description !== undefined) updateData.description = video.description;
+        if (video.duration_minutes !== undefined) updateData.duration_minutes = video.duration_minutes;
+        if (video.lesson_order !== undefined) updateData.lesson_order = video.lesson_order;
+        if (video.thumbnail_url !== undefined) updateData.thumbnail_url = video.thumbnail_url;
+
         const { data, error } = await supabase
           .from("videos")
-          .update({
-            title: video.title,
-            transcript: video.transcript,
-            analysis: video.analysis,
-            thumbnail_url: video.thumbnail_url,
-          })
+          .update(updateData)
           .eq("id", video.id)
           .select()
           .single();
 
         if (error) throw error;
         return new Response(
-          JSON.stringify({ video: data, message: "Vídeo atualizado com sucesso" }),
+          JSON.stringify({ video: data, message: "Aula atualizada com sucesso" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

@@ -4,7 +4,9 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, CheckCircle, Circle, PlayCircle, Clock, BookOpen } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 interface SavedVideo {
   id: string;
@@ -13,6 +15,9 @@ interface SavedVideo {
   transcript: string | null;
   analysis: string | null;
   thumbnail_url: string | null;
+  lesson_order: number;
+  description: string | null;
+  duration_minutes: number | null;
 }
 
 interface VideoInfo {
@@ -23,6 +28,9 @@ interface VideoInfo {
   hasTranscript?: boolean;
   transcript?: string | null;
   analysis: string;
+  lessonNumber: number;
+  description?: string | null;
+  duration?: number | null;
 }
 
 const Student = () => {
@@ -30,6 +38,7 @@ const Student = () => {
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
   const [showVideoList, setShowVideoList] = useState(true);
+  const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
 
   useEffect(() => {
     const loadSavedVideos = async () => {
@@ -37,14 +46,14 @@ const Student = () => {
         const { data, error } = await supabase
           .from('videos')
           .select('*')
-          .order('created_at', { ascending: false });
+          .order('lesson_order', { ascending: true });
 
         if (error) throw error;
         setSavedVideos(data || []);
         
-        // Auto-select first video
+        // Auto-select first lesson
         if (data && data.length > 0) {
-          selectVideo(data[0]);
+          selectVideo(data[0], 0);
         }
       } catch (err) {
         console.error('Error loading saved videos:', err);
@@ -56,7 +65,7 @@ const Student = () => {
     loadSavedVideos();
   }, []);
 
-  const selectVideo = (video: SavedVideo) => {
+  const selectVideo = (video: SavedVideo, index: number) => {
     setSelectedVideo({
       videoId: video.youtube_id,
       title: video.title,
@@ -65,10 +74,28 @@ const Student = () => {
       hasTranscript: !!video.transcript,
       transcript: video.transcript,
       analysis: video.analysis || `Vídeo: ${video.title}`,
+      lessonNumber: video.lesson_order,
+      description: video.description,
+      duration: video.duration_minutes,
     });
+    setCurrentLessonIndex(index);
     // On mobile, hide the video list after selection
     if (window.innerWidth < 1024) {
       setShowVideoList(false);
+    }
+  };
+
+  const goToNextLesson = () => {
+    if (currentLessonIndex < savedVideos.length - 1) {
+      const nextVideo = savedVideos[currentLessonIndex + 1];
+      selectVideo(nextVideo, currentLessonIndex + 1);
+    }
+  };
+
+  const goToPreviousLesson = () => {
+    if (currentLessonIndex > 0) {
+      const prevVideo = savedVideos[currentLessonIndex - 1];
+      selectVideo(prevVideo, currentLessonIndex - 1);
     }
   };
 
@@ -76,17 +103,58 @@ const Student = () => {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-3">
-          <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl gradient-primary">
-            <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl gradient-primary">
+              <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl font-bold truncate">Sala de Aula</h1>
+                {selectedVideo && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    Aula {selectedVideo.lessonNumber} de {savedVideos.length}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                {selectedVideo?.title || 'Selecione uma aula para começar'}
+              </p>
+            </div>
+            
+            {/* Lesson Navigation */}
+            {selectedVideo && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={goToPreviousLesson}
+                  disabled={currentLessonIndex === 0}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={goToNextLesson}
+                  disabled={currentLessonIndex === savedVideos.length - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            <ThemeToggle />
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-lg sm:text-xl font-bold truncate">Sala de Aula</h1>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">
-              {selectedVideo?.title || 'Selecione um vídeo para começar'}
-            </p>
-          </div>
-          <ThemeToggle />
+          
+          {/* Progress bar */}
+          {savedVideos.length > 0 && (
+            <div className="mt-2">
+              <Progress value={((currentLessonIndex + 1) / savedVideos.length) * 100} className="h-1" />
+            </div>
+          )}
         </div>
       </header>
 
@@ -127,7 +195,7 @@ const Student = () => {
               </div>
             ) : (
               <div className="space-y-2">
-                {savedVideos.map((video) => (
+                {savedVideos.map((video, index) => (
                   <Card
                     key={video.id}
                     className={`cursor-pointer transition-all hover:bg-accent ${
@@ -135,19 +203,30 @@ const Student = () => {
                         ? 'ring-2 ring-primary bg-accent' 
                         : ''
                     }`}
-                    onClick={() => selectVideo(video)}
+                    onClick={() => selectVideo(video, index)}
                   >
-                    <CardContent className="p-2 flex gap-2">
+                    <CardContent className="p-2 flex gap-2 items-center">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        {video.lesson_order}
+                      </div>
                       <img
                         src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
                         alt={video.title}
-                        className="w-16 h-10 object-cover rounded flex-shrink-0"
+                        className="w-12 h-8 object-cover rounded flex-shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium line-clamp-2">{video.title}</p>
-                        {video.transcript && (
-                          <p className="text-[9px] text-green-600 mt-0.5">✓ Com transcrição</p>
-                        )}
+                        <p className="text-xs font-medium line-clamp-1">{video.title}</p>
+                        <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5">
+                          {video.duration_minutes && (
+                            <span className="flex items-center gap-0.5">
+                              <Clock className="h-2.5 w-2.5" />
+                              {video.duration_minutes} min
+                            </span>
+                          )}
+                          {video.transcript && (
+                            <span className="text-green-600">✓ Transcrição</span>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
