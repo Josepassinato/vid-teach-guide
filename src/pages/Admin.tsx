@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Upload, Users } from 'lucide-react';
 
 interface Video {
   id: string;
@@ -39,6 +39,8 @@ export default function Admin() {
   const [newVideoTranscript, setNewVideoTranscript] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [editTranscript, setEditTranscript] = useState('');
+  const [editAnalysis, setEditAnalysis] = useState('');
+  const [newVideoAnalysis, setNewVideoAnalysis] = useState('');
 
   const extractYoutubeId = (url: string): string | null => {
     const patterns = [
@@ -111,6 +113,7 @@ export default function Admin() {
             youtube_id: youtubeId,
             title: newVideoTitle.trim(),
             transcript: newVideoTranscript.trim() || null,
+            analysis: newVideoAnalysis.trim() || null,
           }
         }
       });
@@ -123,6 +126,7 @@ export default function Admin() {
       setNewVideoUrl('');
       setNewVideoTitle('');
       setNewVideoTranscript('');
+      setNewVideoAnalysis('');
       loadVideos();
     } catch (err: any) {
       toast.error(err.message || 'Erro ao adicionar vídeo');
@@ -144,6 +148,7 @@ export default function Admin() {
             id: editingVideo.id,
             title: editTitle.trim(),
             transcript: editTranscript.trim() || null,
+            analysis: editAnalysis.trim() || null,
           }
         }
       });
@@ -189,6 +194,7 @@ export default function Admin() {
     setEditingVideo(video);
     setEditTitle(video.title);
     setEditTranscript(video.transcript || '');
+    setEditAnalysis(video.analysis || '');
     setIsEditDialogOpen(true);
   };
 
@@ -249,34 +255,59 @@ export default function Admin() {
                   Adicionar Vídeo
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Adicionar Novo Vídeo</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>URL do YouTube</Label>
-                    <Input
-                      placeholder="https://www.youtube.com/watch?v=..."
-                      value={newVideoUrl}
-                      onChange={(e) => setNewVideoUrl(e.target.value)}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>URL do YouTube</Label>
+                      <Input
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        value={newVideoUrl}
+                        onChange={(e) => setNewVideoUrl(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Título</Label>
+                      <Input
+                        placeholder="Título do vídeo"
+                        value={newVideoTitle}
+                        onChange={(e) => setNewVideoTitle(e.target.value)}
+                      />
+                    </div>
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label>Título</Label>
-                    <Input
-                      placeholder="Título do vídeo"
-                      value={newVideoTitle}
-                      onChange={(e) => setNewVideoTitle(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Transcrição (opcional)</Label>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <Label>Transcrição</Label>
+                      <span className="text-xs text-muted-foreground">(Necessária para o professor IA ensinar corretamente)</span>
+                    </div>
                     <Textarea
-                      placeholder="Cole a transcrição do vídeo aqui..."
+                      placeholder="Cole a transcrição completa do vídeo aqui. Quanto mais detalhada, melhor será o ensino do professor IA..."
                       value={newVideoTranscript}
                       onChange={(e) => setNewVideoTranscript(e.target.value)}
-                      rows={6}
+                      rows={8}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      💡 Dica: Use ferramentas como YouTube Transcript ou Whisper para extrair a transcrição do vídeo
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-4 w-4 text-muted-foreground" />
+                      <Label>Análise/Resumo</Label>
+                      <span className="text-xs text-muted-foreground">(Opcional - pontos principais do vídeo)</span>
+                    </div>
+                    <Textarea
+                      placeholder="Resumo dos pontos principais do vídeo, conceitos-chave, etc..."
+                      value={newVideoAnalysis}
+                      onChange={(e) => setNewVideoAnalysis(e.target.value)}
+                      rows={4}
                     />
                   </div>
                 </div>
@@ -290,6 +321,10 @@ export default function Admin() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            <Button variant="outline" onClick={() => navigate('/aluno')}>
+              <Users className="h-4 w-4 mr-2" />
+              Área do Aluno
+            </Button>
             <Button variant="ghost" onClick={() => navigate('/')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar
@@ -386,7 +421,7 @@ export default function Admin() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Vídeo</DialogTitle>
           </DialogHeader>
@@ -398,12 +433,34 @@ export default function Admin() {
                 onChange={(e) => setEditTitle(e.target.value)}
               />
             </div>
+            
             <div className="space-y-2">
-              <Label>Transcrição</Label>
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <Label>Transcrição</Label>
+              </div>
               <Textarea
                 value={editTranscript}
                 onChange={(e) => setEditTranscript(e.target.value)}
-                rows={8}
+                rows={10}
+                className="font-mono text-sm"
+                placeholder="Cole a transcrição completa do vídeo aqui..."
+              />
+              <p className="text-xs text-muted-foreground">
+                💡 A transcrição é usada pelo professor IA para ensinar o conteúdo do vídeo
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Upload className="h-4 w-4 text-muted-foreground" />
+                <Label>Análise/Resumo</Label>
+              </div>
+              <Textarea
+                value={editAnalysis}
+                onChange={(e) => setEditAnalysis(e.target.value)}
+                rows={4}
+                placeholder="Resumo dos pontos principais do vídeo..."
               />
             </div>
           </div>

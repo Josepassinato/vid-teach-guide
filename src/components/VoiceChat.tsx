@@ -24,9 +24,10 @@ interface VoiceChatProps {
   videoId?: string;
   videoTitle?: string;
   videoTranscript?: string | null;
+  isStudentMode?: boolean;
 }
 
-export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, isStudentMode = false }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
