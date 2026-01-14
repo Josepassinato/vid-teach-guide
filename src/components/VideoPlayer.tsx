@@ -27,6 +27,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const isReadyRef = useRef(false);
     const timeIntervalRef = useRef<number | null>(null);
     const pendingActionsRef = useRef<Array<() => void>>([]);
+    const [userInteracted, setUserInteracted] = useState(false);
 
     useEffect(() => {
       // Load YouTube IFrame API
@@ -228,6 +229,25 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    // Handle first interaction to unlock programmatic playback
+    const handleUnlockPlayback = () => {
+      if (!userInteracted && playerRef.current) {
+        setUserInteracted(true);
+        // Start playing then immediately pause to unlock
+        try {
+          playerRef.current.mute();
+          playerRef.current.playVideo();
+          setTimeout(() => {
+            playerRef.current?.pauseVideo();
+            playerRef.current?.seekTo(0, true);
+            console.log('VideoPlayer: Playback unlocked by user interaction');
+          }, 100);
+        } catch (e) {
+          console.warn('Failed to unlock playback:', e);
+        }
+      }
+    };
+
     return (
       <Card className="overflow-hidden">
         <div className="relative aspect-video bg-black">
@@ -236,6 +256,20 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           {!isReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
               <div className="animate-pulse text-muted-foreground">Carregando player...</div>
+            </div>
+          )}
+          
+          {/* Unlock overlay - requires user click to enable programmatic control */}
+          {isReady && !userInteracted && (
+            <div 
+              className="absolute inset-0 flex items-center justify-center bg-black/60 cursor-pointer z-10"
+              onClick={handleUnlockPlayback}
+            >
+              <div className="text-center text-white">
+                <Play className="h-12 w-12 mx-auto mb-2 opacity-90" />
+                <p className="text-sm font-medium">Clique para habilitar</p>
+                <p className="text-xs opacity-75">Permite controle por voz</p>
+              </div>
             </div>
           )}
         </div>
