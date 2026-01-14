@@ -58,7 +58,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
 
     // No pre-configured moments, need transcript to generate
     if (!transcript && !analysis) {
-      options.onError?.('Nenhum conteúdo disponível para análise');
+      // Silently skip - no content to analyze
       return null;
     }
 
@@ -69,7 +69,14 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
         body: { transcript, title, analysis }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a rate limit error - fail silently
+        if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+          console.warn('[ContentManager] Rate limited, skipping AI analysis');
+          return null;
+        }
+        throw error;
+      }
 
       const plan: ContentPlan = data;
       setContentPlan(plan);
@@ -80,9 +87,8 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       
       return plan;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao analisar conteúdo';
-      options.onError?.(errorMessage);
-      toast.error(errorMessage);
+      // Fail silently for most errors - pre-configured moments are preferred anyway
+      console.warn('[ContentManager] AI analysis failed:', error);
       return null;
     } finally {
       setIsLoading(false);
