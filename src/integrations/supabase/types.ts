@@ -14,6 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
+      student_observations: {
+        Row: {
+          confidence_level: number | null
+          context: string | null
+          created_at: string
+          emotional_state: string | null
+          id: string
+          observation_data: Json
+          observation_type: string
+          student_id: string
+          video_id: string | null
+        }
+        Insert: {
+          confidence_level?: number | null
+          context?: string | null
+          created_at?: string
+          emotional_state?: string | null
+          id?: string
+          observation_data: Json
+          observation_type: string
+          student_id: string
+          video_id?: string | null
+        }
+        Update: {
+          confidence_level?: number | null
+          context?: string | null
+          created_at?: string
+          emotional_state?: string | null
+          id?: string
+          observation_data?: Json
+          observation_type?: string
+          student_id?: string
+          video_id?: string | null
+        }
+        Relationships: []
+      }
+      student_profiles: {
+        Row: {
+          areas_to_improve: string[] | null
+          created_at: string
+          emotional_patterns: Json | null
+          id: string
+          interaction_count: number | null
+          last_seen_at: string | null
+          learning_style: string | null
+          name: string | null
+          personality_notes: string | null
+          preferences: Json | null
+          strengths: string[] | null
+          student_id: string
+          total_study_time_minutes: number | null
+          updated_at: string
+        }
+        Insert: {
+          areas_to_improve?: string[] | null
+          created_at?: string
+          emotional_patterns?: Json | null
+          id?: string
+          interaction_count?: number | null
+          last_seen_at?: string | null
+          learning_style?: string | null
+          name?: string | null
+          personality_notes?: string | null
+          preferences?: Json | null
+          strengths?: string[] | null
+          student_id: string
+          total_study_time_minutes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          areas_to_improve?: string[] | null
+          created_at?: string
+          emotional_patterns?: Json | null
+          id?: string
+          interaction_count?: number | null
+          last_seen_at?: string | null
+          learning_style?: string | null
+          name?: string | null
+          personality_notes?: string | null
+          preferences?: Json | null
+          strengths?: string[] | null
+          student_id?: string
+          total_study_time_minutes?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       videos: {
         Row: {
           analysis: string | null

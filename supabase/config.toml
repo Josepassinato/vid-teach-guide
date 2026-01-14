@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.content-manager]
 verify_jwt = false
+
+[functions.vision-analysis]
+verify_jwt = false
