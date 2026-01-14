@@ -31,6 +31,7 @@ interface SavedVideo {
 
 interface VideoInfo {
   videoId: string;
+  dbId: string; // UUID for database queries
   title: string;
   author: string;
   thumbnail: string;
@@ -50,6 +51,7 @@ const Student = () => {
   const [showVideoList, setShowVideoList] = useState(true);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [showQuiz, setShowQuiz] = useState(false);
+  const [generatedMoments, setGeneratedMoments] = useState<TeachingMoment[] | null>(null);
   
   const [studentId] = useState(() => {
     const stored = localStorage.getItem('studentId');
@@ -103,8 +105,12 @@ const Student = () => {
       ? video.teaching_moments as TeachingMoment[]
       : null;
     
+    // Clear generated moments when switching videos
+    setGeneratedMoments(null);
+    
     setSelectedVideo({
       videoId: video.youtube_id,
+      dbId: video.id, // UUID for database queries
       title: video.title,
       author: '',
       thumbnail: video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`,
@@ -382,10 +388,12 @@ const Student = () => {
                   </div>
                 )}
 
-                {/* Teaching Moments */}
+                {/* Teaching Moments - show generated moments if available, otherwise pre-configured */}
                 {selectedVideo && (
                   <div className="pt-4 border-t">
-                    <TeachingMomentsList moments={selectedVideo.teachingMoments} />
+                    <TeachingMomentsList 
+                      moments={generatedMoments || selectedVideo.teachingMoments} 
+                    />
                   </div>
                 )}
               </div>
@@ -417,10 +425,12 @@ const Student = () => {
               <VoiceChat
                 videoContext={selectedVideo.transcript || selectedVideo.analysis}
                 videoId={selectedVideo.videoId}
+                videoDbId={selectedVideo.dbId}
                 videoTitle={selectedVideo.title}
                 videoTranscript={selectedVideo.transcript}
                 preConfiguredMoments={selectedVideo.teachingMoments}
                 isStudentMode={true}
+                onContentPlanReady={(moments) => setGeneratedMoments(moments)}
               />
               
               {/* Quiz Section */}
