@@ -9,6 +9,8 @@ interface VideoInfo {
   title: string;
   author: string;
   thumbnail: string;
+  hasTranscript?: boolean;
+  transcript?: string | null;
   analysis: string;
 }
 
@@ -75,7 +77,7 @@ const Index = () => {
           {/* Right Panel - Voice Chat */}
           <div className="min-h-[400px] lg:h-full">
             <VoiceChat 
-              videoContext={videoInfo?.analysis} 
+              videoContext={videoInfo?.transcript || videoInfo?.analysis} 
               videoId={videoInfo?.videoId}
               videoTitle={videoInfo?.title}
             />

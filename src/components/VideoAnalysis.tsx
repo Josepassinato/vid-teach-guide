@@ -12,6 +12,7 @@ interface VideoInfo {
   author: string;
   thumbnail: string;
   hasTranscript?: boolean;
+  transcript?: string | null;
   analysis: string;
 }
 
