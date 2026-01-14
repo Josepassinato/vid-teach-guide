@@ -363,6 +363,8 @@ MINI QUIZZES (Perguntas interativas):
 
   // Handle agent connection events - process pending actions
   useEffect(() => {
+    let introTimeout: ReturnType<typeof setTimeout> | null = null;
+    
     if (status === 'connected') {
       // Start microphone when connected
       if (!isListening) {
@@ -402,7 +404,7 @@ INSTRUÇÕES:
       if (agentMode === 'intro' && !introCompletedRef.current) {
         introCompletedRef.current = true;
         // After intro speech, start video and disconnect to save tokens
-        const introTimeout = setTimeout(() => {
+        introTimeout = setTimeout(() => {
           if (statusRef.current === 'connected') {
             sendText('[SISTEMA] Sua introdução foi ótima! Agora vou começar o vídeo. Você será reconectado nos momentos de pausa para interagir com o aluno.');
             setTimeout(() => {
@@ -415,10 +417,15 @@ INSTRUÇÕES:
             }, 2000);
           }
         }, 15000); // Give 15 seconds for intro
-        
-        return () => clearTimeout(introTimeout);
       }
     }
+    
+    // Always return cleanup function to avoid hooks order issues
+    return () => {
+      if (introTimeout) {
+        clearTimeout(introTimeout);
+      }
+    };
   }, [status, pendingReconnect, agentMode, isListening, startListening, sendText, generateTeacherInstructions, disconnect]);
 
   // Monitor video time for teaching moments and quizzes (works even when disconnected)
