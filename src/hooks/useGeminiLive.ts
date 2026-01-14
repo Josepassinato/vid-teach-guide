@@ -410,6 +410,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         } 
       });
       

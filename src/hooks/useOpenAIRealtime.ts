@@ -198,9 +198,9 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             },
             turn_detection: {
               type: "server_vad",
-              threshold: 0.7,
-              prefix_padding_ms: 400,
-              silence_duration_ms: 800
+              threshold: 0.85,
+              prefix_padding_ms: 500,
+              silence_duration_ms: 1200
             },
             tools: tools,
             tool_choice: "auto"
@@ -405,6 +405,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         } 
       });
       
