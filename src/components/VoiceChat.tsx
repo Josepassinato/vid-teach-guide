@@ -54,6 +54,10 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
     },
   });
 
+  // Refs for callbacks that need access to sendText/status
+  const sendTextRef = useRef<((text: string) => void) | null>(null);
+  const statusRef = useRef<string>('disconnected');
+
   // Vision Analysis for emotional detection
   const {
     isActive: isVisionActive,
@@ -79,8 +83,8 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
       // If engagement is low or student seems confused/frustrated, notify the AI
       if (analysis.engagement_level === 'low' || 
           ['confuso', 'frustrado', 'entediado', 'cansado'].includes(analysis.emotion)) {
-        if (status === 'connected') {
-          sendText(`[SISTEMA - OBSERVAÇÃO DO ALUNO] Estado emocional detectado: ${analysis.emotion}. Engajamento: ${analysis.engagement_level}. ${analysis.details}. Sugestões: ${analysis.suggestions?.join(', ') || 'Nenhuma'}`);
+        if (statusRef.current === 'connected' && sendTextRef.current) {
+          sendTextRef.current(`[SISTEMA - OBSERVAÇÃO DO ALUNO] Estado emocional detectado: ${analysis.emotion}. Engajamento: ${analysis.engagement_level}. ${analysis.details}. Sugestões: ${analysis.suggestions?.join(', ') || 'Nenhuma'}`);
         }
       }
     },
@@ -253,6 +257,12 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
       toast.error(error);
     }
   });
+
+  // Update refs when values change
+  useEffect(() => {
+    sendTextRef.current = sendText;
+    statusRef.current = status;
+  }, [sendText, status]);
 
   // Monitor video time for teaching moments
   useEffect(() => {
