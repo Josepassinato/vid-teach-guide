@@ -246,8 +246,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         }];
         
         // Send setup message with Gemini 2.0 Flash
-        // Using Kore voice - warm female voice, better for Portuguese
-        // Other options: Charon (deep male), Fenrir (energetic), Aoede (warm female), Puck (playful)
+        // Using Charon voice - deep male voice with authority
+        // Other options: Fenrir (energetic male), Kore (warm female), Aoede (warm female), Puck (playful)
         ws.send(JSON.stringify({
           setup: {
             model: "models/gemini-2.0-flash-exp",
@@ -257,7 +257,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
                 languageCode: "pt-BR",
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: "Kore"
+                    voiceName: "Charon"
                   }
                 }
               }
