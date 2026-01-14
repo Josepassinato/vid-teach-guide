@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LessonProgress {
@@ -32,6 +32,10 @@ export function useStudentProgress(options: UseStudentProgressOptions = {}) {
     totalWatchTimeMinutes: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Use ref to avoid re-creating loadProgress when options change
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   // Initialize student ID
   useEffect(() => {
@@ -90,13 +94,13 @@ export function useStudentProgress(options: UseStudentProgressOptions = {}) {
       };
 
       setStats(newStats);
-      options.onProgressUpdate?.(newStats);
+      optionsRef.current.onProgressUpdate?.(newStats);
     } catch (error) {
       console.error('[StudentProgress] Error loading progress:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [studentId, options]);
+  }, [studentId]);
 
   // Load progress when student ID is available
   useEffect(() => {
