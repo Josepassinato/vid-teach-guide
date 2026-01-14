@@ -5,7 +5,7 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3 } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TeachingMoment } from '@/hooks/useContentManager';
@@ -13,6 +13,7 @@ import { useStudentProgress } from '@/hooks/useStudentProgress';
 import { LessonQuiz } from '@/components/LessonQuiz';
 import { TeachingMomentsList } from '@/components/TeachingMomentsList';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface SavedVideo {
   id: string;
@@ -50,7 +51,6 @@ const Student = () => {
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [showQuiz, setShowQuiz] = useState(false);
   
-  // Generate a simple student ID (in a real app this would come from auth)
   const [studentId] = useState(() => {
     const stored = localStorage.getItem('studentId');
     if (stored) return stored;
@@ -59,14 +59,12 @@ const Student = () => {
     return newId;
   });
 
-  // Memoize the progress update callback
   const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
     if (newStats.progressPercentage === 100) {
       toast.success('🎉 Parabéns! Você completou todas as aulas!');
     }
   }, []);
 
-  // Student progress tracking
   const {
     stats,
     isLessonCompleted,
@@ -75,26 +73,19 @@ const Student = () => {
   } = useStudentProgress({
     onProgressUpdate: handleProgressUpdate
   });
+
   useEffect(() => {
     const loadSavedVideos = async () => {
-      console.log('[Student] Loading saved videos...');
       try {
         const { data, error } = await supabase
           .from('videos')
           .select('*')
           .order('lesson_order', { ascending: true });
 
-        if (error) {
-          console.error('[Student] Error loading videos:', error);
-          throw error;
-        }
-        
-        console.log('[Student] Videos loaded:', data?.length || 0);
+        if (error) throw error;
         setSavedVideos(data || []);
         
-        // Auto-select first lesson
         if (data && data.length > 0) {
-          console.log('[Student] Auto-selecting first video:', data[0].title);
           selectVideo(data[0], 0);
         }
       } catch (err) {
@@ -108,19 +99,9 @@ const Student = () => {
   }, []);
 
   const selectVideo = (video: SavedVideo, index: number) => {
-    console.log('[Student] Selecting video:', {
-      id: video.id,
-      title: video.title,
-      hasTranscript: !!video.transcript,
-      teachingMomentsCount: Array.isArray(video.teaching_moments) ? video.teaching_moments.length : 0
-    });
-    
-    // Parse teaching moments from JSON
     const moments = Array.isArray(video.teaching_moments) 
       ? video.teaching_moments as TeachingMoment[]
       : null;
-    
-    console.log('[Student] Parsed teaching moments:', moments?.length || 0);
     
     setSelectedVideo({
       videoId: video.youtube_id,
@@ -136,7 +117,6 @@ const Student = () => {
       teachingMoments: moments,
     });
     setCurrentLessonIndex(index);
-    // On mobile, hide the video list after selection
     if (window.innerWidth < 1024) {
       setShowVideoList(false);
     }
@@ -144,15 +124,13 @@ const Student = () => {
 
   const goToNextLesson = () => {
     if (currentLessonIndex < savedVideos.length - 1) {
-      const nextVideo = savedVideos[currentLessonIndex + 1];
-      selectVideo(nextVideo, currentLessonIndex + 1);
+      selectVideo(savedVideos[currentLessonIndex + 1], currentLessonIndex + 1);
     }
   };
 
   const goToPreviousLesson = () => {
     if (currentLessonIndex > 0) {
-      const prevVideo = savedVideos[currentLessonIndex - 1];
-      selectVideo(prevVideo, currentLessonIndex - 1);
+      selectVideo(savedVideos[currentLessonIndex - 1], currentLessonIndex - 1);
     }
   };
 
@@ -166,55 +144,74 @@ const Student = () => {
     }
   };
 
-  const handleOpenQuiz = () => {
-    setShowQuiz(true);
-  };
+  const handleOpenQuiz = () => setShowQuiz(true);
 
   const handleQuizComplete = async (passed: boolean) => {
-    if (passed) {
-      await handleMarkComplete();
-    }
+    if (passed) await handleMarkComplete();
   };
+
+  // Google colors for decorative elements
+  const googleColors = ['bg-google-blue', 'bg-google-red', 'bg-google-yellow', 'bg-google-green'];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl gradient-primary">
-              <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-            </div>
+      {/* Modern Header with Google-style gradient accent */}
+      <header className="border-b bg-card/80 backdrop-blur-lg sticky top-0 z-10">
+        {/* Colorful top bar */}
+        <div className="h-1 flex">
+          <div className="flex-1 bg-google-blue" />
+          <div className="flex-1 bg-google-red" />
+          <div className="flex-1 bg-google-yellow" />
+          <div className="flex-1 bg-google-green" />
+        </div>
+        
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center gap-3">
+            {/* Logo with gradient */}
+            <motion.div 
+              className="p-2.5 rounded-2xl bg-primary shadow-medium"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <GraduationCap className="h-6 w-6 text-white" />
+            </motion.div>
+            
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-bold truncate">Sala de Aula</h1>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+                  Vibe Class
+                </h1>
                 {selectedVideo && (
-                  <Badge variant="secondary" className="text-[10px]">
-                    Aula {selectedVideo.lessonNumber} de {savedVideos.length}
+                  <Badge className="bg-primary/10 text-primary border-0 font-medium">
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Aula {selectedVideo.lessonNumber}
                   </Badge>
                 )}
               </div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                {selectedVideo?.title || 'Selecione uma aula para começar'}
+              <p className="text-xs text-muted-foreground truncate">
+                {selectedVideo?.title || 'Aprenda programação com IA'}
               </p>
             </div>
             
-            {/* Lesson Navigation */}
+            {/* Navigation Pills */}
             {selectedVideo && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 bg-muted rounded-full p-1">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full hover:bg-background"
                   onClick={goToPreviousLesson}
                   disabled={currentLessonIndex === 0}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
+                <span className="text-xs font-medium px-2">
+                  {currentLessonIndex + 1}/{savedVideos.length}
+                </span>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full hover:bg-background"
                   onClick={goToNextLesson}
                   disabled={currentLessonIndex === savedVideos.length - 1}
                 >
@@ -223,8 +220,12 @@ const Student = () => {
               </div>
             )}
 
-            {/* Dashboard Link */}
-            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9 rounded-full" 
+              asChild
+            >
               <Link to="/aluno/dashboard">
                 <BarChart3 className="h-4 w-4" />
               </Link>
@@ -233,18 +234,31 @@ const Student = () => {
             <ThemeToggle />
           </div>
           
-          {/* Progress Stats */}
+          {/* Progress Bar with Google colors */}
           {stats.totalLessons > 0 && (
-            <div className="mt-2 flex items-center gap-3">
-              <Progress value={stats.progressPercentage} className="h-2 flex-1" />
-              <div className="flex items-center gap-2 text-xs">
-                <Badge variant={stats.progressPercentage === 100 ? "default" : "secondary"} className="flex items-center gap-1">
-                  {stats.progressPercentage === 100 ? <Trophy className="h-3 w-3" /> : <Award className="h-3 w-3" />}
-                  {stats.completedLessons}/{stats.totalLessons}
-                </Badge>
-                <span className="text-muted-foreground hidden sm:inline">
-                  {stats.progressPercentage}% concluído
+            <div className="mt-3 space-y-2">
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full gradient-cool rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${stats.progressPercentage}%` }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {stats.completedLessons} de {stats.totalLessons} aulas concluídas
                 </span>
+                <Badge 
+                  variant="secondary" 
+                  className={`${stats.progressPercentage === 100 ? 'bg-accent text-white' : ''}`}
+                >
+                  {stats.progressPercentage === 100 ? (
+                    <><Trophy className="h-3 w-3 mr-1" /> Completo!</>
+                  ) : (
+                    <><Award className="h-3 w-3 mr-1" /> {stats.progressPercentage}%</>
+                  )}
+                </Badge>
               </div>
             </div>
           )}
@@ -253,111 +267,150 @@ const Student = () => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Video List Sidebar */}
-        <div 
-          className={`
-            ${showVideoList ? 'w-full lg:w-64 xl:w-72' : 'w-0'} 
-            border-r bg-card transition-all duration-300 overflow-hidden flex-shrink-0
-          `}
-        >
-          <div className="p-3 h-full overflow-y-auto space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold flex items-center gap-2">
-                  <Video className="h-4 w-4 text-primary" />
-                  Aulas
-                </h2>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 lg:hidden"
-                  onClick={() => setShowVideoList(false)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
+        {/* Sidebar - Video List */}
+        <AnimatePresence>
+          {showVideoList && (
+            <motion.div 
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 'auto', opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="w-full lg:w-72 xl:w-80 border-r bg-card/50 backdrop-blur-sm flex-shrink-0 overflow-hidden"
+            >
+              <div className="p-4 h-full overflow-y-auto space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-primary/10">
+                      <Video className="h-4 w-4 text-primary" />
+                    </div>
+                    Suas Aulas
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 lg:hidden rounded-full"
+                    onClick={() => setShowVideoList(false)}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {isLoadingVideos ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-24 bg-muted animate-pulse rounded-2xl" />
+                    ))}
+                  </div>
+                ) : savedVideos.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="p-4 rounded-full bg-muted inline-block mb-4">
+                      <Video className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground">Nenhuma aula disponível</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {savedVideos.map((video, index) => {
+                      const completed = isLessonCompleted(video.id);
+                      const isActive = selectedVideo?.videoId === video.youtube_id;
+                      const colorIndex = index % 4;
+                      
+                      return (
+                        <motion.div
+                          key={video.id}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Card
+                            className={`cursor-pointer transition-all overflow-hidden ${
+                              isActive 
+                                ? 'ring-2 ring-primary shadow-medium' 
+                                : 'hover:shadow-soft'
+                            } ${completed ? 'bg-accent/5' : ''}`}
+                            onClick={() => selectVideo(video, index)}
+                          >
+                            <CardContent className="p-0">
+                              <div className="flex gap-3 p-3">
+                                {/* Thumbnail with overlay */}
+                                <div className="relative w-20 h-14 rounded-xl overflow-hidden flex-shrink-0">
+                                  <img
+                                    src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
+                                    alt={video.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  {completed && (
+                                    <div className="absolute inset-0 bg-accent/80 flex items-center justify-center">
+                                      <CheckCircle className="h-6 w-6 text-white" />
+                                    </div>
+                                  )}
+                                  {!completed && isActive && (
+                                    <div className="absolute inset-0 bg-primary/80 flex items-center justify-center">
+                                      <Play className="h-5 w-5 text-white fill-white" />
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${googleColors[colorIndex]}`}>
+                                      {video.lesson_order}
+                                    </div>
+                                  </div>
+                                  <p className="text-sm font-medium line-clamp-1">
+                                    {video.title}
+                                  </p>
+                                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
+                                    {video.duration_minutes && (
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {video.duration_minutes} min
+                                      </span>
+                                    )}
+                                    {completed && (
+                                      <Badge variant="secondary" className="text-[10px] bg-accent/10 text-accent border-0">
+                                        Concluída
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Teaching Moments */}
+                {selectedVideo && (
+                  <div className="pt-4 border-t">
+                    <TeachingMomentsList moments={selectedVideo.teachingMoments} />
+                  </div>
+                )}
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-              {isLoadingVideos ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
-                  ))}
-                </div>
-              ) : savedVideos.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  Nenhuma aula disponível
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {savedVideos.map((video, index) => {
-                    const completed = isLessonCompleted(video.id);
-                    return (
-                      <Card
-                        key={video.id}
-                        className={`cursor-pointer transition-all hover:bg-accent ${
-                          selectedVideo?.videoId === video.youtube_id 
-                            ? 'ring-2 ring-primary bg-accent' 
-                            : ''
-                        } ${completed ? 'border-green-500/50' : ''}`}
-                        onClick={() => selectVideo(video, index)}
-                      >
-                        <CardContent className="p-2 flex gap-2 items-center">
-                          <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                            completed 
-                              ? 'bg-green-500 text-white' 
-                              : 'bg-primary/10 text-primary'
-                          }`}>
-                            {completed ? <CheckCircle className="h-3.5 w-3.5" /> : video.lesson_order}
-                          </div>
-                          <img
-                            src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
-                            alt={video.title}
-                            className="w-12 h-8 object-cover rounded flex-shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-xs font-medium line-clamp-1 ${completed ? 'text-green-600' : ''}`}>
-                              {video.title}
-                            </p>
-                            <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5">
-                              {video.duration_minutes && (
-                                <span className="flex items-center gap-0.5">
-                                  <Clock className="h-2.5 w-2.5" />
-                                  {video.duration_minutes} min
-                                </span>
-                              )}
-                              {completed && (
-                                <span className="text-green-600 font-medium">✓ Concluída</span>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Teaching Moments List */}
-            {selectedVideo && (
-              <TeachingMomentsList moments={selectedVideo.teachingMoments} />
-            )}
-          </div>
-        </div>
-
-        {/* Toggle Sidebar Button (when hidden) */}
+        {/* Toggle Sidebar Button */}
         {!showVideoList && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 h-12 w-6 rounded-l-none bg-card border border-l-0"
-            onClick={() => setShowVideoList(true)}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
           >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              className="fixed left-0 top-1/2 -translate-y-1/2 z-20 h-12 w-8 rounded-l-none rounded-r-2xl shadow-medium"
+              onClick={() => setShowVideoList(true)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </motion.div>
         )}
 
-        {/* Main Content Area - Video + Chat */}
+        {/* Main Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {selectedVideo ? (
             <>
@@ -369,59 +422,100 @@ const Student = () => {
                 preConfiguredMoments={selectedVideo.teachingMoments}
                 isStudentMode={true}
               />
+              
               {/* Quiz Section */}
-              {showQuiz && savedVideos[currentLessonIndex] && (
-                <div className="border-t bg-card/50 p-4">
-                  <LessonQuiz
-                    videoId={savedVideos[currentLessonIndex].id}
-                    studentId={studentId}
-                    onQuizComplete={handleQuizComplete}
-                    passingScore={70}
-                  />
-                </div>
-              )}
+              <AnimatePresence>
+                {showQuiz && savedVideos[currentLessonIndex] && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="border-t bg-card/50 backdrop-blur-sm p-4"
+                  >
+                    <LessonQuiz
+                      videoId={savedVideos[currentLessonIndex].id}
+                      studentId={studentId}
+                      onQuizComplete={handleQuizComplete}
+                      passingScore={70}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              {/* Complete Lesson Button */}
-              <div className="border-t bg-card p-3 flex items-center justify-between">
-                <div className="text-xs text-muted-foreground">
-                  {isLessonCompleted(savedVideos[currentLessonIndex]?.id) ? (
-                    <span className="text-green-600 flex items-center gap-1">
-                      <CheckCircle className="h-4 w-4" />
-                      Aula concluída
-                    </span>
-                  ) : (
-                    `Aula ${selectedVideo.lessonNumber} de ${savedVideos.length}`
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {!isLessonCompleted(savedVideos[currentLessonIndex]?.id) && !showQuiz && (
-                    <Button size="sm" variant="outline" onClick={handleOpenQuiz}>
-                      <ClipboardCheck className="h-4 w-4 mr-1" />
-                      Fazer Quiz
-                    </Button>
-                  )}
-                  {currentLessonIndex < savedVideos.length - 1 && (
-                    <Button size="sm" variant="outline" onClick={goToNextLesson}>
-                      Próxima Aula
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  )}
+              {/* Bottom Action Bar */}
+              <div className="border-t bg-card/80 backdrop-blur-sm p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm">
+                    {isLessonCompleted(savedVideos[currentLessonIndex]?.id) ? (
+                      <Badge className="bg-accent text-white border-0">
+                        <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                        Aula concluída
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Aula {selectedVideo.lessonNumber} de {savedVideos.length}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {!isLessonCompleted(savedVideos[currentLessonIndex]?.id) && !showQuiz && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={handleOpenQuiz}
+                        className="rounded-full"
+                      >
+                        <ClipboardCheck className="h-4 w-4 mr-1.5" />
+                        Fazer Quiz
+                      </Button>
+                    )}
+                    {currentLessonIndex < savedVideos.length - 1 && (
+                      <Button 
+                        size="sm" 
+                        onClick={goToNextLesson}
+                        className="rounded-full bg-primary hover:bg-primary/90"
+                      >
+                        Próxima Aula
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center bg-muted/30">
-              <div className="text-center p-8">
-                <GraduationCap className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-                <h2 className="text-xl font-semibold mb-2">Bem-vindo à Sala de Aula</h2>
-                <p className="text-muted-foreground mb-4">
-                  Selecione uma aula na lista para começar a aprender
+            <div className="flex-1 flex items-center justify-center bg-muted/20">
+              <motion.div 
+                className="text-center p-8 max-w-md"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div className="relative inline-block mb-6">
+                  <div className="p-6 rounded-3xl bg-gradient-to-br from-primary/20 via-accent/20 to-secondary/20">
+                    <GraduationCap className="h-16 w-16 text-primary" />
+                  </div>
+                  {/* Decorative dots */}
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-google-blue rounded-full" />
+                  <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-google-red rounded-full" />
+                  <div className="absolute top-1/2 -right-4 w-2 h-2 bg-google-yellow rounded-full" />
+                </div>
+                
+                <h2 className="text-2xl font-bold mb-2">
+                  Bem-vindo ao <span className="text-primary">Vibe Class</span>
+                </h2>
+                <p className="text-muted-foreground mb-6">
+                  Aprenda programação de um jeito diferente, com IA conversacional e vibe coding
                 </p>
-                <Button onClick={() => setShowVideoList(true)}>
-                  <Video className="h-4 w-4 mr-2" />
-                  Ver Aulas Disponíveis
+                <Button 
+                  onClick={() => setShowVideoList(true)}
+                  size="lg"
+                  className="rounded-full px-6"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Começar a Aprender
                 </Button>
-              </div>
+              </motion.div>
             </div>
           )}
         </div>
