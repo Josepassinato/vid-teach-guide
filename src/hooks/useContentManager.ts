@@ -49,14 +49,15 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
   ) => {
     console.log('[ContentManager] analyzeContent called:', {
       hasTranscript: !!transcript,
+      transcriptLength: transcript?.length || 0,
       title,
       hasAnalysis: !!analysis,
       preConfiguredMomentsCount: preConfiguredMoments?.length || 0
     });
 
-    // If we have pre-configured moments, use them instead of generating
+    // If we have pre-configured moments (not empty array), use them
     if (preConfiguredMoments && preConfiguredMoments.length > 0) {
-      console.log('[ContentManager] Using pre-configured moments');
+      console.log('[ContentManager] Using pre-configured moments:', preConfiguredMoments.length);
       const plan = loadPreConfiguredMoments(preConfiguredMoments);
       if (plan) {
         toast.success(`📚 ${plan.teaching_moments.length} momentos de ensino carregados`);
@@ -64,7 +65,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       }
     }
 
-    // No pre-configured moments, need transcript to generate
+    // No pre-configured moments, need transcript or analysis to generate via AI
     if (!transcript && !analysis) {
       console.log('[ContentManager] No content to analyze, skipping');
       return null;

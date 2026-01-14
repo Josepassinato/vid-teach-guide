@@ -25,13 +25,15 @@ interface Message {
 interface VoiceChatProps {
   videoContext?: string;
   videoId?: string;
+  videoDbId?: string; // UUID for database queries (quizzes, progress)
   videoTitle?: string;
   videoTranscript?: string | null;
   preConfiguredMoments?: TeachingMoment[] | null;
   isStudentMode?: boolean;
+  onContentPlanReady?: (moments: TeachingMoment[]) => void;
 }
 
-export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, preConfiguredMoments, isStudentMode = false }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, isStudentMode = false, onContentPlanReady }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
@@ -120,20 +122,24 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   } = useContentManager({
     onPlanReady: (plan) => {
       console.log('[ContentManager] Plan ready:', plan);
+      // Notify parent component when teaching moments are ready
+      if (plan.teaching_moments.length > 0 && onContentPlanReady) {
+        onContentPlanReady(plan.teaching_moments);
+      }
     },
     onError: (error) => {
       console.error('[ContentManager] Error:', error);
     },
   });
 
-  // Timestamp-based quizzes
+  // Timestamp-based quizzes - use videoDbId (UUID) for database queries
   const {
     quizzes: timestampQuizzes,
     loadQuizzes,
     getQuizForTimestamp,
     markQuizTriggered,
     recordAttempt,
-  } = useTimestampQuizzes({ videoId, studentId });
+  } = useTimestampQuizzes({ videoId: videoDbId, studentId });
 
   // Load pre-configured moments or analyze content when video changes
   useEffect(() => {
@@ -144,10 +150,15 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
       lastCheckedMomentRef.current = -1;
       setActiveMoment(null);
       setActiveQuiz(null);
-      // Load timestamp quizzes
+    }
+  }, [videoId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent]);
+
+  // Load timestamp quizzes when videoDbId changes
+  useEffect(() => {
+    if (videoDbId) {
       loadQuizzes();
     }
-  }, [videoId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent, loadQuizzes]);
+  }, [videoDbId, loadQuizzes]);
 
   // Load memory context when profile is ready
   useEffect(() => {
