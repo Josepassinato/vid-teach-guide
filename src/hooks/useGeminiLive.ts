@@ -274,7 +274,20 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       
       ws.onmessage = async (event) => {
         try {
-          const data = JSON.parse(event.data);
+          // Handle binary data (Blob)
+          let messageData = event.data;
+          
+          if (messageData instanceof Blob) {
+            messageData = await messageData.text();
+          }
+          
+          // Skip if not a string
+          if (typeof messageData !== 'string') {
+            console.log('[gemini:event] Received non-string data, skipping');
+            return;
+          }
+          
+          const data = JSON.parse(messageData);
           console.log('[gemini:event]', data);
           
           // Handle audio response
@@ -312,7 +325,12 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
             console.log('[gemini] Setup complete');
           }
         } catch (e) {
-          console.error('Error processing message:', e);
+          // Only log if it's not a parse error from binary data
+          if (e instanceof SyntaxError) {
+            console.log('[gemini:event] Non-JSON message received, likely binary audio');
+          } else {
+            console.error('Error processing message:', e);
+          }
         }
       };
       
