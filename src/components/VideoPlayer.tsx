@@ -217,14 +217,15 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             return;
           }
 
+          // Set immediately to prevent double-calls
+          userInteractedRef.current = true;
+          setUserInteracted(true);
+
           runOrQueue(() => {
-            if (userInteractedRef.current || !playerRef.current) {
-              console.log('VideoPlayer: Already unlocked or no player, skipping unlock');
+            if (!playerRef.current) {
+              console.log('VideoPlayer: No player, skipping unlock');
               return;
             }
-
-            userInteractedRef.current = true;
-            setUserInteracted(true);
 
             // Start playing (muted) then immediately pause to unlock programmatic control
             try {
@@ -246,7 +247,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           });
         },
       };
-    });
+    }, [isPlaying]);
 
     const handlePlay = () => {
       // Programmatic play may be blocked unless muted; we keep default muted.
