@@ -37,9 +37,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
   // Store callbacks in refs to avoid dependency issues
   const optionsRef = useRef(options);
-  useEffect(() => {
-    optionsRef.current = options;
-  });
+  optionsRef.current = options;
 
   // Keep videoControls ref updated
   useEffect(() => {
