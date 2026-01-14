@@ -343,6 +343,13 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
     setTextInput('');
   };
 
+  const handleStartClass = useCallback(() => {
+    // One-click student flow: use this user gesture to unlock YouTube programmatic playback
+    // (removes the "Clique para habilitar" overlay).
+    videoPlayerRef.current?.unlockPlayback?.();
+    connect();
+  }, [connect]);
+
   const toggleListening = () => {
     if (isListening) {
       stopListening();
@@ -666,7 +673,7 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
         <div className="space-y-2 sm:space-y-3 pt-2 border-t flex-shrink-0">
           <div className="flex gap-2">
             {status === 'disconnected' || status === 'error' ? (
-              <Button onClick={connect} className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
+              <Button onClick={handleStartClass} className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
                 <Phone className="h-4 w-4 mr-2" />
                 Iniciar Aula
               </Button>

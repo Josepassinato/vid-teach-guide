@@ -10,6 +10,11 @@ export interface VideoPlayerRef {
   seekTo: (seconds: number) => void;
   getCurrentTime: () => number;
   isPaused: () => boolean;
+  /**
+   * Must be called from a real user gesture (e.g. click) to unlock programmatic playback.
+   * This removes the "Clique para habilitar" overlay.
+   */
+  unlockPlayback: () => void;
 }
 
 interface VideoPlayerProps {
@@ -201,6 +206,32 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         },
         isPaused: () => {
           return !isPlaying;
+        },
+        unlockPlayback: () => {
+          console.log('VideoPlayer: unlockPlayback called');
+          runOrQueue(() => {
+            if (userInteracted || !playerRef.current) return;
+
+            setUserInteracted(true);
+
+            // Start playing (muted) then immediately pause to unlock programmatic control
+            try {
+              playerRef.current.mute();
+              setIsMuted(true);
+              playerRef.current.playVideo();
+              window.setTimeout(() => {
+                try {
+                  playerRef.current?.pauseVideo();
+                  playerRef.current?.seekTo(0, true);
+                  console.log('VideoPlayer: Playback unlocked by user interaction');
+                } catch (e) {
+                  console.warn('Failed to finalize unlock playback:', e);
+                }
+              }, 100);
+            } catch (e) {
+              console.warn('Failed to unlock playback:', e);
+            }
+          });
         },
       };
     });
