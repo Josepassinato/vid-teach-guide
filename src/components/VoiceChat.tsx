@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect, useCallback, forwardRef } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +28,7 @@ interface VoiceChatProps {
   isStudentMode?: boolean;
 }
 
-export const VoiceChat = forwardRef<HTMLDivElement, VoiceChatProps>(function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, preConfiguredMoments, isStudentMode = false }, ref) {
+export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, preConfiguredMoments, isStudentMode = false }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
@@ -357,7 +357,7 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
   };
 
   return (
-    <Card ref={ref} className="flex flex-col h-full min-h-[400px] sm:min-h-0">
+    <Card className="flex flex-col h-full min-h-[400px] sm:min-h-0">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base sm:text-lg flex items-center gap-2">
@@ -716,4 +716,4 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
       </CardContent>
     </Card>
   );
-});
+}
