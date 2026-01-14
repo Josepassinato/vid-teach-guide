@@ -25,7 +25,8 @@ interface VideoPlayerProps {
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
   ({ videoId, title }, ref) => {
     const [isPlaying, setIsPlaying] = useState(false);
-    const [isMuted, setIsMuted] = useState(true);
+    const [isMuted, setIsMuted] = useState(false);
+    const [volume, setVolume] = useState(100);
     const [currentTime, setCurrentTime] = useState(0);
     const playerRef = useRef<any>(null);
     const [isReady, setIsReady] = useState(false);
@@ -99,11 +100,12 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             setIsReady(true);
             isReadyRef.current = true;
 
-            // Keep muted by default so the first programmatic play isn't blocked.
-            // (We unmute when the agent explicitly plays/restarts.)
+            // Start with full volume unmuted
             try {
-              playerRef.current?.mute();
-              setIsMuted(true);
+              playerRef.current?.unMute();
+              playerRef.current?.setVolume(100);
+              setIsMuted(false);
+              setVolume(100);
             } catch {
               // ignore
             }
@@ -148,24 +150,13 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         play: () => {
           console.log('VideoPlayer: play called');
           runOrQueue(() => {
-            // Important: programmatic play (triggered by the agent) is often blocked
-            // if the player is unmuted. So we start muted to guarantee play works,
-            // then we *attempt* to unmute shortly after.
-            try {
-              playerRef.current?.mute();
-              setIsMuted(true);
-            } catch {}
-
             playerRef.current?.playVideo();
-
-            window.setTimeout(() => {
-              try {
-                playerRef.current?.unMute();
-                setIsMuted(false);
-              } catch {
-                // If the browser blocks unmute, user can click the volume button.
-              }
-            }, 350);
+            // Ensure volume is up
+            try {
+              playerRef.current?.unMute();
+              playerRef.current?.setVolume(100);
+              setIsMuted(false);
+            } catch {}
           });
         },
         pause: () => {
@@ -178,22 +169,13 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           console.log('VideoPlayer: restart called');
           runOrQueue(() => {
             playerRef.current?.seekTo(0, true);
-
-            try {
-              playerRef.current?.mute();
-              setIsMuted(true);
-            } catch {}
-
             playerRef.current?.playVideo();
-
-            window.setTimeout(() => {
-              try {
-                playerRef.current?.unMute();
-                setIsMuted(false);
-              } catch {
-                // If blocked, user can click the volume button.
-              }
-            }, 350);
+            // Ensure volume is up
+            try {
+              playerRef.current?.unMute();
+              playerRef.current?.setVolume(100);
+              setIsMuted(false);
+            } catch {}
           });
         },
         seekTo: (seconds: number) => {
