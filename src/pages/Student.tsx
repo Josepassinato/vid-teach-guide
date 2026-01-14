@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TeachingMoment } from '@/hooks/useContentManager';
@@ -200,6 +201,13 @@ const Student = () => {
                 </Button>
               </div>
             )}
+
+            {/* Dashboard Link */}
+            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+              <Link to="/aluno/dashboard">
+                <BarChart3 className="h-4 w-4" />
+              </Link>
+            </Button>
             
             <ThemeToggle />
           </div>
