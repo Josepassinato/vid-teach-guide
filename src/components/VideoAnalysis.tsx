@@ -392,7 +392,7 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
               </CardHeader>
               <CardContent>
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
                     <h4 className="text-sm font-medium">📚 Pontos principais:</h4>
                     {videoInfo.hasTranscript ? (
                       <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-0.5 rounded-full">
@@ -400,10 +400,24 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
                       </span>
                     ) : (
                       <span className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 px-2 py-0.5 rounded-full">
-                        Baseado no título
+                        ⚠️ Baseado apenas no título
                       </span>
                     )}
                   </div>
+                  
+                  {!videoInfo.hasTranscript && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-3">
+                      <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                        <strong>⚠️ Não foi possível acessar as legendas deste vídeo.</strong>
+                        <br />
+                        Para uma análise precisa, clique em "Adicionar transcrição" acima e:
+                        <br />• Cole as legendas manualmente, ou
+                        <br />• Faça upload de um arquivo de texto, ou
+                        <br />• Envie o áudio para transcrição via Whisper
+                      </p>
+                    </div>
+                  )}
+                  
                   <div className="text-sm whitespace-pre-wrap text-muted-foreground">
                     {videoInfo.analysis}
                   </div>
