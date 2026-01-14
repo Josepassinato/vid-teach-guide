@@ -65,59 +65,68 @@
   }
 
   .dark {
-    --background: 220 15% 10%;
-    --foreground: 210 20% 95%;
+    /* Deep dark background with subtle blue tint */
+    --background: 225 20% 7%;
+    --foreground: 210 40% 98%;
 
-    --card: 220 15% 13%;
-    --card-foreground: 210 20% 95%;
+    --card: 225 20% 10%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 220 15% 13%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 225 25% 12%;
+    --popover-foreground: 210 40% 98%;
 
-    /* Google Blue - brighter for dark */
-    --primary: 217 91% 65%;
+    /* Google Blue - VIBRANT */
+    --primary: 217 100% 65%;
     --primary-foreground: 0 0% 100%;
 
-    /* Google Yellow */
-    --secondary: 43 96% 56%;
-    --secondary-foreground: 220 15% 10%;
+    /* Google Yellow - VIBRANT */
+    --secondary: 43 100% 60%;
+    --secondary-foreground: 225 20% 7%;
 
-    /* Google Green */
-    --accent: 142 69% 50%;
+    /* Google Green - VIBRANT */
+    --accent: 142 80% 55%;
     --accent-foreground: 0 0% 100%;
 
-    /* Google Red */
-    --destructive: 4 90% 60%;
+    /* Google Red - VIBRANT */
+    --destructive: 4 100% 65%;
     --destructive-foreground: 0 0% 100%;
 
-    --muted: 220 15% 18%;
-    --muted-foreground: 215 14% 55%;
+    --muted: 225 20% 15%;
+    --muted-foreground: 215 20% 65%;
 
-    --border: 220 15% 20%;
-    --input: 220 15% 20%;
-    --ring: 217 91% 65%;
+    --border: 225 20% 18%;
+    --input: 225 20% 18%;
+    --ring: 217 100% 65%;
     
-    --sidebar-background: 220 15% 8%;
-    --sidebar-foreground: 210 20% 95%;
-    --sidebar-primary: 217 91% 65%;
+    /* Sidebar with subtle gradient feel */
+    --sidebar-background: 225 25% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 100% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 15%;
-    --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 217 91% 65%;
+    --sidebar-accent: 225 20% 12%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 225 20% 15%;
+    --sidebar-ring: 217 100% 65%;
     
-    /* Dark mode custom tokens */
-    --google-blue: 217 91% 65%;
-    --google-red: 4 90% 60%;
-    --google-yellow: 43 96% 58%;
-    --google-green: 142 69% 50%;
+    /* VIBRANT Google colors for dark mode */
+    --google-blue: 217 100% 68%;
+    --google-red: 4 100% 68%;
+    --google-yellow: 43 100% 65%;
+    --google-green: 142 80% 58%;
     
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 65%) 0%, hsl(142 69% 50%) 50%, hsl(43 96% 58%) 100%);
-    --gradient-warm: linear-gradient(135deg, hsl(43 96% 58%) 0%, hsl(4 90% 60%) 100%);
-    --gradient-cool: linear-gradient(135deg, hsl(217 91% 65%) 0%, hsl(142 69% 50%) 100%);
-    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.3), 0 1px 2px -1px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
-    --shadow-glow: 0 0 30px -5px hsl(217 91% 65% / 0.3);
+    /* Neon-inspired gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 100% 68%) 0%, hsl(280 100% 70%) 50%, hsl(4 100% 68%) 100%);
+    --gradient-warm: linear-gradient(135deg, hsl(43 100% 65%) 0%, hsl(4 100% 68%) 100%);
+    --gradient-cool: linear-gradient(135deg, hsl(217 100% 68%) 0%, hsl(142 80% 58%) 100%);
+    --gradient-rainbow: linear-gradient(90deg, hsl(217 100% 68%) 0%, hsl(4 100% 68%) 33%, hsl(43 100% 65%) 66%, hsl(142 80% 58%) 100%);
+    
+    /* Glow shadows for dark mode */
+    --shadow-soft: 0 2px 8px 0 hsl(0 0% 0% / 0.4);
+    --shadow-medium: 0 4px 16px -2px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 40px -8px hsl(217 100% 65% / 0.5);
+    --shadow-glow-red: 0 0 40px -8px hsl(4 100% 65% / 0.4);
+    --shadow-glow-green: 0 0 40px -8px hsl(142 80% 55% / 0.4);
+    --shadow-glow-yellow: 0 0 40px -8px hsl(43 100% 60% / 0.4);
   }
 }
 
@@ -145,6 +154,10 @@
     background: var(--gradient-cool);
   }
   
+  .gradient-rainbow {
+    background: var(--gradient-rainbow);
+  }
+  
   .shadow-soft {
     box-shadow: var(--shadow-soft);
   }
@@ -155,6 +168,18 @@
   
   .shadow-glow {
     box-shadow: var(--shadow-glow);
+  }
+  
+  .shadow-glow-red {
+    box-shadow: var(--shadow-glow-red);
+  }
+  
+  .shadow-glow-green {
+    box-shadow: var(--shadow-glow-green);
+  }
+  
+  .shadow-glow-yellow {
+    box-shadow: var(--shadow-glow-yellow);
   }
   
   .google-blue {
@@ -187,5 +212,32 @@
   
   .bg-google-green {
     background-color: hsl(var(--google-green));
+  }
+  
+  /* Glow effects for dark mode */
+  .dark .glow-blue {
+    box-shadow: 0 0 20px -4px hsl(var(--google-blue) / 0.6);
+  }
+  
+  .dark .glow-red {
+    box-shadow: 0 0 20px -4px hsl(var(--google-red) / 0.6);
+  }
+  
+  .dark .glow-yellow {
+    box-shadow: 0 0 20px -4px hsl(var(--google-yellow) / 0.6);
+  }
+  
+  .dark .glow-green {
+    box-shadow: 0 0 20px -4px hsl(var(--google-green) / 0.6);
+  }
+  
+  /* Neon text effect */
+  .dark .neon-text {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+  
+  /* Vibrant card hover in dark mode */
+  .dark .card-glow:hover {
+    box-shadow: 0 0 30px -10px hsl(var(--primary) / 0.4);
   }
 }
