@@ -28,6 +28,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const [isMuted, setIsMuted] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
     const playerRef = useRef<any>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
     const [isReady, setIsReady] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const isReadyRef = useRef(false);
@@ -38,7 +39,19 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const initTimeoutRef = useRef<number | null>(null);
 
     useEffect(() => {
+      let cancelled = false;
+
       setLoadError(null);
+
+      const safeInit = () => {
+        if (cancelled) return;
+        if (!containerRef.current) {
+          console.log('VideoPlayer: container not ready yet');
+          // We'll retry via the polling loop below.
+          return;
+        }
+        initPlayer();
+      };
 
       // Load YouTube IFrame API (only once)
       if (!document.getElementById('youtube-iframe-api')) {
@@ -54,11 +67,19 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
       }
 
-      // Wait for API to load
+      // If API already exists, init immediately.
+      if (window.YT && window.YT.Player) {
+        safeInit();
+      }
+
+      // Wait for API to load (polling fallback)
       const checkAPI = window.setInterval(() => {
         if (window.YT && window.YT.Player) {
-          clearInterval(checkAPI);
-          initPlayer();
+          // Try to init; if the container isn't mounted yet, keep polling.
+          safeInit();
+          if (isReadyRef.current) {
+            clearInterval(checkAPI);
+          }
         }
       }, 100);
 
@@ -70,6 +91,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       }, 12000);
 
       return () => {
+        cancelled = true;
         clearInterval(checkAPI);
         if (initTimeoutRef.current) {
           clearTimeout(initTimeoutRef.current);
@@ -108,8 +130,17 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         playerRef.current = null;
       }
 
+      if (!containerRef.current) {
+        console.warn('VideoPlayer: initPlayer called but containerRef is null');
+        setLoadError('Falha ao inicializar o player do YouTube.');
+        return;
+      }
+
+      // Clear previous iframe (helps when switching videos / re-initializing)
+      containerRef.current.innerHTML = '';
+
       try {
-        playerRef.current = new window.YT.Player(`youtube-player-${videoId}`, {
+        playerRef.current = new window.YT.Player(containerRef.current, {
           videoId: videoId,
           playerVars: {
             autoplay: 0,
@@ -339,7 +370,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     return (
       <div className="overflow-hidden rounded-lg border bg-card">
         <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-          <div id={`youtube-player-${videoId}`} className="absolute inset-0 w-full h-full" />
+          <div ref={containerRef} className="absolute inset-0 w-full h-full" />
           
           {loadError ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 px-4 text-center">
