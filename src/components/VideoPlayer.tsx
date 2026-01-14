@@ -20,10 +20,11 @@ export interface VideoPlayerRef {
 interface VideoPlayerProps {
   videoId: string;
   title?: string;
+  onReady?: () => void;
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  ({ videoId, title }, ref) => {
+  ({ videoId, title, onReady }, ref) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
@@ -71,6 +72,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       setIsReady(false);
       isReadyRef.current = false;
       setIsPlaying(false);
+      setUserInteracted(false);
+      userInteractedRef.current = false;
 
       if (timeIntervalRef.current) {
         clearInterval(timeIntervalRef.current);
@@ -104,6 +107,13 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             try {
               playerRef.current?.mute();
               setIsMuted(true);
+            } catch {
+              // ignore
+            }
+
+            // Notify parent
+            try {
+              onReady?.();
             } catch {
               // ignore
             }
@@ -209,42 +219,38 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           return !isPlaying;
         },
         unlockPlayback: () => {
-          console.log('VideoPlayer: unlockPlayback called, userInteracted:', userInteractedRef.current);
-          
-          // Check using ref to avoid stale closures
-          if (userInteractedRef.current) {
-            console.log('VideoPlayer: Already unlocked, skipping');
+          console.log('VideoPlayer: unlockPlayback called, userInteracted:', userInteractedRef.current, 'isReady:', isReadyRef.current);
+
+          if (userInteractedRef.current) return;
+
+          // IMPORTANT: This must run during a real user gesture.
+          // If the player isn't ready yet, we do nothing and keep the overlay,
+          // so the user can still click it once it appears.
+          if (!playerRef.current || !isReadyRef.current) {
+            console.log('VideoPlayer: unlockPlayback skipped (player not ready yet)');
             return;
           }
 
-          // Set immediately to prevent double-calls
           userInteractedRef.current = true;
           setUserInteracted(true);
 
-          runOrQueue(() => {
-            if (!playerRef.current) {
-              console.log('VideoPlayer: No player, skipping unlock');
-              return;
-            }
-
-            // Start playing (muted) then immediately pause to unlock programmatic control
-            try {
-              playerRef.current.mute();
-              setIsMuted(true);
-              playerRef.current.playVideo();
-              window.setTimeout(() => {
-                try {
-                  playerRef.current?.pauseVideo();
-                  playerRef.current?.seekTo(0, true);
-                  console.log('VideoPlayer: Playback unlocked by user interaction');
-                } catch (e) {
-                  console.warn('Failed to finalize unlock playback:', e);
-                }
-              }, 100);
-            } catch (e) {
-              console.warn('Failed to unlock playback:', e);
-            }
-          });
+          // Start playing (muted) then immediately pause to unlock programmatic control
+          try {
+            playerRef.current.mute();
+            setIsMuted(true);
+            playerRef.current.playVideo();
+            window.setTimeout(() => {
+              try {
+                playerRef.current?.pauseVideo();
+                playerRef.current?.seekTo(0, true);
+                console.log('VideoPlayer: Playback unlocked by user interaction');
+              } catch (e) {
+                console.warn('Failed to finalize unlock playback:', e);
+              }
+            }, 100);
+          } catch (e) {
+            console.warn('Failed to unlock playback:', e);
+          }
         },
       };
     }, [isPlaying]);

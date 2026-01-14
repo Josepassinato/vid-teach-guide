@@ -33,6 +33,7 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
   const [debugInfo, setDebugInfo] = useState({ playerReady: false, lastAction: '' });
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const [activeMoment, setActiveMoment] = useState<TeachingMoment | null>(null);
   const [showContentPlan, setShowContentPlan] = useState(false);
   const [showStudentInfo, setShowStudentInfo] = useState(false);
@@ -112,6 +113,7 @@ export function VoiceChat({ videoContext, videoId, videoTitle, videoTranscript, 
 
   // Load pre-configured moments or analyze content when video changes
   useEffect(() => {
+    setIsVideoReady(false);
     if (videoId && analyzedVideoRef.current !== videoId) {
       analyzedVideoRef.current = videoId;
       // Use pre-configured moments if available, otherwise analyze
@@ -344,11 +346,16 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
   };
 
   const handleStartClass = useCallback(() => {
-    // One-click student flow: use this user gesture to unlock YouTube programmatic playback
-    // (removes the "Clique para habilitar" overlay).
+    // One-click student flow: only unlock when the YouTube player is ready;
+    // otherwise the browser may block it (and the agent can't control the video).
+    if (!isVideoReady) {
+      toast.info('Aguarde o vídeo carregar antes de iniciar a aula');
+      return;
+    }
+
     videoPlayerRef.current?.unlockPlayback?.();
     connect();
-  }, [connect]);
+  }, [connect, isVideoReady]);
 
   const toggleListening = () => {
     if (isListening) {
@@ -455,6 +462,7 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
               ref={videoPlayerRef} 
               videoId={videoId} 
               title={videoTitle}
+              onReady={() => setIsVideoReady(true)}
             />
             <div className="flex items-center justify-between mt-1.5 sm:mt-2">
               <p className="text-[10px] sm:text-xs text-muted-foreground">
@@ -673,9 +681,13 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
         <div className="space-y-2 sm:space-y-3 pt-2 border-t flex-shrink-0">
           <div className="flex gap-2">
             {status === 'disconnected' || status === 'error' ? (
-              <Button onClick={handleStartClass} className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
+              <Button
+                onClick={handleStartClass}
+                disabled={!isVideoReady}
+                className="flex-1 h-10 sm:h-11 text-sm sm:text-base"
+              >
                 <Phone className="h-4 w-4 mr-2" />
-                Iniciar Aula
+                {isVideoReady ? 'Iniciar Aula' : 'Carregando vídeo...'}
               </Button>
             ) : status === 'connecting' ? (
               <Button disabled className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
