@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { TeachingMoment } from '@/hooks/useContentManager';
 import { useStudentProgress } from '@/hooks/useStudentProgress';
 import { LessonQuiz } from '@/components/LessonQuiz';
+import { TeachingMomentsList } from '@/components/TeachingMomentsList';
 import { toast } from 'sonner';
 
 interface SavedVideo {
@@ -259,80 +260,87 @@ const Student = () => {
             border-r bg-card transition-all duration-300 overflow-hidden flex-shrink-0
           `}
         >
-          <div className="p-3 h-full overflow-y-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <Video className="h-4 w-4 text-primary" />
-                Aulas
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 lg:hidden"
-                onClick={() => setShowVideoList(false)}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
+          <div className="p-3 h-full overflow-y-auto space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Video className="h-4 w-4 text-primary" />
+                  Aulas
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 lg:hidden"
+                  onClick={() => setShowVideoList(false)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {isLoadingVideos ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+                  ))}
+                </div>
+              ) : savedVideos.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Nenhuma aula disponível
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {savedVideos.map((video, index) => {
+                    const completed = isLessonCompleted(video.id);
+                    return (
+                      <Card
+                        key={video.id}
+                        className={`cursor-pointer transition-all hover:bg-accent ${
+                          selectedVideo?.videoId === video.youtube_id 
+                            ? 'ring-2 ring-primary bg-accent' 
+                            : ''
+                        } ${completed ? 'border-green-500/50' : ''}`}
+                        onClick={() => selectVideo(video, index)}
+                      >
+                        <CardContent className="p-2 flex gap-2 items-center">
+                          <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                            completed 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-primary/10 text-primary'
+                          }`}>
+                            {completed ? <CheckCircle className="h-3.5 w-3.5" /> : video.lesson_order}
+                          </div>
+                          <img
+                            src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
+                            alt={video.title}
+                            className="w-12 h-8 object-cover rounded flex-shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-xs font-medium line-clamp-1 ${completed ? 'text-green-600' : ''}`}>
+                              {video.title}
+                            </p>
+                            <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5">
+                              {video.duration_minutes && (
+                                <span className="flex items-center gap-0.5">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {video.duration_minutes} min
+                                </span>
+                              )}
+                              {completed && (
+                                <span className="text-green-600 font-medium">✓ Concluída</span>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {isLoadingVideos ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
-                ))}
-              </div>
-            ) : savedVideos.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                Nenhuma aula disponível
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {savedVideos.map((video, index) => {
-                  const completed = isLessonCompleted(video.id);
-                  return (
-                    <Card
-                      key={video.id}
-                      className={`cursor-pointer transition-all hover:bg-accent ${
-                        selectedVideo?.videoId === video.youtube_id 
-                          ? 'ring-2 ring-primary bg-accent' 
-                          : ''
-                      } ${completed ? 'border-green-500/50' : ''}`}
-                      onClick={() => selectVideo(video, index)}
-                    >
-                      <CardContent className="p-2 flex gap-2 items-center">
-                        <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          completed 
-                            ? 'bg-green-500 text-white' 
-                            : 'bg-primary/10 text-primary'
-                        }`}>
-                          {completed ? <CheckCircle className="h-3.5 w-3.5" /> : video.lesson_order}
-                        </div>
-                        <img
-                          src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
-                          alt={video.title}
-                          className="w-12 h-8 object-cover rounded flex-shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-xs font-medium line-clamp-1 ${completed ? 'text-green-600' : ''}`}>
-                            {video.title}
-                          </p>
-                          <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5">
-                            {video.duration_minutes && (
-                              <span className="flex items-center gap-0.5">
-                                <Clock className="h-2.5 w-2.5" />
-                                {video.duration_minutes} min
-                              </span>
-                            )}
-                            {completed && (
-                              <span className="text-green-600 font-medium">✓ Concluída</span>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+            {/* Teaching Moments List */}
+            {selectedVideo && (
+              <TeachingMomentsList moments={selectedVideo.teachingMoments} />
             )}
           </div>
         </div>
