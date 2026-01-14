@@ -277,15 +277,21 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
   }, [sendText, status]);
 
   // Auto-start vision analysis when agent connects
+  // Auto-start everything when agent connects (vision + microphone)
   useEffect(() => {
-    if (status === 'connected' && !isVisionActive && isStudentMode) {
-      // Small delay to ensure everything is ready
+    if (status === 'connected' && isStudentMode) {
+      // Small delay to ensure everything is ready, then start vision and microphone
       const timer = setTimeout(() => {
-        startAnalysis();
-      }, 1000);
+        if (!isVisionActive) {
+          startAnalysis();
+        }
+        if (!isListening) {
+          startListening();
+        }
+      }, 500);
       return () => clearTimeout(timer);
     }
-  }, [status, isVisionActive, isStudentMode, startAnalysis]);
+  }, [status, isStudentMode, isVisionActive, isListening, startAnalysis, startListening]);
 
   // Monitor video time for teaching moments
   useEffect(() => {
@@ -670,27 +676,30 @@ IMPORTANTE: Quando eu (o sistema) enviar uma mensagem começando com "🎯 MOMEN
               </Button>
             ) : (
               <>
-                <Button 
-                  onClick={toggleListening}
-                  variant={isListening ? 'destructive' : 'default'}
-                  className="flex-1 h-10 sm:h-11 text-sm sm:text-base"
-                >
+                {/* Show listening status indicator */}
+                <div className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-11 bg-primary/10 rounded-md px-3">
                   {isListening ? (
                     <>
-                      <MicOff className="h-4 w-4 mr-1.5 sm:mr-2" />
-                      <span className="hidden xs:inline">Parar</span>
-                      <span className="xs:hidden">⏹</span>
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-sm text-primary">Ouvindo...</span>
+                      <VoiceIndicator isActive={true} type="listening" />
+                    </>
+                  ) : isSpeaking ? (
+                    <>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                      <span className="text-sm text-primary">Professor falando...</span>
+                      <VoiceIndicator isActive={true} type="speaking" />
                     </>
                   ) : (
                     <>
-                      <Mic className="h-4 w-4 mr-1.5 sm:mr-2" />
-                      <span className="hidden xs:inline">Falar</span>
-                      <span className="xs:hidden">🎤</span>
+                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      <span className="text-sm text-muted-foreground">Aula em andamento</span>
                     </>
                   )}
-                </Button>
-                <Button onClick={disconnect} variant="outline" className="h-10 sm:h-11 w-10 sm:w-11">
-                  <PhoneOff className="h-4 w-4" />
+                </div>
+                <Button onClick={disconnect} variant="destructive" className="h-10 sm:h-11 px-4">
+                  <PhoneOff className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Encerrar</span>
                 </Button>
               </>
             )}
