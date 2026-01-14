@@ -211,18 +211,18 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Youtube className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Youtube className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
           <Input
             placeholder="Cole o link do YouTube aqui..."
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
-            className="pl-11"
+            className="pl-9 sm:pl-11 h-10 text-sm"
           />
         </div>
-        <Button onClick={handleAnalyze} disabled={loading || !url.trim()}>
+        <Button onClick={handleAnalyze} disabled={loading || !url.trim()} className="h-10 sm:w-auto w-full">
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Analisar'}
         </Button>
       </div>
@@ -312,26 +312,27 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
             </p>
 
             {/* Audio transcription options */}
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 pt-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleFetchTranscript}
                 disabled={transcribing || !url.trim()}
-                className="flex items-center gap-2"
+                className="flex items-center justify-center gap-2 h-9 text-xs sm:text-sm"
               >
                 {transcribing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Youtube className="h-4 w-4" />
                 )}
-                Buscar legendas do YouTube
+                <span className="hidden xs:inline">Buscar legendas do YouTube</span>
+                <span className="xs:hidden">Buscar legendas</span>
               </Button>
 
-              <span className="text-xs text-muted-foreground">ou</span>
+              <span className="text-xs text-muted-foreground hidden sm:block">ou</span>
 
-              <div>
+              <div className="w-full sm:w-auto">
                 <input
                   ref={audioInputRef}
                   type="file"
@@ -345,14 +346,15 @@ export function VideoAnalysis({ onVideoAnalyzed }: VideoAnalysisProps) {
                   size="sm"
                   onClick={() => audioInputRef.current?.click()}
                   disabled={transcribing}
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 h-9 text-xs sm:text-sm w-full sm:w-auto"
                 >
                   {transcribing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Mic className="h-4 w-4" />
                   )}
-                  Transcrever áudio (Whisper)
+                  <span className="hidden xs:inline">Transcrever áudio (Whisper)</span>
+                  <span className="xs:hidden">Transcrever áudio</span>
                 </Button>
               </div>
             </div>

@@ -133,18 +133,18 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
   };
 
   return (
-    <Card className="flex flex-col h-full">
-      <CardHeader className="pb-3">
+    <Card className="flex flex-col h-full min-h-[400px] sm:min-h-0">
+      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
             Professor IA
           </CardTitle>
-          <span className="text-xs text-muted-foreground">{getStatusText()}</span>
+          <span className="text-[10px] sm:text-xs text-muted-foreground">{getStatusText()}</span>
         </div>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden">
+      <CardContent className="flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden px-3 sm:px-6 pb-3 sm:pb-6">
         {/* Video Player */}
         {videoId && (
           <div className="flex-shrink-0">
@@ -153,15 +153,15 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
               videoId={videoId} 
               title={videoTitle}
             />
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground">
+            <div className="flex items-center justify-between mt-1.5 sm:mt-2">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 💡 Diga "dê play", "pause" ou "reinicie o vídeo"
               </p>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setShowDebug(!showDebug)}
-                className="h-6 px-2"
+                className="h-5 sm:h-6 px-1.5 sm:px-2"
               >
                 <Bug className="h-3 w-3" />
               </Button>
@@ -232,11 +232,11 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
         )}
         
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto space-y-3 pr-2 min-h-0">
+        <div className="flex-1 overflow-y-auto space-y-2 sm:space-y-3 pr-1 sm:pr-2 min-h-0">
           {messages.length === 0 && status === 'disconnected' && (
-            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-              <AlertCircle className="h-10 w-10 mb-3 opacity-50" />
-              <p className="text-sm">Clique em "Iniciar Aula" para começar a conversar com o professor IA</p>
+            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-3 sm:p-4">
+              <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 mb-2 sm:mb-3 opacity-50" />
+              <p className="text-xs sm:text-sm">Clique em "Iniciar Aula" para começar a conversar com o professor IA</p>
             </div>
           )}
           
@@ -246,7 +246,7 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div 
-                className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                className={`max-w-[90%] sm:max-w-[85%] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm ${
                   msg.role === 'user' 
                     ? 'bg-primary text-primary-foreground' 
                     : 'bg-muted'
@@ -260,32 +260,32 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
         
         {/* Voice indicators */}
         {status === 'connected' && (
-          <div className="flex justify-center gap-8 py-2">
+          <div className="flex justify-center gap-6 sm:gap-8 py-1.5 sm:py-2">
             {isListening && (
               <div className="text-center">
                 <VoiceIndicator isActive={isListening} type="listening" />
-                <p className="text-xs text-muted-foreground mt-1">Ouvindo...</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Ouvindo...</p>
               </div>
             )}
             {isSpeaking && (
               <div className="text-center">
                 <VoiceIndicator isActive={isSpeaking} type="speaking" />
-                <p className="text-xs text-muted-foreground mt-1">Falando...</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Falando...</p>
               </div>
             )}
           </div>
         )}
         
         {/* Controls */}
-        <div className="space-y-3 pt-2 border-t">
+        <div className="space-y-2 sm:space-y-3 pt-2 border-t flex-shrink-0">
           <div className="flex gap-2">
             {status === 'disconnected' || status === 'error' ? (
-              <Button onClick={connect} className="flex-1" size="lg">
+              <Button onClick={connect} className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
                 <Phone className="h-4 w-4 mr-2" />
                 Iniciar Aula
               </Button>
             ) : status === 'connecting' ? (
-              <Button disabled className="flex-1" size="lg">
+              <Button disabled className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
                 Conectando...
               </Button>
             ) : (
@@ -293,22 +293,23 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
                 <Button 
                   onClick={toggleListening}
                   variant={isListening ? 'destructive' : 'default'}
-                  className="flex-1"
-                  size="lg"
+                  className="flex-1 h-10 sm:h-11 text-sm sm:text-base"
                 >
                   {isListening ? (
                     <>
-                      <MicOff className="h-4 w-4 mr-2" />
-                      Parar
+                      <MicOff className="h-4 w-4 mr-1.5 sm:mr-2" />
+                      <span className="hidden xs:inline">Parar</span>
+                      <span className="xs:hidden">⏹</span>
                     </>
                   ) : (
                     <>
-                      <Mic className="h-4 w-4 mr-2" />
-                      Falar
+                      <Mic className="h-4 w-4 mr-1.5 sm:mr-2" />
+                      <span className="hidden xs:inline">Falar</span>
+                      <span className="xs:hidden">🎤</span>
                     </>
                   )}
                 </Button>
-                <Button onClick={disconnect} variant="outline" size="lg">
+                <Button onClick={disconnect} variant="outline" className="h-10 sm:h-11 w-10 sm:w-11">
                   <PhoneOff className="h-4 w-4" />
                 </Button>
               </>
@@ -322,8 +323,9 @@ export function VoiceChat({ videoContext, videoId, videoTitle }: VoiceChatProps)
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendText()}
+                className="h-9 sm:h-10 text-sm"
               />
-              <Button onClick={handleSendText} size="icon" variant="secondary">
+              <Button onClick={handleSendText} size="icon" variant="secondary" className="h-9 w-9 sm:h-10 sm:w-10">
                 <Send className="h-4 w-4" />
               </Button>
             </div>
