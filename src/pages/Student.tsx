@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { VoiceChat } from '@/components/VoiceChat';
@@ -12,6 +12,7 @@ import { TeachingMoment } from '@/hooks/useContentManager';
 import { useStudentProgress } from '@/hooks/useStudentProgress';
 import { LessonQuiz } from '@/components/LessonQuiz';
 import { toast } from 'sonner';
+
 interface SavedVideo {
   id: string;
   youtube_id: string;
@@ -57,6 +58,13 @@ const Student = () => {
     return newId;
   });
 
+  // Memoize the progress update callback
+  const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
+    if (newStats.progressPercentage === 100) {
+      toast.success('🎉 Parabéns! Você completou todas as aulas!');
+    }
+  }, []);
+
   // Student progress tracking
   const {
     stats,
@@ -64,11 +72,7 @@ const Student = () => {
     markLessonComplete,
     refreshProgress,
   } = useStudentProgress({
-    onProgressUpdate: (newStats) => {
-      if (newStats.progressPercentage === 100) {
-        toast.success('🎉 Parabéns! Você completou todas as aulas!');
-      }
-    }
+    onProgressUpdate: handleProgressUpdate
   });
   useEffect(() => {
     const loadSavedVideos = async () => {
