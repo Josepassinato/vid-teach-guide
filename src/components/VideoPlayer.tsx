@@ -1,5 +1,4 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 
@@ -338,9 +337,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     };
 
     return (
-      <Card className="overflow-hidden">
-        <div className="relative aspect-video bg-black">
-          <div id={`youtube-player-${videoId}`} className="absolute inset-0" />
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+          <div id={`youtube-player-${videoId}`} className="absolute inset-0 w-full h-full" />
           
           {loadError ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-3 px-4 text-center">
@@ -400,7 +399,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             <p className="text-xs sm:text-sm font-medium mt-1.5 sm:mt-2 line-clamp-1">{title}</p>
           )}
         </div>
-      </Card>
+      </div>
     );
   }
 );
