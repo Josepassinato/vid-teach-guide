@@ -120,6 +120,31 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     setIsListening(false);
   }, []);
 
+  // Helper to wait until the agent finishes speaking before playing video
+  const waitForSpeechEnd = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      // Check immediately - if not speaking, resolve right away
+      if (!isPlayingRef.current && audioQueueRef.current.length === 0) {
+        resolve();
+        return;
+      }
+      
+      // Poll until speaking ends
+      const checkInterval = setInterval(() => {
+        if (!isPlayingRef.current && audioQueueRef.current.length === 0) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 100);
+      
+      // Safety timeout - max 30 seconds wait
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        resolve();
+      }, 30000);
+    });
+  }, []);
+
   const handleToolCall = useCallback((functionCall: any) => {
     const name = functionCall.name;
     const callId = functionCall.id || `call_${Date.now()}`;
@@ -134,29 +159,36 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     let result: any = { ok: true };
 
     if (videoControlsRef.current) {
+      const controls = videoControlsRef.current;
+      
       switch (name) {
         case "play_video":
-          console.log('[gemini:tool-call] Executing play_video');
-          toast.success('▶️ Dando play no vídeo...');
-          videoControlsRef.current.play();
-          result = { ok: true, message: "Vídeo iniciado" };
+          console.log('[gemini:tool-call] Scheduling play_video after speech ends');
+          toast.success('▶️ Preparando para dar play no vídeo...');
+          // Wait for agent to finish speaking before playing
+          waitForSpeechEnd().then(() => {
+            console.log('[gemini:tool-call] Speech ended, now executing play_video');
+            toast.success('▶️ Dando play no vídeo...');
+            controls.play();
+          });
+          result = { ok: true, message: "Vídeo será iniciado após a fala terminar" };
           break;
         case "pause_video":
           console.log('[gemini:tool-call] Executing pause_video');
           toast.success('⏸️ Pausando vídeo...');
-          videoControlsRef.current.pause();
+          controls.pause();
           result = { ok: true, message: "Vídeo pausado" };
           break;
         case "restart_video":
           console.log('[gemini:tool-call] Executing restart_video');
           toast.success('🔄 Reiniciando vídeo...');
-          videoControlsRef.current.restart();
+          controls.restart();
           result = { ok: true, message: "Vídeo reiniciado" };
           break;
         case "seek_video":
           console.log('[gemini:tool-call] Executing seek_video to', args.seconds);
           toast.success(`⏩ Pulando para ${Number(args.seconds) || 0}s...`);
-          videoControlsRef.current.seekTo(Number(args.seconds) || 0);
+          controls.seekTo(Number(args.seconds) || 0);
           result = { ok: true, message: `Vídeo pulou para ${Number(args.seconds) || 0} segundos` };
           break;
         default:
@@ -181,7 +213,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         }
       }));
     }
-  }, []);
+  }, [waitForSpeechEnd]);
 
   const connect = useCallback(async () => {
     try {
