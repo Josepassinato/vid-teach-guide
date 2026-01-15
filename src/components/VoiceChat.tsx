@@ -182,8 +182,7 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
 
   // Build system instruction with video context, content plan, and student memory
   const buildSystemInstruction = useCallback(() => {
-    let instruction = videoContext 
-      ? `Você é o Professor Vibe - ESPECIALISTA EM VIBE CODING e mestre em ensinar programação moderna.
+    let instruction = `Você é o Professor Vibe - ESPECIALISTA EM VIBE CODING e mestre em ensinar programação moderna.
 
 🎯 QUEM VOCÊ É:
 - Você domina VIBE CODING: programar com IA, prompts, Lovable, Cursor, Copilot, v0, etc.
@@ -218,8 +217,36 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
 - Arquitetura primeiro: pense na estrutura antes de começar a codar
 - Mentalidade de iteração: a primeira versão nunca é a final, e está tudo bem
 
-Fale em português brasileiro de forma clara e profissional. Seja o professor que você gostaria de ter tido.`
-      : `Você é o Professor Vibe, um assistente educacional especializado em programação e Vibe Coding. Fale em português brasileiro de forma clara e profissional.`;
+Fale em português brasileiro de forma clara e profissional. Seja o professor que você gostaria de ter tido.`;
+
+    // CRITICAL: Add actual video content so the agent knows what the lesson is about
+    if (videoTitle) {
+      instruction += `
+
+📹 AULA ATUAL: "${videoTitle}"`;
+    }
+    
+    if (videoTranscript) {
+      // Include full transcript so agent knows exactly what's being taught
+      instruction += `
+
+📝 TRANSCRIÇÃO COMPLETA DO VÍDEO (USE ESTE CONTEÚDO COMO BASE PARA SUAS EXPLICAÇÕES):
+"""
+${videoTranscript}
+"""
+
+IMPORTANTE: Você está ensinando EXATAMENTE o conteúdo acima. Suas explicações, exemplos e perguntas devem ser sobre os temas abordados nesta transcrição. NÃO fale sobre assuntos que não estão no vídeo.`;
+    } else if (videoContext) {
+      // Fallback to analysis if no transcript
+      instruction += `
+
+📊 CONTEXTO/ANÁLISE DO VÍDEO:
+"""
+${videoContext}
+"""
+
+IMPORTANTE: Use este contexto para guiar suas explicações. Foque nos temas mencionados aqui.`;
+    }
 
     // Add student memory context
     if (memoryContext) {
@@ -280,7 +307,7 @@ MINI QUIZZES (Perguntas interativas):
     }
 
     return instruction;
-  }, [videoContext, videoTitle, contentPlan, memoryContext, timestampQuizzes.length]);
+  }, [videoContext, videoTitle, videoTranscript, contentPlan, memoryContext, timestampQuizzes.length]);
 
   const systemInstruction = buildSystemInstruction();
 
