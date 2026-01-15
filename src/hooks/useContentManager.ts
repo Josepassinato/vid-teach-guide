@@ -8,11 +8,18 @@ export interface TeachingMoment {
   key_insight: string;
   questions_to_ask: string[];
   discussion_points: string[];
+  teaching_approach?: string;
+  difficulty_level?: 'básico' | 'intermediário' | 'avançado';
+  estimated_discussion_minutes?: number;
 }
 
 export interface ContentPlan {
   teaching_moments: TeachingMoment[];
   summary: string;
+  lesson_objectives?: string[];
+  prerequisites?: string[];
+  total_estimated_pauses?: number;
+  recommended_pace?: 'lento' | 'moderado' | 'rápido';
 }
 
 interface UseContentManagerOptions {
@@ -31,6 +38,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       const plan: ContentPlan = {
         teaching_moments: moments,
         summary: 'Momentos de ensino pré-configurados',
+        total_estimated_pauses: moments.length,
       };
       setContentPlan(plan);
       setCurrentMomentIndex(-1);
@@ -45,14 +53,16 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
     transcript: string | null,
     title: string,
     analysis?: string,
-    preConfiguredMoments?: TeachingMoment[] | null
+    preConfiguredMoments?: TeachingMoment[] | null,
+    videoDurationMinutes?: number
   ) => {
     console.log('[ContentManager] analyzeContent called:', {
       hasTranscript: !!transcript,
       transcriptLength: transcript?.length || 0,
       title,
       hasAnalysis: !!analysis,
-      preConfiguredMomentsCount: preConfiguredMoments?.length || 0
+      preConfiguredMomentsCount: preConfiguredMoments?.length || 0,
+      videoDurationMinutes
     });
 
     // If we have pre-configured moments (not empty array), use them
@@ -71,12 +81,18 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       return null;
     }
 
-    console.log('[ContentManager] Calling AI to generate teaching moments...');
+    console.log('[ContentManager] Calling AI Content Agent to analyze lesson...');
     setIsLoading(true);
+    toast.info('🤖 Agente de conteúdo analisando a aula...', { duration: 3000 });
     
     try {
       const { data, error } = await supabase.functions.invoke('content-manager', {
-        body: { transcript, title, analysis }
+        body: { 
+          transcript, 
+          title, 
+          analysis,
+          videoDurationMinutes: videoDurationMinutes || 10
+        }
       });
 
       if (error) {
@@ -84,22 +100,30 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
         // Check if it's a rate limit error - fail silently
         if (error.message?.includes('429') || error.message?.includes('rate limit')) {
           console.warn('[ContentManager] Rate limited, skipping AI analysis');
+          toast.warning('Taxa de uso excedida. Tente novamente em alguns segundos.');
           return null;
         }
         throw error;
       }
 
-      console.log('[ContentManager] AI response received:', data);
+      console.log('[ContentManager] AI Content Agent response:', data);
       const plan: ContentPlan = data;
       setContentPlan(plan);
       setCurrentMomentIndex(-1);
       options.onPlanReady?.(plan);
       
-      toast.success(`📚 Plano de aula criado: ${plan.teaching_moments.length} momentos-chave identificados`);
+      const paceText = plan.recommended_pace === 'lento' ? '🐢 ritmo lento' : 
+                       plan.recommended_pace === 'rápido' ? '🚀 ritmo rápido' : '⚡ ritmo moderado';
+      
+      toast.success(
+        `📚 Plano de aula criado: ${plan.teaching_moments.length} pausas estratégicas (${paceText})`,
+        { duration: 5000 }
+      );
       
       return plan;
     } catch (error) {
       console.error('[ContentManager] AI analysis failed:', error);
+      toast.error('Erro ao analisar conteúdo da aula');
       return null;
     } finally {
       setIsLoading(false);
@@ -157,11 +181,15 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
   }, [contentPlan, currentMomentIndex]);
 
   const generateTeacherInstructions = useCallback((moment: TeachingMoment): string => {
+    const difficultyEmoji = moment.difficulty_level === 'básico' ? '🟢' : 
+                           moment.difficulty_level === 'avançado' ? '🔴' : '🟡';
+    
     return `
 🎯 MOMENTO DE APROFUNDAMENTO - ${moment.topic}
+${difficultyEmoji} Nível: ${moment.difficulty_level || 'intermediário'}
 
 INSTRUÇÃO PARA O PROFESSOR IA:
-Pause o vídeo AGORA e explore este conceito com o aluno.
+${moment.teaching_approach || 'Pause o vídeo e explore este conceito com o aluno.'}
 
 INSIGHT PRINCIPAL:
 ${moment.key_insight}
@@ -171,6 +199,8 @@ ${moment.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n')}
 
 ${moment.discussion_points?.length > 0 ? `PONTOS DE DISCUSSÃO:
 ${moment.discussion_points.map((p) => `• ${p}`).join('\n')}` : ''}
+
+⏱️ Tempo sugerido: ${moment.estimated_discussion_minutes || 2} minutos
 
 Após explorar este momento, pergunte ao aluno se está pronto para continuar o vídeo.
 `;
