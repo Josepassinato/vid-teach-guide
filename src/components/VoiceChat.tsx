@@ -572,29 +572,38 @@ INSTRUÇÕES:
   // Resume video helper with retry logic
   const resumeVideo = useCallback(() => {
     console.log('[VoiceChat] resumeVideo called');
-    const tryPlay = (attempt = 1) => {
-      if (videoPlayerRef.current) {
-        console.log(`[VoiceChat] Attempting to play video (attempt ${attempt})`);
-        videoPlayerRef.current.play();
-        // Verify playback started after a short delay
-        setTimeout(() => {
-          if (videoPlayerRef.current?.isPaused()) {
-            console.log('[VoiceChat] Video still paused after play(), retrying...');
-            if (attempt < 3) {
-              tryPlay(attempt + 1);
-            } else {
-              console.error('[VoiceChat] Failed to resume video after 3 attempts');
-              toast.error('Não foi possível retomar o vídeo. Clique no play manualmente.');
-            }
-          } else {
-            console.log('[VoiceChat] Video resumed successfully');
-          }
-        }, 500);
-      } else {
-        console.error('[VoiceChat] videoPlayerRef.current is null');
-      }
+    
+    if (!videoPlayerRef.current) {
+      console.error('[VoiceChat] videoPlayerRef.current is null');
+      return;
+    }
+    
+    // Call play directly - the VideoPlayer queues the action if not ready
+    console.log('[VoiceChat] Calling videoPlayerRef.current.play()');
+    videoPlayerRef.current.play();
+    
+    // Check after a delay if video started, retry if needed
+    const checkAndRetry = (attempt: number) => {
+      setTimeout(() => {
+        if (!videoPlayerRef.current) return;
+        
+        const isPaused = videoPlayerRef.current.isPaused();
+        console.log(`[VoiceChat] Check attempt ${attempt}: isPaused=${isPaused}`);
+        
+        if (isPaused && attempt < 3) {
+          console.log('[VoiceChat] Video still paused, retrying play()...');
+          videoPlayerRef.current.play();
+          checkAndRetry(attempt + 1);
+        } else if (isPaused) {
+          console.error('[VoiceChat] Failed to start video after 3 attempts');
+          toast.error('Não foi possível iniciar o vídeo. Clique no play manualmente.');
+        } else {
+          console.log('[VoiceChat] Video is playing!');
+        }
+      }, 800); // Give more time for YouTube player to respond
     };
-    tryPlay();
+    
+    checkAndRetry(1);
   }, []);
 
   // Handle quiz completion

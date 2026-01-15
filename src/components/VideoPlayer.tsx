@@ -189,6 +189,12 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           return playerRef.current?.getCurrentTime?.() || 0;
         },
         isPaused: () => {
+          // Check player state directly for more accurate status
+          if (playerRef.current?.getPlayerState) {
+            const state = playerRef.current.getPlayerState();
+            // YT.PlayerState.PLAYING = 1
+            return state !== 1;
+          }
           return !isPlaying;
         },
         unlockPlayback: () => {
