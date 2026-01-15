@@ -469,8 +469,9 @@ Seja breve e objetivo - máximo 30 segundos de introdução.`;
       setNextPauseInfo(allPauses[0] || null);
       
       // Only check when video is playing and no quiz is active
-      // Check in both 'playing' and 'idle' modes to catch pauses even without formal class start
-      if (!isPaused && !activeQuiz && (agentMode === 'playing' || agentMode === 'idle')) {
+      // NOTE: Do not gate by agentMode: the student may start playback manually (e.g. during intro)
+      // and pauses still must trigger reliably.
+      if (!isPaused && !activeQuiz) {
         // Check for timestamp quizzes first
         const quiz = getQuizForTimestamp(currentTime);
         if (quiz) {
@@ -534,7 +535,7 @@ INSTRUÇÕES:
         timeCheckIntervalRef.current = null;
       }
     };
-  }, [status, contentPlan, videoId, activeQuiz, agentMode, checkForTeachingMoment, generateTeacherInstructions, sendText, getQuizForTimestamp, markQuizTriggered, connect, timestampQuizzes]);
+  }, [status, contentPlan, videoId, activeQuiz, checkForTeachingMoment, generateTeacherInstructions, sendText, getQuizForTimestamp, markQuizTriggered, connect, timestampQuizzes]);
 
   // Handle quiz completion
   const handleQuizComplete = useCallback((selectedIndex: number, isCorrect: boolean) => {
