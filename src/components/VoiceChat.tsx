@@ -569,6 +569,34 @@ INSTRUÇÕES:
     };
   }, [status, contentPlan, videoId, activeQuiz, checkForTeachingMoment, generateTeacherInstructions, sendText, getQuizForTimestamp, markQuizTriggered, connect, timestampQuizzes]);
 
+  // Resume video helper with retry logic
+  const resumeVideo = useCallback(() => {
+    console.log('[VoiceChat] resumeVideo called');
+    const tryPlay = (attempt = 1) => {
+      if (videoPlayerRef.current) {
+        console.log(`[VoiceChat] Attempting to play video (attempt ${attempt})`);
+        videoPlayerRef.current.play();
+        // Verify playback started after a short delay
+        setTimeout(() => {
+          if (videoPlayerRef.current?.isPaused()) {
+            console.log('[VoiceChat] Video still paused after play(), retrying...');
+            if (attempt < 3) {
+              tryPlay(attempt + 1);
+            } else {
+              console.error('[VoiceChat] Failed to resume video after 3 attempts');
+              toast.error('Não foi possível retomar o vídeo. Clique no play manualmente.');
+            }
+          } else {
+            console.log('[VoiceChat] Video resumed successfully');
+          }
+        }, 500);
+      } else {
+        console.error('[VoiceChat] videoPlayerRef.current is null');
+      }
+    };
+    tryPlay();
+  }, []);
+
   // Handle quiz completion
   const handleQuizComplete = useCallback((selectedIndex: number, isCorrect: boolean) => {
     if (!activeQuiz) return;
@@ -578,19 +606,20 @@ INSTRUÇÕES:
     
     // Tell the agent the result
     const resultText = isCorrect 
-      ? `[SISTEMA] O aluno acertou o quiz! A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Parabenize brevemente e diga que vamos continuar o vídeo.`
+      ? `[SISTEMA] O aluno acertou o quiz! A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Parabenize brevemente e depois diga "Vamos continuar!".`
       : selectedIndex === -1
-        ? `[SISTEMA] O tempo do quiz acabou sem resposta. A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique em uma frase e diga que vamos continuar.`
-        : `[SISTEMA] O aluno errou o quiz. A correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique brevemente de forma encorajadora e diga que vamos continuar.`;
+        ? `[SISTEMA] O tempo do quiz acabou sem resposta. A resposta correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique em uma frase e depois diga "Continuando o vídeo!".`
+        : `[SISTEMA] O aluno errou o quiz. A correta era "${activeQuiz.options[activeQuiz.correctIndex]}". Explique brevemente de forma encorajadora e depois diga "Vamos seguir!".`;
     
     if (status === 'connected') {
       sendText(resultText);
     }
     setActiveQuiz(null);
     
-    // Resume video and disconnect after feedback
+    // Resume video after brief delay for agent to respond
     setTimeout(() => {
-      videoPlayerRef.current?.play();
+      console.log('[VoiceChat] Quiz complete, resuming video');
+      resumeVideo();
       setAgentMode('playing');
       // Disconnect to save tokens while video plays
       setTimeout(() => {
@@ -599,7 +628,7 @@ INSTRUÇÕES:
         }
       }, 5000); // Give time for agent to finish speaking
     }, 2000);
-  }, [activeQuiz, recordAttempt, sendText, status, disconnect]);
+  }, [activeQuiz, recordAttempt, sendText, status, disconnect, resumeVideo]);
 
   const handleSendText = () => {
     if (!textInput.trim()) return;
@@ -620,7 +649,8 @@ INSTRUÇÕES:
     if (status === 'connected') {
       sendText('[SISTEMA] O aluno confirmou que está pronto. Diga algo breve como "Vamos lá! Começando o vídeo..." e prepare-se para voltar nos momentos de pausa.');
       setTimeout(() => {
-        videoPlayerRef.current?.play();
+        console.log('[VoiceChat] Starting video after intro');
+        resumeVideo();
         setAgentMode('playing');
         // Disconnect after agent finishes speaking
         setTimeout(() => {
@@ -630,23 +660,26 @@ INSTRUÇÕES:
         }, 3000);
       }, 2000);
     }
-  }, [status, sendText, disconnect]);
+  }, [status, sendText, disconnect, resumeVideo]);
 
   // Handle dismissing teaching moment - resume video and disconnect
   const handleDismissMoment = useCallback(() => {
+    console.log('[VoiceChat] handleDismissMoment called');
     setActiveMoment(null);
     if (status === 'connected') {
-      sendText('[SISTEMA] O aluno quer continuar o vídeo. Diga algo breve como "Podemos continuar!" e vamos retomar.');
+      sendText('[SISTEMA] O aluno quer continuar o vídeo. Diga algo breve como "Vamos lá!" e prepare-se para a próxima parada.');
       setTimeout(() => {
-        videoPlayerRef.current?.play();
+        console.log('[VoiceChat] Moment dismissed, resuming video');
+        resumeVideo();
         setAgentMode('playing');
         setTimeout(() => disconnect(), 3000);
       }, 1500);
     } else {
-      videoPlayerRef.current?.play();
+      console.log('[VoiceChat] Moment dismissed (not connected), resuming video directly');
+      resumeVideo();
       setAgentMode('playing');
     }
-  }, [disconnect, sendText, status]);
+  }, [disconnect, sendText, status, resumeVideo]);
 
   const toggleListening = () => {
     if (isListening) {
