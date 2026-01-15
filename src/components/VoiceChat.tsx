@@ -147,13 +147,22 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   useEffect(() => {
     if (videoId && analyzedVideoRef.current !== videoId) {
       analyzedVideoRef.current = videoId;
-      // Use pre-configured moments if available, otherwise analyze
-      analyzeContent(videoTranscript || null, videoTitle || '', videoContext, preConfiguredMoments);
+      // Use pre-configured moments if available, otherwise analyze and auto-save
+      // Pass videoDbId for auto-save, and duration (default 10 min)
+      analyzeContent(
+        videoTranscript || null, 
+        videoTitle || '', 
+        videoContext, 
+        preConfiguredMoments,
+        undefined, // videoDurationMinutes - will use default
+        videoDbId, // Pass database ID for auto-saving
+        true // autoSave enabled
+      );
       lastCheckedMomentRef.current = -1;
       setActiveMoment(null);
       setActiveQuiz(null);
     }
-  }, [videoId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent]);
+  }, [videoId, videoDbId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent]);
 
   // Load timestamp quizzes when videoDbId changes
   useEffect(() => {

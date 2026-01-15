@@ -48,13 +48,57 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
     return null;
   }, [options]);
 
+  // Save teaching moments to database
+  const saveTeachingMomentsToDatabase = useCallback(async (
+    videoId: string,
+    moments: TeachingMoment[]
+  ): Promise<boolean> => {
+    try {
+      console.log('[ContentManager] Saving teaching moments to database for video:', videoId);
+      
+      // Convert TeachingMoment[] to JSON-compatible format
+      const momentsAsJson = moments.map(m => ({
+        timestamp_seconds: m.timestamp_seconds,
+        topic: m.topic,
+        key_insight: m.key_insight,
+        questions_to_ask: m.questions_to_ask,
+        discussion_points: m.discussion_points,
+        teaching_approach: m.teaching_approach,
+        difficulty_level: m.difficulty_level,
+        estimated_discussion_minutes: m.estimated_discussion_minutes,
+      }));
+      
+      // Update the video with teaching_moments
+      const { error: updateError } = await supabase
+        .from('videos')
+        .update({ 
+          teaching_moments: momentsAsJson,
+          is_configured: true 
+        })
+        .eq('id', videoId);
+
+      if (updateError) {
+        console.error('[ContentManager] Failed to save teaching moments:', updateError);
+        return false;
+      }
+
+      console.log('[ContentManager] Teaching moments saved successfully');
+      return true;
+    } catch (error) {
+      console.error('[ContentManager] Error saving teaching moments:', error);
+      return false;
+    }
+  }, []);
+
   // Analyze content via AI (fallback if no pre-configured moments)
   const analyzeContent = useCallback(async (
     transcript: string | null,
     title: string,
     analysis?: string,
     preConfiguredMoments?: TeachingMoment[] | null,
-    videoDurationMinutes?: number
+    videoDurationMinutes?: number,
+    videoId?: string,
+    autoSave: boolean = true
   ) => {
     console.log('[ContentManager] analyzeContent called:', {
       hasTranscript: !!transcript,
@@ -62,7 +106,9 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       title,
       hasAnalysis: !!analysis,
       preConfiguredMomentsCount: preConfiguredMoments?.length || 0,
-      videoDurationMinutes
+      videoDurationMinutes,
+      videoId,
+      autoSave
     });
 
     // If we have pre-configured moments (not empty array), use them
@@ -112,6 +158,17 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       setCurrentMomentIndex(-1);
       options.onPlanReady?.(plan);
       
+      // Auto-save teaching moments to database if videoId is provided
+      if (autoSave && videoId && plan.teaching_moments.length > 0) {
+        const saved = await saveTeachingMomentsToDatabase(videoId, plan.teaching_moments);
+        if (saved) {
+          toast.success(
+            `💾 ${plan.teaching_moments.length} momentos salvos automaticamente no banco`,
+            { duration: 3000 }
+          );
+        }
+      }
+      
       const paceText = plan.recommended_pace === 'lento' ? '🐢 ritmo lento' : 
                        plan.recommended_pace === 'rápido' ? '🚀 ritmo rápido' : '⚡ ritmo moderado';
       
@@ -128,7 +185,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [options, loadPreConfiguredMoments]);
+  }, [options, loadPreConfiguredMoments, saveTeachingMomentsToDatabase]);
 
   const getCurrentMoment = useCallback((): TeachingMoment | null => {
     if (!contentPlan || currentMomentIndex < 0 || currentMomentIndex >= contentPlan.teaching_moments.length) {
