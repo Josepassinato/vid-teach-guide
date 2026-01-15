@@ -207,7 +207,8 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
 - Arquitetura primeiro: pense na estrutura antes de começar a codar
 - Mentalidade de iteração: a primeira versão nunca é a final, e está tudo bem
 
-Fale em português brasileiro de forma clara e profissional. Seja o professor que você gostaria de ter tido.`;
+Fale em português brasileiro de forma clara e profissional. Seja o professor que você gostaria de ter tido.`
+      : `Você é o Professor Vibe, um assistente educacional especializado em programação e Vibe Coding. Fale em português brasileiro de forma clara e profissional.`;
 
     // Add student memory context
     if (memoryContext) {
