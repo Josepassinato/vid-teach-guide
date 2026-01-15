@@ -219,11 +219,16 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
                 try {
                   playerRef.current?.pauseVideo();
                   playerRef.current?.seekTo(0, true);
+                  // Unmute and set volume to max after unlocking
+                  playerRef.current?.unMute();
+                  playerRef.current?.setVolume(100);
+                  setIsMuted(false);
+                  setVolume(100);
                   console.log('VideoPlayer: Playback unlocked by user interaction');
                 } catch (e) {
                   console.warn('Failed to finalize unlock playback:', e);
                 }
-              }, 100);
+              }, 150);
             } catch (e) {
               console.warn('Failed to unlock playback:', e);
             }
@@ -290,8 +295,13 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           setTimeout(() => {
             playerRef.current?.pauseVideo();
             playerRef.current?.seekTo(0, true);
+            // Unmute and set volume to max after unlocking
+            playerRef.current?.unMute();
+            playerRef.current?.setVolume(100);
+            setIsMuted(false);
+            setVolume(100);
             console.log('VideoPlayer: Playback unlocked by user interaction (manual click)');
-          }, 100);
+          }, 150);
         } catch (e) {
           console.warn('Failed to unlock playback:', e);
         }
