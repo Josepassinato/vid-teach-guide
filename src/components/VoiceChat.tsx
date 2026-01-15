@@ -227,12 +227,17 @@ Fale em português brasileiro de forma clara e profissional. Seja o professor qu
     }
     
     if (videoTranscript) {
-      // Include full transcript so agent knows exactly what's being taught
+      // Limit transcript to ~8000 characters (~2000 tokens) to avoid exceeding model limits
+      const MAX_TRANSCRIPT_CHARS = 8000;
+      const truncatedTranscript = videoTranscript.length > MAX_TRANSCRIPT_CHARS
+        ? videoTranscript.substring(0, MAX_TRANSCRIPT_CHARS) + '\n\n[... transcrição truncada por limite de tamanho ...]'
+        : videoTranscript;
+      
       instruction += `
 
-📝 TRANSCRIÇÃO COMPLETA DO VÍDEO (USE ESTE CONTEÚDO COMO BASE PARA SUAS EXPLICAÇÕES):
+📝 TRANSCRIÇÃO DO VÍDEO (USE ESTE CONTEÚDO COMO BASE PARA SUAS EXPLICAÇÕES):
 """
-${videoTranscript}
+${truncatedTranscript}
 """
 
 IMPORTANTE: Você está ensinando EXATAMENTE o conteúdo acima. Suas explicações, exemplos e perguntas devem ser sobre os temas abordados nesta transcrição. NÃO fale sobre assuntos que não estão no vídeo.`;
