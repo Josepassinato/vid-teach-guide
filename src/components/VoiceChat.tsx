@@ -45,6 +45,8 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const [activeQuiz, setActiveQuiz] = useState<TimestampQuiz | null>(null);
   const [agentMode, setAgentMode] = useState<'idle' | 'intro' | 'teaching' | 'playing'>('idle');
   const [pendingReconnect, setPendingReconnect] = useState<{type: 'moment' | 'quiz', data: any} | null>(null);
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
@@ -431,6 +433,32 @@ Seja breve e objetivo - máximo 30 segundos de introdução.`;
       const currentTime = videoPlayerRef.current?.getCurrentTime() || 0;
       const isPaused = videoPlayerRef.current?.isPaused() ?? true;
       
+      // Update current time for timer display
+      setCurrentVideoTime(currentTime);
+      
+      // Calculate next pause (quiz or teaching moment)
+      const allPauses: {time: number; type: 'quiz' | 'moment'; topic?: string}[] = [];
+      
+      // Add upcoming quizzes
+      timestampQuizzes.forEach(q => {
+        if (q.timestampSeconds && q.timestampSeconds > currentTime) {
+          allPauses.push({ time: q.timestampSeconds, type: 'quiz', topic: 'Quiz' });
+        }
+      });
+      
+      // Add upcoming teaching moments
+      if (contentPlan) {
+        contentPlan.teaching_moments.forEach(m => {
+          if (m.timestamp_seconds > currentTime) {
+            allPauses.push({ time: m.timestamp_seconds, type: 'moment', topic: m.topic });
+          }
+        });
+      }
+      
+      // Sort and get the next one
+      allPauses.sort((a, b) => a.time - b.time);
+      setNextPauseInfo(allPauses[0] || null);
+      
       // Only check when video is playing and no quiz is active
       // Check in both 'playing' and 'idle' modes to catch pauses even without formal class start
       if (!isPaused && !activeQuiz && (agentMode === 'playing' || agentMode === 'idle')) {
@@ -497,7 +525,7 @@ INSTRUÇÕES:
         timeCheckIntervalRef.current = null;
       }
     };
-  }, [status, contentPlan, videoId, activeQuiz, agentMode, checkForTeachingMoment, generateTeacherInstructions, sendText, getQuizForTimestamp, markQuizTriggered, connect]);
+  }, [status, contentPlan, videoId, activeQuiz, agentMode, checkForTeachingMoment, generateTeacherInstructions, sendText, getQuizForTimestamp, markQuizTriggered, connect, timestampQuizzes]);
 
   // Handle quiz completion
   const handleQuizComplete = useCallback((selectedIndex: number, isCorrect: boolean) => {
@@ -589,6 +617,16 @@ INSTRUÇÕES:
   const dismissActiveMoment = () => {
     handleDismissMoment();
   };
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Calculate time remaining until next pause
+  const timeUntilNextPause = nextPauseInfo ? Math.max(0, nextPauseInfo.time - currentVideoTime) : null;
 
   const getStatusColor = () => {
     if (agentMode === 'playing' && status === 'disconnected') return 'bg-google-blue';
@@ -688,6 +726,20 @@ INSTRUÇÕES:
               videoId={videoId} 
               title={videoTitle}
             />
+            
+            {/* Next Pause Timer - Discrete overlay at bottom of video */}
+            {agentMode === 'playing' && nextPauseInfo && timeUntilNextPause !== null && timeUntilNextPause > 0 && (
+              <div className="absolute bottom-2 right-2 z-10">
+                <div className="bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded-md text-xs flex items-center gap-1.5 animate-fade-in">
+                  <Target className="h-3 w-3 text-google-yellow" />
+                  <span className="text-muted-foreground/80">Próxima pausa:</span>
+                  <span className="font-mono font-medium text-google-yellow">{formatTime(timeUntilNextPause)}</span>
+                  {nextPauseInfo.type === 'quiz' && (
+                    <Badge variant="outline" className="text-[8px] h-4 px-1 border-google-blue text-google-blue">Quiz</Badge>
+                  )}
+                </div>
+              </div>
+            )}
             
             {/* Mini Quiz Overlay */}
             <AnimatePresence>
