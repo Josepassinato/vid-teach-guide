@@ -389,20 +389,23 @@ INSTRUÇÕES:
       // Handle intro mode - agent starts class
       if (agentMode === 'intro' && !introCompletedRef.current) {
         introCompletedRef.current = true;
-        // After intro speech, start video and disconnect to save tokens
-        introTimeout = setTimeout(() => {
-          if (statusRef.current === 'connected') {
-            sendText('[SISTEMA] Sua introdução foi ótima! Agora vou começar o vídeo. Você será reconectado nos momentos de pausa para interagir com o aluno.');
-            setTimeout(() => {
-              videoPlayerRef.current?.play();
-              setAgentMode('playing');
-              // Disconnect after a brief moment to let the goodbye play
-              setTimeout(() => {
-                disconnect();
-              }, 3000);
-            }, 2000);
+        // Send intro instruction to agent
+        const introInstruction = `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
+
+INSTRUÇÕES DE INTRODUÇÃO:
+1. Cumprimente o aluno de forma calorosa e profissional
+2. Apresente brevemente o tema da aula: "${videoTitle || 'Vibe Coding'}"
+3. Diga que o vídeo vai começar em alguns segundos
+4. Explique que você vai pausar em momentos importantes para aprofundar o aprendizado
+5. Pergunte se o aluno está pronto para começar
+
+Seja breve e objetivo - máximo 30 segundos de introdução.`;
+        
+        setTimeout(() => {
+          if (statusRef.current === 'connected' && sendTextRef.current) {
+            sendTextRef.current(introInstruction);
           }
-        }, 15000); // Give 15 seconds for intro
+        }, 1000);
       }
     }
     
@@ -542,19 +545,38 @@ INSTRUÇÕES:
     connect();
   }, [connect]);
 
+  // Called when student confirms they're ready to start the video
+  const handleStartVideo = useCallback(() => {
+    if (status === 'connected') {
+      sendText('[SISTEMA] O aluno confirmou que está pronto. Diga algo breve como "Vamos lá! Começando o vídeo..." e prepare-se para voltar nos momentos de pausa.');
+      setTimeout(() => {
+        videoPlayerRef.current?.play();
+        setAgentMode('playing');
+        // Disconnect after agent finishes speaking
+        setTimeout(() => {
+          if (statusRef.current === 'connected') {
+            disconnect();
+          }
+        }, 3000);
+      }, 2000);
+    }
+  }, [status, sendText, disconnect]);
+
   // Handle dismissing teaching moment - resume video and disconnect
   const handleDismissMoment = useCallback(() => {
     setActiveMoment(null);
-    videoPlayerRef.current?.play();
-    setAgentMode('playing');
-    // Disconnect to save tokens
-    setTimeout(() => {
-      if (statusRef.current === 'connected') {
-        sendText('[SISTEMA] O aluno quer continuar o vídeo. Diga "Bora continuar!" e vamos retomar.');
+    if (status === 'connected') {
+      sendText('[SISTEMA] O aluno quer continuar o vídeo. Diga algo breve como "Podemos continuar!" e vamos retomar.');
+      setTimeout(() => {
+        videoPlayerRef.current?.play();
+        setAgentMode('playing');
         setTimeout(() => disconnect(), 3000);
-      }
-    }, 500);
-  }, [disconnect, sendText]);
+      }, 1500);
+    } else {
+      videoPlayerRef.current?.play();
+      setAgentMode('playing');
+    }
+  }, [disconnect, sendText, status]);
 
   const toggleListening = () => {
     if (isListening) {
@@ -905,7 +927,7 @@ INSTRUÇÕES:
         {/* Controls */}
         <div className="space-y-2 sm:space-y-3 pt-2 border-t flex-shrink-0">
           <div className="flex gap-2">
-            {status === 'disconnected' || status === 'error' ? (
+            {status === 'disconnected' && agentMode !== 'playing' ? (
               <Button onClick={handleStartClass} className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
                 <Phone className="h-4 w-4 mr-2" />
                 Iniciar Aula
@@ -914,9 +936,46 @@ INSTRUÇÕES:
               <Button disabled className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
                 Conectando...
               </Button>
-            ) : (
+            ) : agentMode === 'intro' && status === 'connected' ? (
               <>
-                {/* Show listening status indicator */}
+                {/* Intro mode - show "Start Video" button */}
+                <div className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-11 bg-primary/10 rounded-md px-3">
+                  {isListening ? (
+                    <>
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-sm text-primary">Professor apresentando...</span>
+                    </>
+                  ) : isSpeaking ? (
+                    <>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                      <span className="text-sm text-primary">Ouvindo introdução...</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      <span className="text-sm text-muted-foreground">Preparando aula...</span>
+                    </>
+                  )}
+                </div>
+                <Button 
+                  onClick={handleStartVideo} 
+                  className="h-10 sm:h-11 px-4 bg-google-green hover:bg-google-green/90"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  <span>Começar Vídeo</span>
+                </Button>
+              </>
+            ) : agentMode === 'playing' && status === 'disconnected' ? (
+              <>
+                {/* Video playing mode - agent disconnected */}
+                <div className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-11 bg-blue-500/10 rounded-md px-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  <span className="text-sm text-blue-600 dark:text-blue-400">▶️ Vídeo em andamento...</span>
+                </div>
+              </>
+            ) : status === 'connected' ? (
+              <>
+                {/* Connected and teaching */}
                 <div className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-11 bg-primary/10 rounded-md px-3">
                   {isListening ? (
                     <>
@@ -933,7 +992,7 @@ INSTRUÇÕES:
                   ) : (
                     <>
                       <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span className="text-sm text-muted-foreground">Aula em andamento</span>
+                      <span className="text-sm text-muted-foreground">Momento de aprendizado</span>
                     </>
                   )}
                 </div>
@@ -942,6 +1001,11 @@ INSTRUÇÕES:
                   <span className="hidden sm:inline">Encerrar</span>
                 </Button>
               </>
+            ) : (
+              <Button onClick={handleStartClass} className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
+                <Phone className="h-4 w-4 mr-2" />
+                Iniciar Aula
+              </Button>
             )}
           </div>
           
