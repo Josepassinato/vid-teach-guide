@@ -763,7 +763,35 @@ INSTRUÇÕES:
               )}
             </AnimatePresence>
             
-            <div className="flex items-center justify-between mt-1.5 sm:mt-2">
+            {/* Pause Times List */}
+            {(contentPlan?.teaching_moments?.length > 0 || timestampQuizzes.length > 0) && (
+              <div className="flex flex-wrap items-center gap-1 mt-1.5 text-[9px] text-muted-foreground">
+                <span className="font-medium">Pausas:</span>
+                {[
+                  ...timestampQuizzes
+                    .filter(q => q.timestampSeconds)
+                    .map(q => ({ time: q.timestampSeconds!, type: 'quiz' as const })),
+                  ...(contentPlan?.teaching_moments || [])
+                    .map(m => ({ time: m.timestamp_seconds, type: 'moment' as const }))
+                ]
+                  .sort((a, b) => a.time - b.time)
+                  .map((pause, i) => (
+                    <span 
+                      key={i} 
+                      className={`font-mono px-1 py-0.5 rounded ${
+                        pause.type === 'quiz' 
+                          ? 'bg-google-blue/20 text-google-blue' 
+                          : 'bg-google-yellow/20 text-google-yellow'
+                      }`}
+                    >
+                      {formatTime(pause.time)}
+                    </span>
+                  ))
+                }
+              </div>
+            )}
+            
+            <div className="flex items-center justify-between mt-1">
               <p className="text-[10px] sm:text-xs text-muted-foreground">
                 💡 Diga "dê play", "pause" ou "reinicie o vídeo"
               </p>
