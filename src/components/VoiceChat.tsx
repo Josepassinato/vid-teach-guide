@@ -397,15 +397,15 @@ INSTRUÇÕES:
         }
       }
       
-      // Handle intro mode - agent starts class
+      // Handle intro mode - agent starts class only if custom intro is configured
       if (agentMode === 'intro' && !introCompletedRef.current) {
         introCompletedRef.current = true;
         
-        // Use custom teacher intro if provided, otherwise use default
+        // Only send intro if admin configured a custom teacher intro
         const customIntro = teacherIntro?.trim();
         
-        const introInstruction = customIntro
-          ? `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
+        if (customIntro) {
+          const introInstruction = `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
 
 INTRODUÇÃO PERSONALIZADA (USE EXATAMENTE ESTE TEXTO COMO BASE):
 "${customIntro}"
@@ -414,23 +414,15 @@ INSTRUÇÕES:
 1. Use a introdução personalizada acima como guia para seu tom e estilo
 2. Adapte naturalmente, mas mantenha a essência do texto
 3. Após a introdução, pergunte se o aluno está pronto para começar
-4. Seja breve - máximo 30 segundos`
-          : `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
-
-INSTRUÇÕES DE INTRODUÇÃO:
-1. Cumprimente o aluno de forma calorosa e profissional
-2. Apresente brevemente o tema da aula: "${videoTitle || 'Vibe Coding'}"
-3. Diga que o vídeo vai começar em alguns segundos
-4. Explique que você vai pausar em momentos importantes para aprofundar o aprendizado
-5. Pergunte se o aluno está pronto para começar
-
-Seja breve e objetivo - máximo 30 segundos de introdução.`;
-        
-        setTimeout(() => {
-          if (statusRef.current === 'connected' && sendTextRef.current) {
-            sendTextRef.current(introInstruction);
-          }
-        }, 1000);
+4. Seja breve - máximo 30 segundos`;
+          
+          setTimeout(() => {
+            if (statusRef.current === 'connected' && sendTextRef.current) {
+              sendTextRef.current(introInstruction);
+            }
+          }, 1000);
+        }
+        // If no custom intro, agent stays silent and waits for user interaction
       }
     }
     
