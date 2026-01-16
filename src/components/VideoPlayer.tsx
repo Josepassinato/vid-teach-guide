@@ -24,7 +24,7 @@ export interface VideoPlayerProps {
   videoId: string;
   /** Optional video title */
   title?: string;
-  /** When true, video expands to fill available height (90% of viewport) */
+  /** When true, video expands to fill available height (90vh) */
   expanded?: boolean;
 }
 
@@ -391,6 +391,9 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
   }
 );
 
+VideoPlayer.displayName = 'VideoPlayer';
+
+// Add display name for debugging
 VideoPlayer.displayName = 'VideoPlayer';
 
 // Extend window for YouTube API
