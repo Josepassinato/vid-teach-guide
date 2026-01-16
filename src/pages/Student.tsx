@@ -7,7 +7,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play, LogOut, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { TeachingMoment } from '@/hooks/useContentManager';
 import { useStudentProgress } from '@/hooks/useStudentProgress';
 import { LessonQuiz } from '@/components/LessonQuiz';
@@ -63,7 +62,7 @@ const Student = () => {
   const [studentId] = useState(() => {
     const stored = localStorage.getItem('studentId');
     if (stored) return stored;
-    const newId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newId = `student_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     localStorage.setItem('studentId', newId);
     return newId;
   });

@@ -4,14 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
-import { useContentManager, TeachingMoment, ContentPlan } from '@/hooks/useContentManager';
+import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useStudentMemory } from '@/hooks/useStudentMemory';
-import { useVisionAnalysis, EmotionAnalysis } from '@/hooks/useVisionAnalysis';
+import { useVisionAnalysis } from '@/hooks/useVisionAnalysis';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
-import { VideoPlayer, VideoPlayerRef, VideoPlayerProps } from './VideoPlayer';
+import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
-import { MiniQuiz, MiniQuizQuestion } from './MiniQuiz';
-import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Camera, CameraOff, Brain, Heart } from 'lucide-react';
+import { MiniQuiz } from './MiniQuiz';
+import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Camera, Brain, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
 
@@ -33,7 +33,7 @@ interface VoiceChatProps {
   onContentPlanReady?: (moments: TeachingMoment[]) => void;
 }
 
-export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, isStudentMode = false, onContentPlanReady }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, onContentPlanReady }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
@@ -58,7 +58,7 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const [studentId] = useState(() => {
     const stored = localStorage.getItem('studentId');
     if (stored) return stored;
-    const newId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newId = `student_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     localStorage.setItem('studentId', newId);
     return newId;
   });
@@ -67,7 +67,6 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const {
     profile: studentProfile,
     recordObservation,
-    updateProfile,
     buildMemoryContext,
   } = useStudentMemory({
     onProfileLoaded: (profile) => {
@@ -83,9 +82,6 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const {
     isActive: isVisionActive,
     currentEmotion,
-    hasPermission: cameraPermission,
-    startAnalysis,
-    stopAnalysis,
   } = useVisionAnalysis({
     analysisInterval: 10000, // Analyze every 10 seconds
     onEmotionDetected: async (analysis) => {
@@ -121,7 +117,6 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
     analyzeContent,
     checkForTeachingMoment,
     generateTeacherInstructions,
-    resetMoments,
   } = useContentManager({
     onPlanReady: (plan) => {
       console.log('[ContentManager] Plan ready:', plan);
@@ -697,14 +692,6 @@ INSTRUÇÕES:
       setIsVideoExpanded(true); // Re-expand video when resuming
     }
   }, [disconnect, sendText, status, resumeVideo]);
-
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  };
 
   const dismissActiveMoment = () => {
     handleDismissMoment();

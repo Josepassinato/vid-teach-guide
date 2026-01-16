@@ -433,9 +433,6 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
 
 VideoPlayer.displayName = 'VideoPlayer';
 
-// Add display name for debugging
-VideoPlayer.displayName = 'VideoPlayer';
-
 // Extend window for YouTube API
 declare global {
   interface Window {
