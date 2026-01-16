@@ -10,7 +10,7 @@ import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes'
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
 import { MiniQuiz } from './MiniQuiz';
-import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Brain, Heart } from 'lucide-react';
+import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Brain, Heart, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
 
@@ -37,6 +37,7 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [debugInfo, setDebugInfo] = useState({ playerReady: false, lastAction: '' });
   const [activeMoment, setActiveMoment] = useState<TeachingMoment | null>(null);
   const [showContentPlan, setShowContentPlan] = useState(false);
@@ -1042,31 +1043,73 @@ INSTRUÇÕES:
           </div>
         )}
         
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto space-y-2 sm:space-y-3 pr-1 sm:pr-2 min-h-0">
-          {messages.length === 0 && status === 'disconnected' && (
-            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-3 sm:p-4">
-              <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 mb-2 sm:mb-3 opacity-50" />
-              <p className="text-xs sm:text-sm">Clique em "Iniciar Aula" para começar a conversar com o professor IA</p>
+        {/* Collapsible Chat Section */}
+        <div className="border rounded-lg overflow-hidden flex-shrink-0">
+          <button
+            onClick={() => setShowChat(!showChat)}
+            className="w-full flex items-center justify-between p-2 sm:p-3 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <MessageSquare className="h-4 w-4" />
+              <span>Chat de Texto</span>
+              {messages.length > 0 && (
+                <Badge variant="secondary" className="text-[10px] h-5">
+                  {messages.length}
+                </Badge>
+              )}
+            </div>
+            {showChat ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
+          
+          {showChat && (
+            <div className="p-2 sm:p-3 border-t space-y-2">
+              {/* Messages */}
+              <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                {messages.length === 0 ? (
+                  <div className="text-center text-muted-foreground p-3">
+                    <p className="text-xs">Nenhuma mensagem ainda</p>
+                  </div>
+                ) : (
+                  messages.map((msg) => (
+                    <div 
+                      key={msg.id}
+                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div 
+                        className={`max-w-[90%] sm:max-w-[85%] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm ${
+                          msg.role === 'user' 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-muted'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              {/* Text input - only when connected */}
+              {status === 'connected' && (
+                <div className="flex gap-2 pt-2 border-t">
+                  <Input
+                    placeholder="Digite sua pergunta..."
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendText()}
+                    className="h-9 text-sm"
+                  />
+                  <Button onClick={handleSendText} size="icon" variant="secondary" className="h-9 w-9">
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
           )}
-          
-          {messages.map((msg) => (
-            <div 
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div 
-                className={`max-w-[90%] sm:max-w-[85%] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm ${
-                  msg.role === 'user' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted'
-                }`}
-              >
-                {msg.text}
-              </div>
-            </div>
-          ))}
         </div>
         
         {/* Voice indicators */}
@@ -1172,20 +1215,6 @@ INSTRUÇÕES:
             )}
           </div>
           
-          {status === 'connected' && (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Ou digite sua pergunta..."
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendText()}
-                className="h-9 sm:h-10 text-sm"
-              />
-              <Button onClick={handleSendText} size="icon" variant="secondary" className="h-9 w-9 sm:h-10 sm:w-10">
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
