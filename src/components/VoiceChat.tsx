@@ -6,12 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useStudentMemory } from '@/hooks/useStudentMemory';
-import { useVisionAnalysis } from '@/hooks/useVisionAnalysis';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
 import { MiniQuiz } from './MiniQuiz';
-import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Camera, Brain, Heart } from 'lucide-react';
+import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Brain, Heart } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
 
@@ -79,40 +78,6 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const sendTextRef = useRef<((text: string) => void) | null>(null);
   const statusRef = useRef<string>('disconnected');
 
-  // Vision Analysis for emotional detection
-  const {
-    isActive: isVisionActive,
-    currentEmotion,
-  } = useVisionAnalysis({
-    analysisInterval: 10000, // Analyze every 10 seconds
-    onEmotionDetected: async (analysis) => {
-      console.log('[VisionAnalysis] Emotion detected:', analysis);
-      
-      // Record observation to memory (internal use only)
-      // IMPORTANT: never send facial-expression details or labels to the agent as text.
-      // The agent must NOT narrate what it "sees"; these signals are only for internal analytics.
-      recordObservation({
-        observation_type: 'emotion',
-        // Store only minimal structured data (no "details" text) to avoid leakage into prompts.
-        observation_data: {
-          emotion: analysis.emotion,
-          engagement_level: analysis.engagement_level,
-          confidence: analysis.confidence,
-        },
-        emotional_state: analysis.emotion,
-        confidence_level: analysis.confidence,
-        context: videoTitle || 'Interação com professor',
-        video_id: videoId,
-      });
-
-      // Privacy rule: do NOT push any emotion/vision output (even coded) into the conversation.
-      // If we ever want to adapt the teaching style, we must do it via neutral pedagogical prompts
-      // that do not reference observations about the student.
-    },
-    onError: (error) => {
-      console.error('[VisionAnalysis] Error:', error);
-    },
-  });
 
   // Content Manager for teaching moments
   const {
@@ -788,27 +753,7 @@ INSTRUÇÕES:
               Professor IA
             </CardTitle>
             <div className="flex items-center gap-2">
-              {/* Indicadores internos (apenas para debug) */}
-              {showDebug && isVisionActive && (
-                <Badge variant="outline" className="text-[10px] border-green-500 text-green-600">
-                  <Camera className="h-2.5 w-2.5 mr-1" />
-                  <span className="hidden sm:inline">Visão ativa</span>
-                </Badge>
-              )}
-
-              {showDebug && currentEmotion && isVisionActive && (
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] ${
-                    currentEmotion.engagement_level === 'high' ? 'border-green-500 text-green-600' :
-                    currentEmotion.engagement_level === 'low' ? 'border-red-500 text-red-600' :
-                    'border-yellow-500 text-yellow-600'
-                  }`}
-                >
-                  <Heart className="h-2.5 w-2.5 mr-1" />
-                  {currentEmotion.emotion}
-                </Badge>
-              )}
+              {/* Debug badge */}
               
               {/* Student memory indicator */}
               {studentProfile && (
