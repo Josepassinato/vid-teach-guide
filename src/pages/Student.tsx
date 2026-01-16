@@ -165,7 +165,7 @@ const Student = () => {
       hasTranscript: !!video.transcript,
       transcript: video.transcript,
       analysis: video.analysis || `Vídeo: ${video.title}`,
-      lessonNumber: video.lesson_order,
+      lessonNumber: index + 1, // Use actual position in sorted list, not lesson_order field
       description: video.description,
       duration: video.duration_minutes,
       teachingMoments: moments,
