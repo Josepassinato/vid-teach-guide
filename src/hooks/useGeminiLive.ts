@@ -256,8 +256,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         }];
         
         // Send setup message with Gemini 2.0 Flash
-        // Using Puck voice - playful, energetic and dynamic, perfect for engaging teaching
-        // Other options: Fenrir (energetic male), Kore (warm female), Aoede (warm female), Charon (deep/authoritative)
+        // Using Kore voice - warm female voice
+        // Other options: Fenrir (energetic male), Puck (playful), Aoede (warm female), Charon (deep/authoritative)
         ws.send(JSON.stringify({
           setup: {
             model: "models/gemini-2.0-flash-exp",
@@ -268,7 +268,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
                 languageCode: "pt-BR",
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: "Puck"
+                    voiceName: "Kore"
                   }
                 }
               }
