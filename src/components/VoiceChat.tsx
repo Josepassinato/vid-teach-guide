@@ -959,15 +959,6 @@ INSTRUÇÕES:
                 </div>
               )}
             </div>
-            {showDebug && studentProfile.emotional_patterns?.length > 0 && (
-              <div className="flex flex-wrap gap-1 pt-1 border-t">
-                {studentProfile.emotional_patterns.slice(0, 4).map((pattern, idx) => (
-                  <Badge key={idx} variant="outline" className="text-[10px]">
-                    {pattern.emotion} ({pattern.count}x)
-                  </Badge>
-                ))}
-              </div>
-            )}
             {studentProfile.strengths?.length > 0 && (
               <div className="text-xs pt-1 border-t">
                 <span className="text-muted-foreground">Pontos fortes:</span>

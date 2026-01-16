@@ -6,7 +6,6 @@ export interface StudentProfile {
   student_id: string;
   name: string | null;
   learning_style: string | null;
-  emotional_patterns: EmotionalPattern[];
   strengths: string[];
   areas_to_improve: string[];
   preferences: Record<string, any>;
@@ -16,17 +15,9 @@ export interface StudentProfile {
   last_seen_at: string;
 }
 
-export interface EmotionalPattern {
-  emotion: string;
-  count: number;
-  last_seen: string;
-}
-
 export interface StudentObservation {
-  observation_type: 'emotion' | 'comprehension' | 'engagement' | 'behavior';
+  observation_type: 'comprehension' | 'engagement' | 'behavior';
   observation_data: Record<string, any>;
-  emotional_state?: string;
-  confidence_level?: number;
   context?: string;
   video_id?: string;
 }
@@ -92,7 +83,6 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
       if (existing) {
         const profileData: StudentProfile = {
           ...existing,
-          emotional_patterns: (existing.emotional_patterns as unknown as EmotionalPattern[]) || [],
           strengths: existing.strengths || [],
           areas_to_improve: existing.areas_to_improve || [],
           preferences: (existing.preferences as unknown as Record<string, any>) || {},
@@ -123,7 +113,6 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
         
         const profileData: StudentProfile = {
           ...newProfile,
-          emotional_patterns: [],
           strengths: [],
           areas_to_improve: [],
           preferences: {},
@@ -150,41 +139,12 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
           video_id: observation.video_id,
           observation_type: observation.observation_type,
           observation_data: observation.observation_data,
-          emotional_state: observation.emotional_state,
-          confidence_level: observation.confidence_level,
           context: observation.context,
         });
       
       if (error) throw error;
       
       optionsRef.current.onObservationRecorded?.(observation);
-      
-      // Update emotional patterns if this is an emotion observation
-      if (observation.observation_type === 'emotion' && observation.emotional_state) {
-        const patterns = [...(profile.emotional_patterns || [])];
-        const existingIdx = patterns.findIndex(p => p.emotion === observation.emotional_state);
-        
-        if (existingIdx >= 0) {
-          patterns[existingIdx] = {
-            ...patterns[existingIdx],
-            count: patterns[existingIdx].count + 1,
-            last_seen: new Date().toISOString(),
-          };
-        } else {
-          patterns.push({
-            emotion: observation.emotional_state!,
-            count: 1,
-            last_seen: new Date().toISOString(),
-          });
-        }
-        
-        await supabase
-          .from('student_profiles')
-          .update({ emotional_patterns: JSON.parse(JSON.stringify(patterns)) })
-          .eq('id', profile.id);
-        
-        setProfile(prev => prev ? { ...prev, emotional_patterns: patterns } : null);
-      }
     } catch (error) {
       console.error('[StudentMemory] Error recording observation:', error);
     }
@@ -223,8 +183,6 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
       return (data || []).map(obs => ({
         observation_type: obs.observation_type as StudentObservation['observation_type'],
         observation_data: obs.observation_data as Record<string, any>,
-        emotional_state: obs.emotional_state || undefined,
-        confidence_level: obs.confidence_level ? Number(obs.confidence_level) : undefined,
         context: obs.context || undefined,
         video_id: obs.video_id || undefined,
       }));
@@ -258,9 +216,6 @@ MEMÓRIA DO ALUNO:
     if (profile.personality_notes) {
       context += `- Observações: ${profile.personality_notes}\n`;
     }
-    
-    // IMPORTANT: We intentionally do NOT include emotional patterns or recent emotion observations
-    // in the AI prompt context to prevent the agent from narrating sensitive observations.
 
     return context;
   }, [profile]);
