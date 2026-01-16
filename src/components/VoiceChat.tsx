@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes'
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
 import { MiniQuiz } from './MiniQuiz';
+import { LessonEndScreen } from './LessonEndScreen';
 import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
@@ -33,6 +35,7 @@ interface VoiceChatProps {
 }
 
 export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady }: VoiceChatProps) {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
@@ -41,16 +44,19 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const [activeMoment, setActiveMoment] = useState<TeachingMoment | null>(null);
   const [showContentPlan, setShowContentPlan] = useState(false);
   const [activeQuiz, setActiveQuiz] = useState<TimestampQuiz | null>(null);
-  const [agentMode, setAgentMode] = useState<'idle' | 'intro' | 'teaching' | 'playing'>('idle');
+  const [agentMode, setAgentMode] = useState<'idle' | 'intro' | 'teaching' | 'playing' | 'ended'>('idle');
   const [isVideoExpanded, setIsVideoExpanded] = useState(false);
   const [pendingReconnect, setPendingReconnect] = useState<{type: 'moment' | 'quiz', data: any} | null>(null);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
+  const [lessonEndData, setLessonEndData] = useState<{ weeklyTask?: string; summaryPoints?: string[] }>({});
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
   const analyzedVideoRef = useRef<string | null>(null);
   const introCompletedRef = useRef<boolean>(false);
+  const isCapturingEndDataRef = useRef<boolean>(false);
+  const endMessageBufferRef = useRef<string>('');
   
   // Generate student ID
   const [studentId] = useState(() => {
@@ -222,13 +228,15 @@ Quando receber "MINI QUIZ!":
 
 === ENCERRAMENTO DA AULA ===
 Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
-1. Faça um breve resumo dos principais pontos aprendidos (máximo 3-4 pontos)
-2. Celebre o progresso do aluno: "Mandou muito bem hoje!"
-3. Proponha uma TAREFA DA SEMANA relacionada ao conteúdo:
+1. Diga "Aula concluída!" para sinalizar o encerramento
+2. Faça um breve resumo dos principais pontos aprendidos (máximo 3-4 pontos), começando cada ponto com "•"
+3. Celebre o progresso do aluno: "Mandou muito bem hoje!"
+4. Proponha uma TAREFA DA SEMANA iniciando com "📋 Tarefa da Semana:" seguido da descrição:
    - Deve ser prática e aplicável
    - Algo que o aluno possa fazer usando o que aprendeu
-   - Ex: "Seu desafio: criar um projeto simples usando X" ou "Pratique Y fazendo Z"
-4. Despeça-se de forma motivadora e informal`;
+   - Ex: "📋 Tarefa da Semana: criar um projeto simples usando X" ou "📋 Tarefa da Semana: Pratique Y fazendo Z"
+5. Despeça-se de forma motivadora e informal`;
+
 
     return instruction;
   }, [videoContext, videoTitle, videoTranscript, contentPlan, timestampQuizzes.length]);
@@ -297,6 +305,24 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
         role,
         timestamp: new Date()
       }]);
+      
+      // Capture end-of-lesson data from assistant messages
+      if (role === 'assistant' && isCapturingEndDataRef.current) {
+        endMessageBufferRef.current += ' ' + text;
+        
+        // Extract weekly task if present
+        const taskMatch = endMessageBufferRef.current.match(/📋\s*Tarefa da Semana[:\s]+([^📋]+?)(?=\.|!|$)/i);
+        if (taskMatch) {
+          setLessonEndData(prev => ({ ...prev, weeklyTask: taskMatch[1].trim() }));
+        }
+        
+        // Extract summary points (lines starting with •)
+        const bulletPoints = endMessageBufferRef.current.match(/•\s*[^•\n]+/g);
+        if (bulletPoints && bulletPoints.length > 0) {
+          const points = bulletPoints.map(p => p.replace(/^•\s*/, '').trim()).filter(p => p.length > 0);
+          setLessonEndData(prev => ({ ...prev, summaryPoints: points }));
+        }
+      }
     },
     onError: (error) => {
       toast.error(error);
@@ -537,14 +563,24 @@ INSTRUÇÕES:
   const handleVideoEnded = useCallback(() => {
     console.log('[VoiceChat] Video ended, triggering class wrap-up');
     
+    // Start capturing end data
+    isCapturingEndDataRef.current = true;
+    endMessageBufferRef.current = '';
+    setLessonEndData({});
+    
     // Collapse video and set to teaching mode for wrap-up
     setIsVideoExpanded(false);
     setAgentMode('teaching');
     
     // If agent is connected, send the wrap-up instruction
     if (statusRef.current === 'connected' && sendTextRef.current) {
-      sendTextRef.current('[SISTEMA] O vídeo terminou. Hora de encerrar a aula! Faça um resumo breve dos principais pontos, celebre o progresso do aluno, proponha uma tarefa prática da semana relacionada ao conteúdo, e despeça-se de forma motivadora.');
-      toast.success('🎉 Aula concluída!', { duration: 5000 });
+      sendTextRef.current('[SISTEMA] O vídeo terminou. Hora de encerrar a aula! Diga "Aula concluída!", faça um resumo breve com bullets (•), celebre o progresso, proponha a 📋 Tarefa da Semana, e despeça-se.');
+      
+      // Show end screen after a delay for agent to finish
+      setTimeout(() => {
+        setAgentMode('ended');
+        isCapturingEndDataRef.current = false;
+      }, 15000);
     } else {
       // Reconnect to deliver wrap-up
       setPendingReconnect({ type: 'moment', data: { topic: 'Encerramento da aula' } as any });
@@ -676,6 +712,7 @@ INSTRUÇÕES:
   };
 
   return (
+    <>
     <Card className={`flex flex-col transition-all duration-500 ${
       isVideoExpanded 
         ? 'h-[90vh] fixed inset-x-0 top-0 z-50 rounded-none border-x-0 border-t-0' 
@@ -1126,5 +1163,22 @@ INSTRUÇÕES:
         </div>
       </CardContent>
     </Card>
+    
+    {/* Lesson End Screen */}
+    <LessonEndScreen
+      isVisible={agentMode === 'ended'}
+      videoTitle={videoTitle}
+      weeklyTask={lessonEndData.weeklyTask}
+      summaryPoints={lessonEndData.summaryPoints}
+      onGoHome={() => navigate('/aluno/dashboard')}
+      onRestartLesson={() => {
+        setAgentMode('idle');
+        setLessonEndData({});
+        introCompletedRef.current = false;
+        lastCheckedMomentRef.current = -1;
+        videoPlayerRef.current?.restart();
+      }}
+    />
+    </>
   );
 }
