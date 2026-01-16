@@ -18,13 +18,18 @@ export interface VideoPlayerRef {
   unlockPlayback: () => void;
 }
 
-interface VideoPlayerProps {
+/** Props for the VideoPlayer component */
+export interface VideoPlayerProps {
+  /** YouTube video ID */
   videoId: string;
+  /** Optional video title */
   title?: string;
+  /** When true, video expands to fill available height (90% of viewport) */
+  expanded?: boolean;
 }
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  ({ videoId, title }, ref) => {
+  ({ videoId, title, expanded = false }, ref) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [volume, setVolume] = useState(100);
@@ -315,8 +320,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     };
 
     return (
-      <Card className="overflow-hidden">
-        <div className="relative aspect-video bg-black">
+      <Card className={`overflow-hidden transition-all duration-300 ${expanded ? 'h-full border-0 rounded-none' : ''}`}>
+        <div className={`relative bg-black ${expanded ? 'h-full' : 'aspect-video'}`}>
           <div id={`youtube-player-${videoId}`} className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
           
           {!isReady && (
