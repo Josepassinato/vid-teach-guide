@@ -238,12 +238,9 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
   }, [contentPlan, currentMomentIndex]);
 
   const generateTeacherInstructions = useCallback((moment: TeachingMoment): string => {
-    const difficultyEmoji = moment.difficulty_level === 'básico' ? '🟢' : 
-                           moment.difficulty_level === 'avançado' ? '🔴' : '🟡';
-    
     return `
-🎯 MOMENTO DE APROFUNDAMENTO - ${moment.topic}
-${difficultyEmoji} Nível: ${moment.difficulty_level || 'intermediário'}
+MOMENTO DE APROFUNDAMENTO - ${moment.topic}
+Nível: ${moment.difficulty_level || 'intermediário'}
 
 INSTRUÇÃO PARA O PROFESSOR IA:
 ${moment.teaching_approach || 'Pause o vídeo e explore este conceito com o aluno.'}
@@ -254,10 +251,9 @@ ${moment.key_insight}
 PERGUNTAS PARA FAZER AO ALUNO:
 ${moment.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n')}
 
-${moment.discussion_points?.length > 0 ? `PONTOS DE DISCUSSÃO:
-${moment.discussion_points.map((p) => `• ${p}`).join('\n')}` : ''}
+${moment.discussion_points?.length > 0 ? `PONTOS DE DISCUSSÃO:\n${moment.discussion_points.map((p) => `- ${p}`).join('\n')}` : ''}
 
-⏱️ Tempo sugerido: ${moment.estimated_discussion_minutes || 2} minutos
+Tempo sugerido: ${moment.estimated_discussion_minutes || 2} minutos
 
 Após explorar este momento, pergunte ao aluno se está pronto para continuar o vídeo.
 `;
