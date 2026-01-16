@@ -19,17 +19,17 @@ export interface VideoPlayerRef {
 }
 
 /** Props for the VideoPlayer component */
-export interface VideoPlayerProps {
+export type VideoPlayerProps = {
   /** YouTube video ID */
   videoId: string;
   /** Optional video title */
   title?: string;
   /** When true, video expands to fill available height (90vh) */
   expanded?: boolean;
-}
+};
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  ({ videoId, title, expanded = false }, ref) => {
+  function VideoPlayer({ videoId, title, expanded = false }, ref) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [volume, setVolume] = useState(100);

@@ -8,7 +8,7 @@ import { useContentManager, TeachingMoment, ContentPlan } from '@/hooks/useConte
 import { useStudentMemory } from '@/hooks/useStudentMemory';
 import { useVisionAnalysis, EmotionAnalysis } from '@/hooks/useVisionAnalysis';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
-import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
+import { VideoPlayer, VideoPlayerRef, VideoPlayerProps } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
 import { MiniQuiz, MiniQuizQuestion } from './MiniQuiz';
 import { Mic, MicOff, Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Camera, CameraOff, Brain, Heart } from 'lucide-react';
