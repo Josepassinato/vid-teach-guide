@@ -5,7 +5,7 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play, LogOut } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play, LogOut, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TeachingMoment } from '@/hooks/useContentManager';
@@ -27,6 +27,12 @@ interface SavedVideo {
   duration_minutes: number | null;
   teaching_moments: unknown;
   is_configured: boolean;
+  is_released: boolean;
+}
+
+interface QuizResult {
+  video_id: string;
+  passed: boolean;
 }
 
 interface VideoInfo {
@@ -52,6 +58,7 @@ const Student = () => {
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [showQuiz, setShowQuiz] = useState(false);
   const [generatedMoments, setGeneratedMoments] = useState<TeachingMoment[] | null>(null);
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   
   const [studentId] = useState(() => {
     const stored = localStorage.getItem('studentId');
@@ -79,16 +86,36 @@ const Student = () => {
   useEffect(() => {
     const loadSavedVideos = async () => {
       try {
-        const { data, error } = await supabase
-          .from('videos')
-          .select('*')
-          .order('lesson_order', { ascending: true });
+        // Load videos and quiz results in parallel
+        const [videosRes, quizRes] = await Promise.all([
+          supabase
+            .from('videos')
+            .select('*')
+            .order('lesson_order', { ascending: true }),
+          supabase
+            .from('student_quiz_results')
+            .select('video_id, passed')
+            .eq('student_id', studentId)
+            .eq('passed', true)
+        ]);
 
-        if (error) throw error;
-        setSavedVideos(data || []);
+        if (videosRes.error) throw videosRes.error;
         
-        if (data && data.length > 0) {
-          selectVideo(data[0], 0);
+        const allVideos = videosRes.data || [];
+        const passedQuizzes = quizRes.data || [];
+        
+        setQuizResults(passedQuizzes);
+        setSavedVideos(allVideos);
+        
+        // Select first available video
+        if (allVideos.length > 0) {
+          const firstUnlocked = allVideos.find((v, i) => isLessonUnlocked(v, i, allVideos, passedQuizzes));
+          if (firstUnlocked) {
+            const idx = allVideos.indexOf(firstUnlocked);
+            selectVideo(firstUnlocked, idx);
+          } else if (allVideos[0]) {
+            selectVideo(allVideos[0], 0);
+          }
         }
       } catch (err) {
         console.error('[Student] Error loading saved videos:', err);
@@ -98,7 +125,28 @@ const Student = () => {
     };
 
     loadSavedVideos();
-  }, []);
+  }, [studentId]);
+
+  // Check if a lesson is unlocked based on progression rules
+  const isLessonUnlocked = (video: SavedVideo, index: number, videos: SavedVideo[], passedQuizResults: QuizResult[]) => {
+    // First lesson is always unlocked if released
+    if (index === 0) return video.is_released;
+    
+    // Not released = not available
+    if (!video.is_released) return false;
+    
+    // Check if previous lesson was completed with passing quiz
+    const previousVideo = videos[index - 1];
+    if (!previousVideo) return false;
+    
+    const previousQuizPassed = passedQuizResults.some(q => q.video_id === previousVideo.id && q.passed);
+    return previousQuizPassed;
+  };
+
+  // Helper to check unlock status with current state
+  const checkLessonUnlocked = (video: SavedVideo, index: number) => {
+    return isLessonUnlocked(video, index, savedVideos, quizResults);
+  };
 
   const selectVideo = (video: SavedVideo, index: number) => {
     const moments = Array.isArray(video.teaching_moments) 
@@ -130,7 +178,12 @@ const Student = () => {
 
   const goToNextLesson = () => {
     if (currentLessonIndex < savedVideos.length - 1) {
-      selectVideo(savedVideos[currentLessonIndex + 1], currentLessonIndex + 1);
+      const nextVideo = savedVideos[currentLessonIndex + 1];
+      if (checkLessonUnlocked(nextVideo, currentLessonIndex + 1)) {
+        selectVideo(nextVideo, currentLessonIndex + 1);
+      } else {
+        toast.error('Complete o quiz desta aula para desbloquear a próxima!');
+      }
     }
   };
 
@@ -153,7 +206,12 @@ const Student = () => {
   const handleOpenQuiz = () => setShowQuiz(true);
 
   const handleQuizComplete = async (passed: boolean) => {
-    if (passed) await handleMarkComplete();
+    if (passed) {
+      await handleMarkComplete();
+      // Update quiz results to unlock next lesson
+      setQuizResults(prev => [...prev, { video_id: savedVideos[currentLessonIndex].id, passed: true }]);
+      toast.success('🎉 Próxima aula desbloqueada!');
+    }
   };
 
   // Google colors for decorative elements
@@ -331,21 +389,32 @@ const Student = () => {
                     {savedVideos.map((video, index) => {
                       const completed = isLessonCompleted(video.id);
                       const isActive = selectedVideo?.videoId === video.youtube_id;
+                      const isUnlocked = checkLessonUnlocked(video, index);
                       const colorIndex = index % 4;
                       
                       return (
                         <motion.div
                           key={video.id}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                          whileHover={isUnlocked ? { scale: 1.02 } : {}}
+                          whileTap={isUnlocked ? { scale: 0.98 } : {}}
                         >
                           <Card
-                            className={`cursor-pointer transition-all overflow-hidden ${
+                            className={`transition-all overflow-hidden ${
+                              !isUnlocked 
+                                ? 'opacity-60 cursor-not-allowed' 
+                                : 'cursor-pointer'
+                            } ${
                               isActive 
                                 ? 'ring-2 ring-primary shadow-medium' 
-                                : 'hover:shadow-soft'
+                                : isUnlocked ? 'hover:shadow-soft' : ''
                             } ${completed ? 'bg-accent/5' : ''}`}
-                            onClick={() => selectVideo(video, index)}
+                            onClick={() => {
+                              if (isUnlocked) {
+                                selectVideo(video, index);
+                              } else {
+                                toast.error('Complete a aula anterior com aprovação no quiz para desbloquear!');
+                              }
+                            }}
                           >
                             <CardContent className="p-0">
                               <div className="flex gap-3 p-3">
@@ -354,14 +423,19 @@ const Student = () => {
                                   <img
                                     src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
                                     alt={video.title}
-                                    className="w-full h-full object-cover"
+                                    className={`w-full h-full object-cover ${!isUnlocked ? 'grayscale' : ''}`}
                                   />
-                                  {completed && (
+                                  {!isUnlocked && (
+                                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                      <Lock className="h-5 w-5 text-white" />
+                                    </div>
+                                  )}
+                                  {isUnlocked && completed && (
                                     <div className="absolute inset-0 bg-accent/80 flex items-center justify-center">
                                       <CheckCircle className="h-6 w-6 text-white" />
                                     </div>
                                   )}
-                                  {!completed && isActive && (
+                                  {isUnlocked && !completed && isActive && (
                                     <div className="absolute inset-0 bg-primary/80 flex items-center justify-center">
                                       <Play className="h-5 w-5 text-white fill-white" />
                                     </div>
@@ -370,21 +444,27 @@ const Student = () => {
                                 
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${googleColors[colorIndex]}`}>
-                                      {video.lesson_order}
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${isUnlocked ? googleColors[colorIndex] : 'bg-muted-foreground'}`}>
+                                      {isUnlocked ? video.lesson_order : <Lock className="h-2.5 w-2.5" />}
                                     </div>
                                   </div>
-                                  <p className="text-sm font-medium line-clamp-1">
+                                  <p className={`text-sm font-medium line-clamp-1 ${!isUnlocked ? 'text-muted-foreground' : ''}`}>
                                     {video.title}
                                   </p>
                                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
-                                    {video.duration_minutes && (
+                                    {!isUnlocked && (
+                                      <Badge variant="outline" className="text-[10px] border-orange-500 text-orange-600">
+                                        <Lock className="h-2.5 w-2.5 mr-0.5" />
+                                        Bloqueada
+                                      </Badge>
+                                    )}
+                                    {isUnlocked && video.duration_minutes && (
                                       <span className="flex items-center gap-1">
                                         <Clock className="h-3 w-3" />
                                         {video.duration_minutes} min
                                       </span>
                                     )}
-                                    {completed && (
+                                    {isUnlocked && completed && (
                                       <Badge variant="secondary" className="text-[10px] bg-accent/10 text-accent border-0">
                                         Concluída
                                       </Badge>
@@ -493,14 +573,28 @@ const Student = () => {
                       </Button>
                     )}
                     {currentLessonIndex < savedVideos.length - 1 && (
-                      <Button 
-                        size="sm" 
-                        onClick={goToNextLesson}
-                        className="rounded-full bg-primary hover:bg-primary/90"
-                      >
-                        Próxima Aula
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
+                      <>
+                        {checkLessonUnlocked(savedVideos[currentLessonIndex + 1], currentLessonIndex + 1) ? (
+                          <Button 
+                            size="sm" 
+                            onClick={goToNextLesson}
+                            className="rounded-full bg-primary hover:bg-primary/90"
+                          >
+                            Próxima Aula
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        ) : (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            disabled
+                            className="rounded-full"
+                          >
+                            <Lock className="h-4 w-4 mr-1.5" />
+                            Próxima Bloqueada
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
