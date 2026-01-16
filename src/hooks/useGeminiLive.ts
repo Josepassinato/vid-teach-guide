@@ -256,8 +256,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         }];
         
         // Send setup message with Gemini 2.0 Flash
-        // Using Aoede voice - warm and calm female voice, speaks more clearly and slowly
-        // Other options: Puck (energetic), Fenrir (energetic male), Kore (warm female), Charon (deep/authoritative)
+        // Using Puck voice - playful, energetic and dynamic, perfect for engaging teaching
+        // Other options: Fenrir (energetic male), Kore (warm female), Aoede (warm female), Charon (deep/authoritative)
         ws.send(JSON.stringify({
           setup: {
             model: "models/gemini-2.0-flash-exp",
@@ -268,14 +268,14 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
                 languageCode: "pt-BR",
                 voiceConfig: {
                   prebuiltVoiceConfig: {
-                    voiceName: "Aoede"
+                    voiceName: "Puck"
                   }
                 }
               }
             },
             systemInstruction: {
               parts: [{
-                text: stripEmojis(currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro. IMPORTANTE: Fale de forma pausada e clara, articulando bem cada palavra.")
+                text: stripEmojis(currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro.")
               }]
             },
             tools: tools
