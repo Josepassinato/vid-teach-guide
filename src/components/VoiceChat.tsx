@@ -217,6 +217,19 @@ Quando receber "MINI QUIZ!":
    - Errou: explique e encoraje`;
     }
 
+    // Encerramento da aula
+    instruction += `
+
+=== ENCERRAMENTO DA AULA ===
+Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
+1. Faça um breve resumo dos principais pontos aprendidos (máximo 3-4 pontos)
+2. Celebre o progresso do aluno: "Mandou muito bem hoje!"
+3. Proponha uma TAREFA DA SEMANA relacionada ao conteúdo:
+   - Deve ser prática e aplicável
+   - Algo que o aluno possa fazer usando o que aprendeu
+   - Ex: "Seu desafio: criar um projeto simples usando X" ou "Pratique Y fazendo Z"
+4. Despeça-se de forma motivadora e informal`;
+
     return instruction;
   }, [videoContext, videoTitle, videoTranscript, contentPlan, timestampQuizzes.length]);
 
@@ -520,6 +533,25 @@ INSTRUÇÕES:
     checkAndRetry(1);
   }, []);
 
+  // Handle video ended - trigger class wrap-up
+  const handleVideoEnded = useCallback(() => {
+    console.log('[VoiceChat] Video ended, triggering class wrap-up');
+    
+    // Collapse video and set to teaching mode for wrap-up
+    setIsVideoExpanded(false);
+    setAgentMode('teaching');
+    
+    // If agent is connected, send the wrap-up instruction
+    if (statusRef.current === 'connected' && sendTextRef.current) {
+      sendTextRef.current('[SISTEMA] O vídeo terminou. Hora de encerrar a aula! Faça um resumo breve dos principais pontos, celebre o progresso do aluno, proponha uma tarefa prática da semana relacionada ao conteúdo, e despeça-se de forma motivadora.');
+      toast.success('🎉 Aula concluída!', { duration: 5000 });
+    } else {
+      // Reconnect to deliver wrap-up
+      setPendingReconnect({ type: 'moment', data: { topic: 'Encerramento da aula' } as any });
+      connect();
+    }
+  }, [connect]);
+
   // Handle quiz completion
   const handleQuizComplete = useCallback((selectedIndex: number, isCorrect: boolean) => {
     if (!activeQuiz) return;
@@ -724,6 +756,7 @@ INSTRUÇÕES:
                 videoId={videoId} 
                 title={videoTitle}
                 expanded={isVideoExpanded}
+                onEnded={handleVideoEnded}
               />
             </div>
             
