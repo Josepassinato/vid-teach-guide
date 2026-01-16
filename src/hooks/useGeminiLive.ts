@@ -21,6 +21,16 @@ interface UseGeminiLiveOptions {
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
+const stripEmojis = (input: string) => {
+  try {
+    // Removes most emoji/pictographic symbols
+    return input.replace(/\p{Extended_Pictographic}/gu, '').replace(/\uFE0F/g, '');
+  } catch {
+    // Fallback for environments without unicode property escapes
+    return input;
+  }
+};
+
 export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [isListening, setIsListening] = useState(false);
@@ -264,7 +274,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
             },
             systemInstruction: {
               parts: [{
-                text: currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro."
+                text: stripEmojis(currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro.")
               }]
             },
             tools: tools
@@ -471,18 +481,20 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       optionsRef.current.onError?.('Not connected');
       return;
     }
-    
+
+    const safeText = stripEmojis(text);
+
     wsRef.current.send(JSON.stringify({
       clientContent: {
         turns: [{
           role: "user",
-          parts: [{ text }]
+          parts: [{ text: safeText }]
         }],
         turnComplete: true
       }
     }));
-    
-    optionsRef.current.onTranscript?.(text, 'user');
+
+    optionsRef.current.onTranscript?.(safeText, 'user');
   }, []);
 
   // Cleanup on unmount
