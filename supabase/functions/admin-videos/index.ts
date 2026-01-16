@@ -88,6 +88,7 @@ serve(async (req) => {
         if (video.thumbnail_url !== undefined) updateData.thumbnail_url = video.thumbnail_url;
         if (video.teaching_moments !== undefined) updateData.teaching_moments = video.teaching_moments;
         if (video.is_configured !== undefined) updateData.is_configured = video.is_configured;
+        if (video.is_released !== undefined) updateData.is_released = video.is_released;
 
         const { data, error } = await supabase
           .from("videos")
@@ -99,6 +100,30 @@ serve(async (req) => {
         if (error) throw error;
         return new Response(
           JSON.stringify({ video: data, message: "Aula atualizada com sucesso" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "reorder": {
+        // Receive an array of { id, lesson_order } and update all
+        const { videos } = await req.json().catch(() => ({ videos: video }));
+        const videosToUpdate = videos || video;
+        
+        if (!Array.isArray(videosToUpdate)) {
+          throw new Error("Array de vídeos é obrigatório para reordenação");
+        }
+
+        for (const v of videosToUpdate) {
+          const { error } = await supabase
+            .from("videos")
+            .update({ lesson_order: v.lesson_order })
+            .eq("id", v.id);
+          
+          if (error) throw error;
+        }
+
+        return new Response(
+          JSON.stringify({ message: "Ordem atualizada com sucesso" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

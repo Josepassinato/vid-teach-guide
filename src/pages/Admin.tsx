@@ -12,8 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Users, Clock, BookOpen, CheckCircle, Settings, Play, Pause, Target, Lightbulb, Loader2, Sparkles, HelpCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Users, Clock, BookOpen, CheckCircle, Settings, Play, Pause, Target, Lightbulb, Loader2, Sparkles, HelpCircle, GripVertical, ArrowUp, ArrowDown, Unlock, ListOrdered } from 'lucide-react';
 import { QuizEditor } from '@/components/QuizEditor';
+import { Switch } from '@/components/ui/switch';
 
 interface TeachingMoment {
   timestamp_seconds: number;
@@ -36,6 +37,7 @@ interface VideoLesson {
   duration_minutes: number | null;
   teaching_moments: TeachingMoment[] | null;
   is_configured: boolean;
+  is_released: boolean;
 }
 
 export default function Admin() {
@@ -48,8 +50,10 @@ export default function Admin() {
   const [selectedLesson, setSelectedLesson] = useState<VideoLesson | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isGeneratingMoments, setIsGeneratingMoments] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
   
   // Form states for new lesson
   const [newVideoUrl, setNewVideoUrl] = useState('');
@@ -295,6 +299,86 @@ export default function Admin() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Move lesson up in order
+  const moveLessonUp = (index: number) => {
+    if (index === 0) return;
+    const updated = [...lessons];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    // Update lesson_order for both
+    updated[index - 1].lesson_order = index;
+    updated[index].lesson_order = index + 1;
+    setLessons(updated);
+  };
+
+  // Move lesson down in order
+  const moveLessonDown = (index: number) => {
+    if (index === lessons.length - 1) return;
+    const updated = [...lessons];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    // Update lesson_order for both
+    updated[index].lesson_order = index + 1;
+    updated[index + 1].lesson_order = index + 2;
+    setLessons(updated);
+  };
+
+  // Toggle lesson release status
+  const toggleLessonRelease = async (lessonId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase.functions.invoke('admin-videos', {
+        body: {
+          action: 'update',
+          password,
+          video: {
+            id: lessonId,
+            is_released: !currentStatus
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      setLessons(lessons.map(l => 
+        l.id === lessonId ? { ...l, is_released: !currentStatus } : l
+      ));
+      toast.success(!currentStatus ? 'Aula liberada!' : 'Aula bloqueada');
+    } catch (err: any) {
+      toast.error('Erro ao alterar status da aula');
+    }
+  };
+
+  // Save new lesson order
+  const saveNewOrder = async () => {
+    setIsSavingOrder(true);
+    try {
+      const orderedVideos = lessons.map((lesson, index) => ({
+        id: lesson.id,
+        lesson_order: index + 1
+      }));
+
+      for (const video of orderedVideos) {
+        const { error } = await supabase.functions.invoke('admin-videos', {
+          body: {
+            action: 'update',
+            password,
+            video: {
+              id: video.id,
+              lesson_order: video.lesson_order
+            }
+          }
+        });
+        if (error) throw error;
+      }
+
+      toast.success('Ordem das aulas atualizada!');
+      setIsOrderDialogOpen(false);
+      loadLessons();
+    } catch (err: any) {
+      toast.error('Erro ao salvar ordem');
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -351,6 +435,10 @@ export default function Admin() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setIsOrderDialogOpen(true)}>
+              <ListOrdered className="h-4 w-4 mr-2" />
+              Organizar Aulas
+            </Button>
             <Button onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Aula
@@ -395,10 +483,21 @@ export default function Admin() {
                     alt={lesson.title}
                     className="w-full aspect-video object-cover"
                   />
-                  <div className="absolute top-2 left-2">
+                  <div className="absolute top-2 left-2 flex gap-1">
                     <Badge variant="secondary" className="font-bold">
                       Aula {lesson.lesson_order}
                     </Badge>
+                    {lesson.is_released ? (
+                      <Badge className="bg-blue-500">
+                        <Unlock className="h-3 w-3 mr-1" />
+                        Liberada
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-red-500/20 border-red-500 text-red-600">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Bloqueada
+                      </Badge>
+                    )}
                   </div>
                   <div className="absolute top-2 right-2">
                     {lesson.is_configured ? (
@@ -778,6 +877,122 @@ export default function Admin() {
             </Button>
             <Button onClick={handleUpdateLesson} disabled={isLoading}>
               {isLoading ? 'Salvando...' : 'Salvar Aula'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Lessons Dialog */}
+      <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListOrdered className="h-5 w-5" />
+              Organizar Sequência e Liberação de Aulas
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-hidden">
+            <p className="text-sm text-muted-foreground mb-4">
+              Arraste as aulas para reorganizar a ordem. Use o toggle para liberar ou bloquear aulas para os alunos.
+            </p>
+            
+            <ScrollArea className="h-[50vh] pr-4">
+              <div className="space-y-2">
+                {lessons.map((lesson, index) => (
+                  <Card key={lesson.id} className="p-3">
+                    <div className="flex items-center gap-3">
+                      {/* Reorder buttons */}
+                      <div className="flex flex-col gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => moveLessonUp(index)}
+                          disabled={index === 0}
+                        >
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => moveLessonDown(index)}
+                          disabled={index === lessons.length - 1}
+                        >
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      
+                      {/* Order number */}
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+                        {index + 1}
+                      </div>
+                      
+                      {/* Thumbnail */}
+                      <img
+                        src={lesson.thumbnail_url || `https://img.youtube.com/vi/${lesson.youtube_id}/mqdefault.jpg`}
+                        alt={lesson.title}
+                        className="w-20 aspect-video object-cover rounded"
+                      />
+                      
+                      {/* Title and status */}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{lesson.title}</h4>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {lesson.is_configured ? (
+                            <span className="text-green-600 flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Configurada
+                            </span>
+                          ) : (
+                            <span className="text-yellow-600 flex items-center gap-1">
+                              <Settings className="h-3 w-3" />
+                              Pendente
+                            </span>
+                          )}
+                          {lesson.duration_minutes && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {lesson.duration_minutes} min
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Release toggle */}
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${lesson.is_released ? 'text-green-600' : 'text-red-500'}`}>
+                          {lesson.is_released ? 'Liberada' : 'Bloqueada'}
+                        </span>
+                        <Switch
+                          checked={lesson.is_released}
+                          onCheckedChange={() => toggleLessonRelease(lesson.id, lesson.is_released)}
+                        />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+          
+          <DialogFooter className="mt-4">
+            <div className="mr-auto text-xs text-muted-foreground">
+              {lessons.filter(l => l.is_released).length} de {lessons.length} aulas liberadas
+            </div>
+            <Button variant="outline" onClick={() => setIsOrderDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveNewOrder} disabled={isSavingOrder}>
+              {isSavingOrder ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                'Salvar Ordem'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

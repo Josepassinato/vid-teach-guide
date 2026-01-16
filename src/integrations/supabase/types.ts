@@ -286,6 +286,7 @@ export type Database = {
           duration_minutes: number | null
           id: string
           is_configured: boolean | null
+          is_released: boolean | null
           lesson_order: number | null
           teaching_moments: Json | null
           thumbnail_url: string | null
@@ -301,6 +302,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           is_configured?: boolean | null
+          is_released?: boolean | null
           lesson_order?: number | null
           teaching_moments?: Json | null
           thumbnail_url?: string | null
@@ -316,6 +318,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           is_configured?: boolean | null
+          is_released?: boolean | null
           lesson_order?: number | null
           teaching_moments?: Json | null
           thumbnail_url?: string | null
