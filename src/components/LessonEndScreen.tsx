@@ -10,7 +10,8 @@ import {
   Home, 
   RotateCcw,
   CheckCircle2,
-  Calendar
+  Calendar,
+  Check
 } from 'lucide-react';
 
 interface LessonEndScreenProps {
@@ -146,8 +147,8 @@ export function LessonEndScreen({
                           transition={{ delay: 0.5 + index * 0.1 }}
                           className="flex items-start gap-3 text-sm text-foreground/90"
                         >
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-google-green/20 text-google-green flex items-center justify-center text-xs font-medium">
-                            ✓
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-google-green/20 text-google-green flex items-center justify-center">
+                            <Check className="w-3 h-3" />
                           </span>
                           {point}
                         </motion.li>
