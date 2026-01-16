@@ -2,7 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 're
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Volume1 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Volume1, Maximize, Minimize } from 'lucide-react';
 
 export interface VideoPlayerRef {
   play: () => void;
@@ -41,6 +41,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const pendingActionsRef = useRef<Array<() => void>>([]);
     const [userInteracted, setUserInteracted] = useState(false);
     const userInteractedRef = useRef(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       // Load YouTube IFrame API
@@ -319,9 +321,36 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       }
     };
 
+    // Fullscreen toggle using native browser API
+    const toggleFullscreen = async () => {
+      if (!containerRef.current) return;
+      
+      try {
+        if (!document.fullscreenElement) {
+          await containerRef.current.requestFullscreen();
+          setIsFullscreen(true);
+        } else {
+          await document.exitFullscreen();
+          setIsFullscreen(false);
+        }
+      } catch (err) {
+        console.warn('Fullscreen error:', err);
+      }
+    };
+
+    // Listen for fullscreen changes (e.g., user presses Escape)
+    useEffect(() => {
+      const handleFullscreenChange = () => {
+        setIsFullscreen(!!document.fullscreenElement);
+      };
+      
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
     return (
-      <Card className={`overflow-hidden transition-all duration-300 ${expanded ? 'h-full border-0 rounded-none' : ''}`}>
-        <div className={`relative bg-black ${expanded ? 'h-full' : 'aspect-video'}`}>
+      <Card ref={containerRef} className={`overflow-hidden transition-all duration-300 ${expanded || isFullscreen ? 'h-full border-0 rounded-none' : ''} ${isFullscreen ? 'bg-black' : ''}`}>
+        <div className={`relative bg-black ${expanded || isFullscreen ? 'h-[calc(100%-56px)]' : 'aspect-video'}`}>
           <div id={`youtube-player-${videoId}`} className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
           
           {!isReady && (
@@ -346,7 +375,7 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         </div>
         
         {/* Custom Controls */}
-        <div className="p-2 sm:p-3 bg-card border-t">
+        <div className={`p-2 sm:p-3 border-t ${isFullscreen ? 'bg-black/90' : 'bg-card'}`}>
           <div className="flex items-center justify-between gap-2 sm:gap-3">
             <div className="flex items-center gap-1 sm:gap-2">
               {isPlaying ? (
@@ -377,12 +406,23 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
               </div>
             </div>
             
-            <span className="text-xs sm:text-sm text-muted-foreground font-mono">
-              {formatTime(currentTime)}
-            </span>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground font-mono">
+                {formatTime(currentTime)}
+              </span>
+              
+              {/* Fullscreen Button */}
+              <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-8 w-8 sm:h-9 sm:w-9 p-0" title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}>
+                {isFullscreen ? (
+                  <Minimize className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                ) : (
+                  <Maximize className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                )}
+              </Button>
+            </div>
           </div>
           
-          {title && (
+          {title && !isFullscreen && (
             <p className="text-xs sm:text-sm font-medium mt-1.5 sm:mt-2 line-clamp-1">{title}</p>
           )}
         </div>
