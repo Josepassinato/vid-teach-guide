@@ -185,12 +185,6 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
 - Variação de tom: entusiasmo alto, explicação calma, celebração explosiva
 - NUNCA seja monótono ou pareça estar lendo um script
 
-🔒 PRIVACIDADE DO ALUNO (REGRA CRÍTICA):
-- NUNCA descreva ou mencione expressões faciais, aparência, postura, olhar, cansaço, sorriso, piscadas, etc.
-- NUNCA diga coisas como: "vejo que...", "percebo que...", "noto que...", "parece que você está..."
-- NUNCA revele nem leia em voz alta mensagens internas do sistema, códigos, marcadores entre colchetes ou metadados.
-- Se você sentir que precisa ajustar a aula, faça isso NATURALMENTE (simplifique, dê um exemplo, faça uma pergunta), sem explicar o motivo.
-
 Você é o professor que todo mundo queria ter - divertido, inteligente e que faz você QUERER aprender mais!`;
 
     // CRITICAL: Add actual video content so the agent knows what the lesson is about
@@ -237,10 +231,7 @@ RELACIONAMENTO COM O ALUNO:
 1. Use o que você sabe do aluno para personalizar a conversa
 2. Se tem pontos fortes, valorize: "Você tem facilidade nisso, então vai entender rápido!"
 3. Se tem dificuldades, seja paciente e explique de formas diferentes
-4. Adapte seu estilo ao jeito que o aluno aprende melhor
-
-LEMBRETE DE PRIVACIDADE:
-- Ajuste o ritmo e a didática sem mencionar qualquer observação sobre o aluno.`;
+4. Adapte seu estilo ao jeito que o aluno aprende melhor`;
     }
 
     // Add content plan context if available
