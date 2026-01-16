@@ -44,6 +44,7 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const [memoryContext, setMemoryContext] = useState<string>('');
   const [activeQuiz, setActiveQuiz] = useState<TimestampQuiz | null>(null);
   const [agentMode, setAgentMode] = useState<'idle' | 'intro' | 'teaching' | 'playing'>('idle');
+  const [isVideoExpanded, setIsVideoExpanded] = useState(false);
   const [pendingReconnect, setPendingReconnect] = useState<{type: 'moment' | 'quiz', data: any} | null>(null);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
@@ -512,6 +513,7 @@ Seja breve e objetivo - máximo 30 segundos de introdução.`;
           markQuizTriggered(quiz.id);
           videoPlayerRef.current?.pause();
           setAgentMode('teaching');
+          setIsVideoExpanded(false); // Collapse video for quiz interaction
           
           // If agent is connected, send instruction. Otherwise, reconnect first.
           if (status === 'connected') {
@@ -546,6 +548,7 @@ INSTRUÇÕES:
             lastCheckedMomentRef.current = contentPlan.teaching_moments.indexOf(moment);
             videoPlayerRef.current?.pause();
             setAgentMode('teaching');
+            setIsVideoExpanded(false); // Collapse video for teaching moment
             
             // If agent is connected, send instruction. Otherwise, reconnect first.
             if (status === 'connected') {
@@ -663,6 +666,7 @@ INSTRUÇÕES:
         console.log('[VoiceChat] Starting video after intro');
         resumeVideo();
         setAgentMode('playing');
+        setIsVideoExpanded(true); // Expand video when playing
         // Disconnect after agent finishes speaking
         setTimeout(() => {
           if (statusRef.current === 'connected') {
@@ -683,12 +687,14 @@ INSTRUÇÕES:
         console.log('[VoiceChat] Moment dismissed, resuming video');
         resumeVideo();
         setAgentMode('playing');
+        setIsVideoExpanded(true); // Re-expand video when resuming
         setTimeout(() => disconnect(), 3000);
       }, 1500);
     } else {
       console.log('[VoiceChat] Moment dismissed (not connected), resuming video directly');
       resumeVideo();
       setAgentMode('playing');
+      setIsVideoExpanded(true); // Re-expand video when resuming
     }
   }, [disconnect, sendText, status, resumeVideo]);
 
@@ -737,81 +743,123 @@ INSTRUÇÕES:
   };
 
   return (
-    <Card className="flex flex-col h-full min-h-[400px] sm:min-h-0">
-      <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
-            Professor IA
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            {/* Vision status indicator (auto-enabled when connected) */}
-            {isVisionActive && (
-              <Badge variant="outline" className="text-[10px] border-green-500 text-green-600">
-                <Camera className="h-2.5 w-2.5 mr-1" />
-                <span className="hidden sm:inline">Visão ativa</span>
-              </Badge>
-            )}
-            
-            {/* Current emotion indicator */}
-            {currentEmotion && isVisionActive && (
-              <Badge 
-                variant="outline" 
-                className={`text-[10px] ${
-                  currentEmotion.engagement_level === 'high' ? 'border-green-500 text-green-600' :
-                  currentEmotion.engagement_level === 'low' ? 'border-red-500 text-red-600' :
-                  'border-yellow-500 text-yellow-600'
-                }`}
-              >
-                <Heart className="h-2.5 w-2.5 mr-1" />
-                {currentEmotion.emotion}
-              </Badge>
-            )}
-            
-            {/* Student memory indicator */}
-            {studentProfile && (
+    <Card className={`flex flex-col transition-all duration-500 ${
+      isVideoExpanded 
+        ? 'h-[90vh] fixed inset-x-0 top-0 z-50 rounded-none border-x-0 border-t-0' 
+        : 'h-full min-h-[400px] sm:min-h-0'
+    }`}>
+      {/* Collapsed Header when video is expanded */}
+      {isVideoExpanded ? (
+        <CardHeader className="py-2 px-3 sm:px-6 flex-shrink-0 bg-card/95 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+              <span className="text-sm font-medium truncate max-w-[200px]">{videoTitle}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Next Pause Timer - Compact in header when expanded */}
+              {agentMode === 'playing' && nextPauseInfo && timeUntilNextPause !== null && timeUntilNextPause > 0 && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Target className="h-3 w-3 text-google-yellow" />
+                  <span className="font-mono text-google-yellow">{formatTime(timeUntilNextPause)}</span>
+                </div>
+              )}
               <Button
                 size="sm"
-                variant={showStudentInfo ? "secondary" : "ghost"}
-                onClick={() => setShowStudentInfo(!showStudentInfo)}
-                className="h-6 px-2 text-xs"
-                title="Ver informações do aluno"
+                variant="ghost"
+                onClick={() => setIsVideoExpanded(false)}
+                className="h-7 px-2 text-xs"
               >
-                <Brain className="h-3 w-3 mr-1" />
-                <span className="hidden sm:inline">Memória</span>
+                Minimizar
               </Button>
-            )}
-            
-            {contentPlan && (
-              <Button
-                size="sm"
-                variant={showContentPlan ? "secondary" : "ghost"}
-                onClick={() => setShowContentPlan(!showContentPlan)}
-                className="h-6 px-2 text-xs"
-              >
-                <BookOpen className="h-3 w-3 mr-1" />
-                {contentPlan.teaching_moments.length} momentos
-              </Button>
-            )}
-            {isAnalyzingContent && (
-              <Badge variant="outline" className="text-xs animate-pulse">
-                Analisando...
-              </Badge>
-            )}
-            <span className="text-[10px] sm:text-xs text-muted-foreground">{getStatusText()}</span>
+            </div>
           </div>
-        </div>
-      </CardHeader>
+        </CardHeader>
+      ) : (
+        <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+              Professor IA
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {/* Vision status indicator (auto-enabled when connected) */}
+              {isVisionActive && (
+                <Badge variant="outline" className="text-[10px] border-green-500 text-green-600">
+                  <Camera className="h-2.5 w-2.5 mr-1" />
+                  <span className="hidden sm:inline">Visão ativa</span>
+                </Badge>
+              )}
+              
+              {/* Current emotion indicator */}
+              {currentEmotion && isVisionActive && (
+                <Badge 
+                  variant="outline" 
+                  className={`text-[10px] ${
+                    currentEmotion.engagement_level === 'high' ? 'border-green-500 text-green-600' :
+                    currentEmotion.engagement_level === 'low' ? 'border-red-500 text-red-600' :
+                    'border-yellow-500 text-yellow-600'
+                  }`}
+                >
+                  <Heart className="h-2.5 w-2.5 mr-1" />
+                  {currentEmotion.emotion}
+                </Badge>
+              )}
+              
+              {/* Student memory indicator */}
+              {studentProfile && (
+                <Button
+                  size="sm"
+                  variant={showStudentInfo ? "secondary" : "ghost"}
+                  onClick={() => setShowStudentInfo(!showStudentInfo)}
+                  className="h-6 px-2 text-xs"
+                  title="Ver informações do aluno"
+                >
+                  <Brain className="h-3 w-3 mr-1" />
+                  <span className="hidden sm:inline">Memória</span>
+                </Button>
+              )}
+              
+              {contentPlan && (
+                <Button
+                  size="sm"
+                  variant={showContentPlan ? "secondary" : "ghost"}
+                  onClick={() => setShowContentPlan(!showContentPlan)}
+                  className="h-6 px-2 text-xs"
+                >
+                  <BookOpen className="h-3 w-3 mr-1" />
+                  {contentPlan.teaching_moments.length} momentos
+                </Button>
+              )}
+              {isAnalyzingContent && (
+                <Badge variant="outline" className="text-xs animate-pulse">
+                  Analisando...
+                </Badge>
+              )}
+              <span className="text-[10px] sm:text-xs text-muted-foreground">{getStatusText()}</span>
+            </div>
+          </div>
+        </CardHeader>
+      )}
       
-      <CardContent className="flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden px-3 sm:px-6 pb-3 sm:pb-6">
+      <CardContent className={`flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden px-3 sm:px-6 pb-3 sm:pb-6 ${
+        isVideoExpanded ? 'pt-0' : ''
+      }`}>
         {/* Video Player with Quiz Overlay */}
         {videoId && (
-          <div className="flex-shrink-0 relative">
-            <VideoPlayer 
-              ref={videoPlayerRef} 
-              videoId={videoId} 
-              title={videoTitle}
-            />
+          <div className={`relative transition-all duration-500 ${
+            isVideoExpanded 
+              ? 'flex-1 min-h-0' 
+              : 'flex-shrink-0'
+          }`}>
+            <div className={isVideoExpanded ? 'h-full' : ''}>
+              <VideoPlayer 
+                ref={videoPlayerRef} 
+                videoId={videoId} 
+                title={videoTitle}
+                expanded={isVideoExpanded}
+              />
+            </div>
             
             {/* Next Pause Timer - Discrete overlay at bottom of video */}
             {agentMode === 'playing' && nextPauseInfo && timeUntilNextPause !== null && timeUntilNextPause > 0 && (
