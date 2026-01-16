@@ -89,6 +89,7 @@ serve(async (req) => {
         if (video.teaching_moments !== undefined) updateData.teaching_moments = video.teaching_moments;
         if (video.is_configured !== undefined) updateData.is_configured = video.is_configured;
         if (video.is_released !== undefined) updateData.is_released = video.is_released;
+        if (video.teacher_intro !== undefined) updateData.teacher_intro = video.teacher_intro;
 
         const { data, error } = await supabase
           .from("videos")

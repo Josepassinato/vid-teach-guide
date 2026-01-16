@@ -29,11 +29,12 @@ interface VoiceChatProps {
   videoTitle?: string;
   videoTranscript?: string | null;
   preConfiguredMoments?: TeachingMoment[] | null;
+  teacherIntro?: string | null;
   isStudentMode?: boolean;
   onContentPlanReady?: (moments: TeachingMoment[]) => void;
 }
 
-export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, onContentPlanReady }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady }: VoiceChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [showDebug, setShowDebug] = useState(false);
@@ -433,8 +434,22 @@ INSTRUÇÕES:
       // Handle intro mode - agent starts class
       if (agentMode === 'intro' && !introCompletedRef.current) {
         introCompletedRef.current = true;
-        // Send intro instruction to agent
-        const introInstruction = `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
+        
+        // Use custom teacher intro if provided, otherwise use default
+        const customIntro = teacherIntro?.trim();
+        
+        const introInstruction = customIntro
+          ? `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
+
+INTRODUÇÃO PERSONALIZADA (USE EXATAMENTE ESTE TEXTO COMO BASE):
+"${customIntro}"
+
+INSTRUÇÕES:
+1. Use a introdução personalizada acima como guia para seu tom e estilo
+2. Adapte naturalmente, mas mantenha a essência do texto
+3. Após a introdução, pergunte se o aluno está pronto para começar
+4. Seja breve - máximo 30 segundos`
+          : `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
 
 INSTRUÇÕES DE INTRODUÇÃO:
 1. Cumprimente o aluno de forma calorosa e profissional

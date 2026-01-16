@@ -38,6 +38,7 @@ interface VideoLesson {
   teaching_moments: TeachingMoment[] | null;
   is_configured: boolean;
   is_released: boolean;
+  teacher_intro: string | null;
 }
 
 export default function Admin() {
@@ -69,6 +70,7 @@ export default function Admin() {
   const [editTranscript, setEditTranscript] = useState('');
   const [editAnalysis, setEditAnalysis] = useState('');
   const [editMoments, setEditMoments] = useState<TeachingMoment[]>([]);
+  const [editTeacherIntro, setEditTeacherIntro] = useState('');
 
   const extractYoutubeId = (url: string): string | null => {
     const patterns = [
@@ -183,6 +185,7 @@ export default function Admin() {
             analysis: editAnalysis.trim() || null,
             teaching_moments: editMoments,
             is_configured: isFullyConfigured,
+            teacher_intro: editTeacherIntro.trim() || null,
           }
         }
       });
@@ -261,6 +264,7 @@ export default function Admin() {
     setEditTranscript(lesson.transcript || '');
     setEditAnalysis(lesson.analysis || '');
     setEditMoments(lesson.teaching_moments || []);
+    setEditTeacherIntro(lesson.teacher_intro || '');
     setActiveTab('info');
     setIsEditDialogOpen(true);
   };
@@ -706,8 +710,28 @@ export default function Admin() {
                     value={editAnalysis}
                     onChange={(e) => setEditAnalysis(e.target.value)}
                     placeholder="Pontos principais da aula..."
+                    rows={3}
+                  />
+                </div>
+                
+                {/* Teacher Intro - NEW FIELD */}
+                <div className="space-y-2 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <Label className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Introdução do Professor IA
+                  </Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Personalize como o professor IA deve apresentar esta aula. Deixe em branco para usar a introdução padrão.
+                  </p>
+                  <Textarea
+                    value={editTeacherIntro}
+                    onChange={(e) => setEditTeacherIntro(e.target.value)}
+                    placeholder={`Exemplo: "Fala galera! Hoje vamos aprender sobre ${editTitle || 'um tema incrível'}! Preparem-se porque essa aula vai mudar a forma como vocês programam..."`}
                     rows={4}
                   />
+                  <p className="text-[10px] text-muted-foreground">
+                    💡 Dica: Escreva como se fosse o professor falando diretamente com o aluno. Seja animado e acolhedor!
+                  </p>
                 </div>
                 
                 {/* Preview */}

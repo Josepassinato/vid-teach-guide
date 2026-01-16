@@ -27,6 +27,7 @@ interface SavedVideo {
   teaching_moments: unknown;
   is_configured: boolean;
   is_released: boolean;
+  teacher_intro: string | null;
 }
 
 interface QuizResult {
@@ -47,6 +48,7 @@ interface VideoInfo {
   description?: string | null;
   duration?: number | null;
   teachingMoments?: TeachingMoment[] | null;
+  teacherIntro?: string | null;
 }
 
 const Student = () => {
@@ -168,6 +170,7 @@ const Student = () => {
       description: video.description,
       duration: video.duration_minutes,
       teachingMoments: moments,
+      teacherIntro: video.teacher_intro,
     });
     setCurrentLessonIndex(index);
     if (window.innerWidth < 1024) {
@@ -520,6 +523,7 @@ const Student = () => {
                 videoTitle={selectedVideo.title}
                 videoTranscript={selectedVideo.transcript}
                 preConfiguredMoments={selectedVideo.teachingMoments}
+                teacherIntro={selectedVideo.teacherIntro}
                 isStudentMode={true}
                 onContentPlanReady={(moments) => setGeneratedMoments(moments)}
               />

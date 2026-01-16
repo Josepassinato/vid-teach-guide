@@ -288,6 +288,7 @@ export type Database = {
           is_configured: boolean | null
           is_released: boolean | null
           lesson_order: number | null
+          teacher_intro: string | null
           teaching_moments: Json | null
           thumbnail_url: string | null
           title: string
@@ -304,6 +305,7 @@ export type Database = {
           is_configured?: boolean | null
           is_released?: boolean | null
           lesson_order?: number | null
+          teacher_intro?: string | null
           teaching_moments?: Json | null
           thumbnail_url?: string | null
           title: string
@@ -320,6 +322,7 @@ export type Database = {
           is_configured?: boolean | null
           is_released?: boolean | null
           lesson_order?: number | null
+          teacher_intro?: string | null
           teaching_moments?: Json | null
           thumbnail_url?: string | null
           title?: string
