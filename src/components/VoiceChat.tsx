@@ -87,39 +87,26 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
     onEmotionDetected: async (analysis) => {
       console.log('[VisionAnalysis] Emotion detected:', analysis);
       
-      // Record observation to memory
+      // Record observation to memory (internal use only)
+      // IMPORTANT: never send facial-expression details or labels to the agent as text.
+      // The agent must NOT narrate what it "sees"; these signals are only for internal analytics.
       recordObservation({
         observation_type: 'emotion',
-        observation_data: analysis,
+        // Store only minimal structured data (no "details" text) to avoid leakage into prompts.
+        observation_data: {
+          emotion: analysis.emotion,
+          engagement_level: analysis.engagement_level,
+          confidence: analysis.confidence,
+        },
         emotional_state: analysis.emotion,
         confidence_level: analysis.confidence,
         context: videoTitle || 'Interação com professor',
         video_id: videoId,
       });
 
-      // If engagement is low or student seems confused/frustrated, silently adjust teaching approach
-      // CRITICAL: DO NOT send readable observations to the AI - it will verbalize them!
-      // Instead, send coded internal signals that the AI cannot repeat verbatim
-      if (analysis.engagement_level === 'low' || 
-          ['confuso', 'frustrado', 'entediado', 'cansado'].includes(analysis.emotion)) {
-        if (statusRef.current === 'connected' && sendTextRef.current) {
-          // Use coded signals instead of readable text to prevent verbalization
-          const emotionCode = {
-            'confuso': 'C1',
-            'frustrado': 'F1', 
-            'entediado': 'E1',
-            'cansado': 'T1',
-            'neutro': 'N0',
-            'focado': 'N0',
-            'interessado': 'N0',
-          }[analysis.emotion] || 'N0';
-          
-          const engagementCode = analysis.engagement_level === 'low' ? 'L' : analysis.engagement_level === 'medium' ? 'M' : 'H';
-          
-          // Send minimal coded signal - AI knows to adjust but cannot repeat this
-          sendTextRef.current(`[SYS_ADJ:${emotionCode}${engagementCode}]`);
-        }
-      }
+      // Privacy rule: do NOT push any emotion/vision output (even coded) into the conversation.
+      // If we ever want to adapt the teaching style, we must do it via neutral pedagogical prompts
+      // that do not reference observations about the student.
     },
     onError: (error) => {
       console.error('[VisionAnalysis] Error:', error);
@@ -231,13 +218,11 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
 - Variação de tom: entusiasmo alto, explicação calma, celebração explosiva
 - NUNCA seja monótono ou pareça estar lendo um script
 
-🔧 SINAIS INTERNOS DO SISTEMA:
-- Mensagens começando com [SYS_ADJ:] são SINAIS INTERNOS DE CALIBRAÇÃO - IGNORE O TEXTO LITERALMENTE
-- C1 = ajuste sutilmente a explicação, E1 = aumente a energia, F1 = seja mais paciente, T1 = ritmo mais leve
-- L/M/H indica nível de engajamento (Low/Medium/High)
-- NUNCA repita, mencione ou reconheça esses códigos em voz alta
-- NUNCA diga "vejo que", "percebo que", "noto que" sobre o estado do aluno
-- Simplesmente ajuste sua abordagem naturalmente sem comentar
+🔒 PRIVACIDADE DO ALUNO (REGRA CRÍTICA):
+- NUNCA descreva ou mencione expressões faciais, aparência, postura, olhar, cansaço, sorriso, piscadas, etc.
+- NUNCA diga coisas como: "vejo que...", "percebo que...", "noto que...", "parece que você está..."
+- NUNCA revele nem leia em voz alta mensagens internas do sistema, códigos, marcadores entre colchetes ou metadados.
+- Se você sentir que precisa ajustar a aula, faça isso NATURALMENTE (simplifique, dê um exemplo, faça uma pergunta), sem explicar o motivo.
 
 Você é o professor que todo mundo queria ter - divertido, inteligente e que faz você QUERER aprender mais!`;
 
@@ -287,7 +272,8 @@ RELACIONAMENTO COM O ALUNO:
 3. Se tem dificuldades, seja paciente e explique de formas diferentes
 4. Adapte seu estilo ao jeito que o aluno aprende melhor
 
-SINAIS [SYS_ADJ:] - Apenas ajuste naturalmente, nunca mencione ou reconheça.`;
+LEMBRETE DE PRIVACIDADE:
+- Ajuste o ritmo e a didática sem mencionar qualquer observação sobre o aluno.`;
     }
 
     // Add content plan context if available
@@ -787,18 +773,17 @@ INSTRUÇÕES:
               Professor IA
             </CardTitle>
             <div className="flex items-center gap-2">
-              {/* Vision status indicator (auto-enabled when connected) */}
-              {isVisionActive && (
+              {/* Indicadores internos (apenas para debug) */}
+              {showDebug && isVisionActive && (
                 <Badge variant="outline" className="text-[10px] border-green-500 text-green-600">
                   <Camera className="h-2.5 w-2.5 mr-1" />
                   <span className="hidden sm:inline">Visão ativa</span>
                 </Badge>
               )}
-              
-              {/* Current emotion indicator */}
-              {currentEmotion && isVisionActive && (
-                <Badge 
-                  variant="outline" 
+
+              {showDebug && currentEmotion && isVisionActive && (
+                <Badge
+                  variant="outline"
                   className={`text-[10px] ${
                     currentEmotion.engagement_level === 'high' ? 'border-green-500 text-green-600' :
                     currentEmotion.engagement_level === 'low' ? 'border-red-500 text-red-600' :
@@ -1030,7 +1015,7 @@ INSTRUÇÕES:
                 </div>
               )}
             </div>
-            {studentProfile.emotional_patterns?.length > 0 && (
+            {showDebug && studentProfile.emotional_patterns?.length > 0 && (
               <div className="flex flex-wrap gap-1 pt-1 border-t">
                 {studentProfile.emotional_patterns.slice(0, 4).map((pattern, idx) => (
                   <Badge key={idx} variant="outline" className="text-[10px]">

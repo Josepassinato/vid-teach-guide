@@ -238,8 +238,6 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
   const buildMemoryContext = useCallback(async (): Promise<string> => {
     if (!profile) return '';
     
-    const recentObs = await getRecentObservations(10);
-    
     let context = `
 MEMÓRIA DO ALUNO:
 - ID: ${profile.student_id}
@@ -261,27 +259,11 @@ MEMÓRIA DO ALUNO:
       context += `- Observações: ${profile.personality_notes}\n`;
     }
     
-    if (profile.emotional_patterns?.length) {
-      const topEmotions = profile.emotional_patterns
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 3)
-        .map(p => `${p.emotion} (${p.count}x)`);
-      context += `- Padrões emocionais frequentes: ${topEmotions.join(', ')}\n`;
-    }
-    
-    if (recentObs.length > 0) {
-      context += '\nOBSERVAÇÕES RECENTES:\n';
-      recentObs.slice(0, 5).forEach((obs, i) => {
-        if (obs.emotional_state) {
-          context += `${i + 1}. Estado emocional: ${obs.emotional_state}`;
-          if (obs.context) context += ` (durante: ${obs.context})`;
-          context += '\n';
-        }
-      });
-    }
-    
+    // IMPORTANT: We intentionally do NOT include emotional patterns or recent emotion observations
+    // in the AI prompt context to prevent the agent from narrating sensitive observations.
+
     return context;
-  }, [profile, getRecentObservations]);
+  }, [profile]);
 
   // Update study time on unmount
   useEffect(() => {
