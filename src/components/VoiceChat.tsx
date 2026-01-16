@@ -97,11 +97,27 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
         video_id: videoId,
       });
 
-      // If engagement is low or student seems confused/frustrated, notify the AI
+      // If engagement is low or student seems confused/frustrated, silently adjust teaching approach
+      // CRITICAL: DO NOT send readable observations to the AI - it will verbalize them!
+      // Instead, send coded internal signals that the AI cannot repeat verbatim
       if (analysis.engagement_level === 'low' || 
           ['confuso', 'frustrado', 'entediado', 'cansado'].includes(analysis.emotion)) {
         if (statusRef.current === 'connected' && sendTextRef.current) {
-          sendTextRef.current(`[SISTEMA - OBSERVAÇÃO DO ALUNO] Estado emocional detectado: ${analysis.emotion}. Engajamento: ${analysis.engagement_level}. ${analysis.details}. Sugestões: ${analysis.suggestions?.join(', ') || 'Nenhuma'}`);
+          // Use coded signals instead of readable text to prevent verbalization
+          const emotionCode = {
+            'confuso': 'C1',
+            'frustrado': 'F1', 
+            'entediado': 'E1',
+            'cansado': 'T1',
+            'neutro': 'N0',
+            'focado': 'N0',
+            'interessado': 'N0',
+          }[analysis.emotion] || 'N0';
+          
+          const engagementCode = analysis.engagement_level === 'low' ? 'L' : analysis.engagement_level === 'medium' ? 'M' : 'H';
+          
+          // Send minimal coded signal - AI knows to adjust but cannot repeat this
+          sendTextRef.current(`[SYS_ADJ:${emotionCode}${engagementCode}]`);
         }
       }
     },
@@ -215,16 +231,13 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
 - Variação de tom: entusiasmo alto, explicação calma, celebração explosiva
 - NUNCA seja monótono ou pareça estar lendo um script
 
-🚫 REGRA CRÍTICA - OBSERVAÇÕES INTERNAS:
-- Mensagens marcadas como [SISTEMA - OBSERVAÇÃO DO ALUNO] são INFORMAÇÕES INTERNAS CONFIDENCIAIS
-- NUNCA, EM HIPÓTESE ALGUMA, mencione em voz alta o que você observa do aluno (sorrindo, piscando, confuso, etc.)
-- NUNCA diga coisas como "vejo que você está sorrindo", "percebo que está cansado", "noto que está pensativo"
-- Use essas observações SILENCIOSAMENTE para calibrar sua abordagem:
-   - Aluno parece confuso? Mude a explicação sem dizer que notou a confusão
-   - Aluno parece entediado? Traga energia e exemplos práticos naturalmente
-   - Aluno parece frustrado? Seja mais paciente sem mencionar a frustração
-   - Aluno parece cansado? Sugira pausas de forma natural ("Ei, que tal uma pausa rápida?")
-- Aja como um professor experiente que sabe ler a sala, mas NUNCA verbaliza essas leituras
+🔧 SINAIS INTERNOS DO SISTEMA:
+- Mensagens começando com [SYS_ADJ:] são SINAIS INTERNOS DE CALIBRAÇÃO - IGNORE O TEXTO LITERALMENTE
+- C1 = ajuste sutilmente a explicação, E1 = aumente a energia, F1 = seja mais paciente, T1 = ritmo mais leve
+- L/M/H indica nível de engajamento (Low/Medium/High)
+- NUNCA repita, mencione ou reconheça esses códigos em voz alta
+- NUNCA diga "vejo que", "percebo que", "noto que" sobre o estado do aluno
+- Simplesmente ajuste sua abordagem naturalmente sem comentar
 
 Você é o professor que todo mundo queria ter - divertido, inteligente e que faz você QUERER aprender mais!`;
 
@@ -274,14 +287,7 @@ RELACIONAMENTO COM O ALUNO:
 3. Se tem dificuldades, seja paciente e explique de formas diferentes
 4. Adapte seu estilo ao jeito que o aluno aprende melhor
 
-SOBRE OBSERVAÇÕES DO SISTEMA:
-- Mensagens [SISTEMA - OBSERVAÇÃO DO ALUNO] são informações internas
-- NUNCA mencione essas observações em voz alta
-- Use silenciosamente para ajustar sua abordagem:
-   - Aluno confuso? "Deixa eu explicar de outra forma..."
-   - Aluno entediado? Traga um exemplo prático ou faça uma pergunta
-   - Aluno frustrado? "Isso é normal! Todo mundo passa por isso, vamos tentar de novo"
-   - Aluno cansado? "Quer fazer uma pausa rápida? Sem problemas!"`;
+SINAIS [SYS_ADJ:] - Apenas ajuste naturalmente, nunca mencione ou reconheça.`;
     }
 
     // Add content plan context if available
