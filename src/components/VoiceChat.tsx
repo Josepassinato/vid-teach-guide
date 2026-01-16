@@ -5,12 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
-import { useStudentMemory } from '@/hooks/useStudentMemory';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
 import { MiniQuiz } from './MiniQuiz';
-import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, Brain, Heart, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
 
@@ -41,8 +40,6 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const [debugInfo, setDebugInfo] = useState({ playerReady: false, lastAction: '' });
   const [activeMoment, setActiveMoment] = useState<TeachingMoment | null>(null);
   const [showContentPlan, setShowContentPlan] = useState(false);
-  const [showStudentInfo, setShowStudentInfo] = useState(false);
-  const [memoryContext, setMemoryContext] = useState<string>('');
   const [activeQuiz, setActiveQuiz] = useState<TimestampQuiz | null>(null);
   const [agentMode, setAgentMode] = useState<'idle' | 'intro' | 'teaching' | 'playing'>('idle');
   const [isVideoExpanded, setIsVideoExpanded] = useState(false);
@@ -64,17 +61,6 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
     return newId;
   });
   
-  // Student Memory for long-term learning
-  const {
-    profile: studentProfile,
-    recordObservation,
-    buildMemoryContext,
-  } = useStudentMemory({
-    onProfileLoaded: (profile) => {
-      console.log('[StudentMemory] Profile loaded:', profile.student_id);
-    },
-  });
-
   // Refs for callbacks that need access to sendText/status
   const sendTextRef = useRef<((text: string) => void) | null>(null);
   const statusRef = useRef<string>('disconnected');
@@ -137,15 +123,6 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
     }
   }, [videoDbId, loadQuizzes]);
 
-  // Load memory context when profile is ready
-  useEffect(() => {
-    if (studentProfile) {
-      buildMemoryContext().then(ctx => {
-        setMemoryContext(ctx);
-      });
-    }
-  }, [studentProfile, buildMemoryContext]);
-
   // Build system instruction with video context, content plan, and student memory
   const buildSystemInstruction = useCallback(() => {
     let instruction = `Você é o Professor Vibe - parceiro de aprendizado em VIBE CODING.
@@ -154,6 +131,7 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
 - Jamais use emojis, pictogramas ou símbolos gráficos
 - Você NÃO tem acesso a câmera, vídeo do aluno ou qualquer entrada visual
 - Nunca descreva aparência, expressões faciais, olhar, postura ou linguagem corporal
+- Nunca faça comentários sobre rosto/expressões (ex: "rosto pensativo"), nem como metáfora
 - Nunca diga "eu vi", "estou vendo", "percebo pela sua cara", "você parece", "noto que você"
 - Não faça suposições emocionais sem que o aluno verbalize ("você está confuso", "parece frustrado")
 - Não mencione nada sobre "analisar" ou "observar" o aluno
@@ -210,17 +188,6 @@ ${videoContext}
 
 Use este contexto para guiar suas explicações.`;
     }
-
-    // Memória do aluno
-    if (memoryContext) {
-      instruction += `
-
-=== SOBRE O ALUNO ===
-${memoryContext}
-
-Personalize a aula: valorize pontos fortes, seja paciente com dificuldades, adapte ao estilo de aprendizado.`;
-    }
-
     // Plano de ensino
     if (contentPlan) {
       instruction += `
@@ -251,7 +218,7 @@ Quando receber "MINI QUIZ!":
     }
 
     return instruction;
-  }, [videoContext, videoTitle, videoTranscript, contentPlan, memoryContext, timestampQuizzes.length]);
+  }, [videoContext, videoTitle, videoTranscript, contentPlan, timestampQuizzes.length]);
 
   const systemInstruction = buildSystemInstruction();
 
@@ -719,20 +686,6 @@ INSTRUÇÕES:
             <div className="flex items-center gap-2">
               {/* Debug badge */}
               
-              {/* Student memory indicator */}
-              {studentProfile && (
-                <Button
-                  size="sm"
-                  variant={showStudentInfo ? "secondary" : "ghost"}
-                  onClick={() => setShowStudentInfo(!showStudentInfo)}
-                  className="h-6 px-2 text-xs"
-                  title="Ver informações do aluno"
-                >
-                  <Brain className="h-3 w-3 mr-1" />
-                  <span className="hidden sm:inline">Memória</span>
-                </Button>
-              )}
-              
               {contentPlan && (
                 <Button
                   size="sm"
@@ -911,38 +864,6 @@ INSTRUÇÕES:
                     <RotateCcw className="h-3 w-3 mr-1" /> Test Restart
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Student Info Panel */}
-        {showStudentInfo && studentProfile && (
-          <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg p-3 border space-y-2 flex-shrink-0">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Brain className="h-4 w-4 text-primary" />
-              Memória do Aluno
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-muted-foreground">Interações:</span>
-                <span className="ml-1 font-medium">{studentProfile.interaction_count}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Tempo de estudo:</span>
-                <span className="ml-1 font-medium">{studentProfile.total_study_time_minutes} min</span>
-              </div>
-              {studentProfile.learning_style && (
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Estilo:</span>
-                  <span className="ml-1 font-medium">{studentProfile.learning_style}</span>
-                </div>
-              )}
-            </div>
-            {studentProfile.strengths?.length > 0 && (
-              <div className="text-xs pt-1 border-t">
-                <span className="text-muted-foreground">Pontos fortes:</span>
-                <span className="ml-1">{studentProfile.strengths.join(', ')}</span>
               </div>
             )}
           </div>
