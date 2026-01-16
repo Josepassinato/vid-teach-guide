@@ -26,10 +26,12 @@ export type VideoPlayerProps = {
   title?: string;
   /** When true, video expands to fill available height (90vh) */
   expanded?: boolean;
+  /** Callback when video playback ends */
+  onEnded?: () => void;
 };
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  function VideoPlayer({ videoId, title, expanded = false }, ref) {
+  function VideoPlayer({ videoId, title, expanded = false, onEnded }, ref) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [volume, setVolume] = useState(100);
@@ -132,6 +134,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           },
           onStateChange: (event: any) => {
             setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
+            // Detect video ended
+            if (event.data === window.YT.PlayerState.ENDED) {
+              onEnded?.();
+            }
           },
         },
       });
