@@ -130,6 +130,26 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     setIsListening(false);
   }, []);
 
+  // Helper to wait for agent to finish speaking before playing video
+  const waitForSpeechToEnd = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      const checkSpeech = () => {
+        const queueLength = audioQueueRef.current.length;
+        const isPlaying = isPlayingRef.current;
+        console.log('[GEMINI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
+        
+        if (queueLength === 0 && !isPlaying) {
+          console.log('[GEMINI] Fala terminou, prosseguindo...');
+          // Add small buffer to ensure audio fully finished
+          setTimeout(resolve, 300);
+        } else {
+          setTimeout(checkSpeech, 100);
+        }
+      };
+      checkSpeech();
+    });
+  }, []);
+
   const handleToolCall = useCallback((functionCall: any) => {
     const name = functionCall.name;
     const callId = functionCall.id || `call_${Date.now()}`;
@@ -143,6 +163,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     console.log('[GEMINI TOOL CALL] Argumentos:', JSON.stringify(args, null, 2));
     console.log('[GEMINI TOOL CALL] Raw functionCall:', JSON.stringify(functionCall, null, 2));
     console.log('[GEMINI TOOL CALL] Video Controls:', videoControlsRef.current ? 'DISPONIVEL' : 'INDISPONIVEL');
+    console.log('[GEMINI TOOL CALL] Audio Queue:', audioQueueRef.current.length, 'isPlaying:', isPlayingRef.current);
     
     if (videoControlsRef.current) {
       console.log('[GEMINI TOOL CALL] Video Status - isPaused:', videoControlsRef.current.isPaused());
@@ -157,87 +178,101 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     processedCallIdsRef.current.add(callId);
     console.log('[GEMINI TOOL CALL] Call ID adicionado ao set de processados');
 
-    let result: any = { ok: true };
+    // For play and restart, we need to wait for speech to end
+    const executeWithDelay = async () => {
+      let result: any = { ok: true };
 
-    if (videoControlsRef.current) {
-      const beforePaused = videoControlsRef.current.isPaused();
-      const beforeTime = videoControlsRef.current.getCurrentTime();
-      
-      switch (name) {
-        case "play_video":
-          console.log('[GEMINI TOOL CALL] EXECUTANDO: play_video');
-          console.log('[GEMINI TOOL CALL] Estado antes: isPaused =', beforePaused);
-          toast.success('Dando play no video...');
-          videoControlsRef.current.play();
-          setTimeout(() => {
-            console.log('[GEMINI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
-          }, 100);
-          result = { ok: true, message: "Video iniciado" };
-          break;
-        case "pause_video":
-          console.log('[GEMINI TOOL CALL] EXECUTANDO: pause_video');
-          console.log('[GEMINI TOOL CALL] Estado antes: isPaused =', beforePaused);
-          toast.success('Pausando video...');
-          videoControlsRef.current.pause();
-          setTimeout(() => {
-            console.log('[GEMINI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
-          }, 100);
-          result = { ok: true, message: "Video pausado" };
-          break;
-        case "restart_video":
-          console.log('[GEMINI TOOL CALL] EXECUTANDO: restart_video');
-          console.log('[GEMINI TOOL CALL] Tempo antes:', beforeTime);
-          toast.success('Reiniciando video...');
-          videoControlsRef.current.restart();
-          setTimeout(() => {
-            console.log('[GEMINI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
-          }, 100);
-          result = { ok: true, message: "Video reiniciado" };
-          break;
-        case "seek_video":
-          const targetSeconds = Number(args.seconds) || 0;
-          console.log('[GEMINI TOOL CALL] EXECUTANDO: seek_video');
-          console.log('[GEMINI TOOL CALL] Tempo antes:', beforeTime, '-> Destino:', targetSeconds);
-          toast.success(`Pulando para ${targetSeconds}s...`);
-          videoControlsRef.current.seekTo(targetSeconds);
-          setTimeout(() => {
-            console.log('[GEMINI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
-          }, 100);
-          result = { ok: true, message: `Video pulou para ${targetSeconds} segundos` };
-          break;
-        default:
-          console.warn('[GEMINI TOOL CALL] ERRO: Funcao desconhecida:', name);
-          result = { ok: false, message: `Funcao desconhecida: ${name}` };
-      }
-    } else {
-      console.error('[GEMINI TOOL CALL] ERRO: videoControlsRef.current e NULL');
-      console.error('[GEMINI TOOL CALL] Nao foi possivel executar:', name);
-      toast.error('Nenhum video carregado');
-      result = { ok: false, message: "Nenhum video carregado" };
-    }
-
-    console.log('[GEMINI TOOL CALL] Resultado:', JSON.stringify(result));
-
-    // Send tool response back to Gemini
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      const response = {
-        toolResponse: {
-          functionResponses: [{
-            id: callId,
-            name: name,
-            response: result
-          }]
+      if (videoControlsRef.current) {
+        const beforePaused = videoControlsRef.current.isPaused();
+        const beforeTime = videoControlsRef.current.getCurrentTime();
+        
+        switch (name) {
+          case "play_video":
+            console.log('[GEMINI TOOL CALL] EXECUTANDO: play_video');
+            console.log('[GEMINI TOOL CALL] Estado antes: isPaused =', beforePaused);
+            console.log('[GEMINI TOOL CALL] Aguardando agente terminar de falar antes de dar play...');
+            toast.info('Aguardando professor terminar de falar...');
+            await waitForSpeechToEnd();
+            console.log('[GEMINI TOOL CALL] Agente terminou de falar, dando play agora!');
+            toast.success('Dando play no video...');
+            videoControlsRef.current.play();
+            setTimeout(() => {
+              console.log('[GEMINI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
+            }, 100);
+            result = { ok: true, message: "Video iniciado" };
+            break;
+          case "pause_video":
+            console.log('[GEMINI TOOL CALL] EXECUTANDO: pause_video');
+            console.log('[GEMINI TOOL CALL] Estado antes: isPaused =', beforePaused);
+            toast.success('Pausando video...');
+            videoControlsRef.current.pause();
+            setTimeout(() => {
+              console.log('[GEMINI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
+            }, 100);
+            result = { ok: true, message: "Video pausado" };
+            break;
+          case "restart_video":
+            console.log('[GEMINI TOOL CALL] EXECUTANDO: restart_video');
+            console.log('[GEMINI TOOL CALL] Tempo antes:', beforeTime);
+            console.log('[GEMINI TOOL CALL] Aguardando agente terminar de falar antes de reiniciar...');
+            toast.info('Aguardando professor terminar de falar...');
+            await waitForSpeechToEnd();
+            console.log('[GEMINI TOOL CALL] Agente terminou de falar, reiniciando agora!');
+            toast.success('Reiniciando video...');
+            videoControlsRef.current.restart();
+            setTimeout(() => {
+              console.log('[GEMINI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+            }, 100);
+            result = { ok: true, message: "Video reiniciado" };
+            break;
+          case "seek_video":
+            const targetSeconds = Number(args.seconds) || 0;
+            console.log('[GEMINI TOOL CALL] EXECUTANDO: seek_video');
+            console.log('[GEMINI TOOL CALL] Tempo antes:', beforeTime, '-> Destino:', targetSeconds);
+            toast.success(`Pulando para ${targetSeconds}s...`);
+            videoControlsRef.current.seekTo(targetSeconds);
+            setTimeout(() => {
+              console.log('[GEMINI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+            }, 100);
+            result = { ok: true, message: `Video pulou para ${targetSeconds} segundos` };
+            break;
+          default:
+            console.warn('[GEMINI TOOL CALL] ERRO: Funcao desconhecida:', name);
+            result = { ok: false, message: `Funcao desconhecida: ${name}` };
         }
-      };
-      console.log('[GEMINI TOOL CALL] Enviando resposta:', JSON.stringify(response, null, 2));
-      wsRef.current.send(JSON.stringify(response));
-      console.log('[GEMINI TOOL CALL] Resposta enviada com sucesso');
-    } else {
-      console.error('[GEMINI TOOL CALL] ERRO: WebSocket nao esta aberto, estado:', wsRef.current?.readyState);
-    }
-    
-    console.log('='.repeat(60));
-  }, []);
+      } else {
+        console.error('[GEMINI TOOL CALL] ERRO: videoControlsRef.current e NULL');
+        console.error('[GEMINI TOOL CALL] Nao foi possivel executar:', name);
+        toast.error('Nenhum video carregado');
+        result = { ok: false, message: "Nenhum video carregado" };
+      }
+
+      console.log('[GEMINI TOOL CALL] Resultado:', JSON.stringify(result));
+
+      // Send tool response back to Gemini
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        const response = {
+          toolResponse: {
+            functionResponses: [{
+              id: callId,
+              name: name,
+              response: result
+            }]
+          }
+        };
+        console.log('[GEMINI TOOL CALL] Enviando resposta:', JSON.stringify(response, null, 2));
+        wsRef.current.send(JSON.stringify(response));
+        console.log('[GEMINI TOOL CALL] Resposta enviada com sucesso');
+      } else {
+        console.error('[GEMINI TOOL CALL] ERRO: WebSocket nao esta aberto, estado:', wsRef.current?.readyState);
+      }
+      
+      console.log('='.repeat(60));
+    };
+
+    // Execute async
+    executeWithDelay();
+  }, [waitForSpeechToEnd]);
 
   const connect = useCallback(async () => {
     try {
