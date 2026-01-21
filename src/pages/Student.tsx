@@ -129,19 +129,24 @@ const Student = () => {
   }, [studentId]);
 
   // Check if a lesson is unlocked based on progression rules
-  const isLessonUnlocked = (video: SavedVideo, index: number, videos: SavedVideo[], passedQuizResults: QuizResult[]) => {
-    // First lesson is always unlocked if released
-    if (index === 0) return video.is_released;
+  // TODO: Para testes, todas as aulas estão liberadas. Remover isso depois.
+  const isLessonUnlocked = (_video: SavedVideo, _index: number, _videos: SavedVideo[], _passedQuizResults: QuizResult[]) => {
+    // MODO DE TESTE: Todas as aulas estão liberadas
+    return true;
     
-    // Not released = not available
-    if (!video.is_released) return false;
-    
-    // Check if previous lesson was completed with passing quiz
-    const previousVideo = videos[index - 1];
-    if (!previousVideo) return false;
-    
-    const previousQuizPassed = passedQuizResults.some(q => q.video_id === previousVideo.id && q.passed);
-    return previousQuizPassed;
+    // Lógica original (descomentrar para produção):
+    // // First lesson is always unlocked if released
+    // if (index === 0) return video.is_released;
+    // 
+    // // Not released = not available
+    // if (!video.is_released) return false;
+    // 
+    // // Check if previous lesson was completed with passing quiz
+    // const previousVideo = videos[index - 1];
+    // if (!previousVideo) return false;
+    // 
+    // const previousQuizPassed = passedQuizResults.some(q => q.video_id === previousVideo.id && q.passed);
+    // return previousQuizPassed;
   };
 
   // Helper to check unlock status with current state
