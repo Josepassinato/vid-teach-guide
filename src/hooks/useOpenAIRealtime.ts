@@ -234,6 +234,26 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             optionsRef.current.onTranscript?.(data.transcript, 'user');
           }
 
+          // Helper to wait for agent to finish speaking before playing video
+          const waitForSpeechToEnd = (): Promise<void> => {
+            return new Promise((resolve) => {
+              const checkSpeech = () => {
+                const queueLength = audioQueueRef.current.length;
+                const isPlaying = isPlayingRef.current;
+                console.log('[OPENAI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
+                
+                if (queueLength === 0 && !isPlaying) {
+                  console.log('[OPENAI] Fala terminou, prosseguindo...');
+                  // Add small buffer to ensure audio fully finished
+                  setTimeout(resolve, 300);
+                } else {
+                  setTimeout(checkSpeech, 100);
+                }
+              };
+              checkSpeech();
+            });
+          };
+
           const runFunctionCall = async (name: string, callId: string, argsJson?: string) => {
             // Detailed debug logging
             console.log('='.repeat(60));
@@ -241,6 +261,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             console.log('[OPENAI TOOL CALL] Funcao:', name);
             console.log('[OPENAI TOOL CALL] Call ID:', callId);
             console.log('[OPENAI TOOL CALL] Args JSON:', argsJson);
+            console.log('[OPENAI TOOL CALL] Audio Queue:', audioQueueRef.current.length, 'isPlaying:', isPlayingRef.current);
             
             if (!callId) {
               console.error('[OPENAI TOOL CALL] ERRO: callId esta vazio/undefined');
@@ -282,6 +303,10 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 case "play_video":
                   console.log('[OPENAI TOOL CALL] EXECUTANDO: play_video');
                   console.log('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
+                  console.log('[OPENAI TOOL CALL] Aguardando agente terminar de falar antes de dar play...');
+                  toast.info('Aguardando professor terminar de falar...');
+                  await waitForSpeechToEnd();
+                  console.log('[OPENAI TOOL CALL] Agente terminou de falar, dando play agora!');
                   toast.success('Dando play no video...');
                   videoControlsRef.current.play();
                   setTimeout(() => {
@@ -302,6 +327,10 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 case "restart_video":
                   console.log('[OPENAI TOOL CALL] EXECUTANDO: restart_video');
                   console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime);
+                  console.log('[OPENAI TOOL CALL] Aguardando agente terminar de falar antes de reiniciar...');
+                  toast.info('Aguardando professor terminar de falar...');
+                  await waitForSpeechToEnd();
+                  console.log('[OPENAI TOOL CALL] Agente terminou de falar, reiniciando agora!');
                   toast.success('Reiniciando video...');
                   videoControlsRef.current.restart();
                   setTimeout(() => {
