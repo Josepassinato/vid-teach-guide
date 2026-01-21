@@ -132,6 +132,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
   }, []);
 
   // Helper to wait for agent to finish speaking before playing video
+  // Waits until audio queue is empty + 2 second buffer for natural pause
   const waitForSpeechToEnd = useCallback((): Promise<void> => {
     return new Promise((resolve) => {
       const checkSpeech = () => {
@@ -140,9 +141,12 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         console.log('[GEMINI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
         
         if (queueLength === 0 && !isPlaying) {
-          console.log('[GEMINI] Fala terminou, prosseguindo...');
-          // Add small buffer to ensure audio fully finished
-          setTimeout(resolve, 300);
+          console.log('[GEMINI] Fala terminou, aguardando 2 segundos...');
+          // 2 second buffer after speech ends for natural pause
+          setTimeout(() => {
+            console.log('[GEMINI] Buffer de 2s concluído, prosseguindo...');
+            resolve();
+          }, 2000);
         } else {
           setTimeout(checkSpeech, 100);
         }
