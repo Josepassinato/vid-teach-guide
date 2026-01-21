@@ -35,6 +35,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isVoiceDetected, setIsVoiceDetected] = useState(false);
   
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -653,6 +654,9 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           const hasNormalZeroCrossings = zeroCrossings >= VAD_ZERO_CROSSING_MIN && zeroCrossings <= VAD_ZERO_CROSSING_MAX;
           const isVoiceDetected = hasEnoughEnergy && hasNormalZeroCrossings;
           
+          // Update voice detection state for UI feedback
+          setIsVoiceDetected(isVoiceDetected);
+          
           if (!isVoiceDetected) {
             silentFrameCount++;
             // Skip sending if too many silent frames (reduces bandwidth and noise)
@@ -741,6 +745,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     status,
     isListening,
     isSpeaking,
+    isVoiceDetected,
     connect,
     disconnect,
     startListening,

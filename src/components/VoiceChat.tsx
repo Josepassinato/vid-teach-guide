@@ -304,6 +304,7 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     status,
     isListening,
     isSpeaking,
+    isVoiceDetected,
     connect,
     disconnect,
     startListening,
@@ -1076,8 +1077,10 @@ INSTRUÇÕES:
           <div className="flex justify-center gap-6 sm:gap-8 py-1.5 sm:py-2">
             {isListening && (
               <div className="text-center">
-                <VoiceIndicator isActive={isListening} type="listening" />
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Ouvindo...</p>
+                <VoiceIndicator isActive={isListening} type="listening" isVoiceDetected={isVoiceDetected} />
+                <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 transition-colors ${isVoiceDetected ? 'text-green-600 dark:text-green-400 font-medium' : 'text-muted-foreground'}`}>
+                  {isVoiceDetected ? 'Voz detectada' : 'Ouvindo...'}
+                </p>
               </div>
             )}
             {isSpeaking && (
@@ -1144,9 +1147,11 @@ INSTRUÇÕES:
                 <div className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-11 bg-primary/10 rounded-md px-3">
                   {isListening ? (
                     <>
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span className="text-sm text-primary">Ouvindo...</span>
-                      <VoiceIndicator isActive={true} type="listening" />
+                      <div className={`w-2 h-2 rounded-full ${isVoiceDetected ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/50'}`} />
+                      <span className={`text-sm ${isVoiceDetected ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                        {isVoiceDetected ? 'Voz detectada' : 'Ouvindo...'}
+                      </span>
+                      <VoiceIndicator isActive={true} type="listening" isVoiceDetected={isVoiceDetected} />
                     </>
                   ) : isSpeaking ? (
                     <>
