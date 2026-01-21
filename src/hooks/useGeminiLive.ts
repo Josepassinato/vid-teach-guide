@@ -223,24 +223,24 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         console.log('WebSocket connected to Gemini');
         processedCallIdsRef.current.clear();
         
-        // Define tools for video control
+        // Define tools for video control - use detailed descriptions for better understanding
         const tools = [{
           functionDeclarations: [
             {
               name: "play_video",
-              description: "Inicia ou retoma a reprodução do vídeo. Use quando o aluno pedir para dar play, iniciar, continuar ou reproduzir o vídeo."
+              description: "OBRIGATORIO: Chame esta funcao para iniciar ou retomar o video. Gatilhos: 'play', 'da play', 'inicia', 'comeca', 'continua', 'roda', 'reproduz', 'volta a tocar', 'pode continuar'. Sempre que o aluno quiser que o video volte a rodar, use esta funcao."
             },
             {
               name: "pause_video",
-              description: "Pausa a reprodução do vídeo. Use quando o aluno pedir para pausar, parar ou interromper o vídeo."
+              description: "OBRIGATORIO: Chame esta funcao para pausar o video. Gatilhos: 'pausa', 'para', 'pause', 'espera', 'segura', 'para ai', 'um momento', 'calma', 'interrompe'. Sempre que o aluno quiser parar o video temporariamente, use esta funcao."
             },
             {
               name: "restart_video",
-              description: "Reinicia o vídeo do começo. Use quando o aluno pedir para voltar ao início, reiniciar ou começar de novo."
+              description: "OBRIGATORIO: Chame esta funcao para reiniciar o video do inicio. Gatilhos: 'reinicia', 'recomeca', 'volta pro inicio', 'do zero', 'desde o comeco', 'de novo', 'novamente'. Sempre que o aluno quiser ver o video desde o principio, use esta funcao."
             },
             {
               name: "seek_video",
-              description: "Pula para um momento específico do vídeo em segundos. Use quando o aluno pedir para ir para um tempo específico.",
+              description: "Pula para um momento especifico do video em segundos. Use quando o aluno mencionar um tempo especifico.",
               parameters: {
                 type: "object",
                 properties: {
