@@ -249,8 +249,10 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
       console.log('[GEMINI TOOL CALL] Resultado:', JSON.stringify(result));
 
-      // Send tool response back to Gemini
+      // Send tool response back to Gemini using the correct format
+      // The Gemini Live API expects the response in a specific structure
       if (wsRef.current?.readyState === WebSocket.OPEN) {
+        // Try the standard toolResponse format first
         const response = {
           toolResponse: {
             functionResponses: [{
@@ -339,12 +341,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         // Send setup message with Gemini 2.0 Flash
         // Using Kore voice - warm female voice
         // Other options: Fenrir (energetic male), Puck (playful), Aoede (warm female), Charon (deep/authoritative)
+        // IMPORTANT: responseModalities must include both AUDIO and TEXT for tool calling to work!
         ws.send(JSON.stringify({
           setup: {
             model: "models/gemini-2.0-flash-exp",
             generationConfig: {
-              temperature: 0.7, // Lower temperature for more consistent, measured speech
-              responseModalities: ["AUDIO"],
+              temperature: 0.7,
+              responseModalities: ["AUDIO", "TEXT"], // TEXT is required for function calling!
               speechConfig: {
                 languageCode: "pt-BR",
                 voiceConfig: {
@@ -383,26 +386,41 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           
           const data = JSON.parse(messageData);
           
-          // Log more details for debugging tool calls
+          // Log ALL messages for complete debugging
+          console.log('[GEMINI RAW]', JSON.stringify(data).substring(0, 500));
+          
+          // Check for tool calls in ALL possible locations
           const hasToolCallInParts = data.serverContent?.modelTurn?.parts?.some((p: any) => p.functionCall);
           const hasToolCallInCandidates = data.candidates?.[0]?.content?.parts?.some((p: any) => p.functionCall);
-          const hasToolCall = data.toolCall || data.functionCall || hasToolCallInParts || hasToolCallInCandidates;
+          const hasToolCallInToolCallField = !!data.toolCall;
+          const hasDirectFunctionCall = !!data.functionCall;
+          // New: check for tool_call (snake_case variant)
+          const hasSnakeCaseToolCall = !!data.tool_call;
+          // New: check serverContent.toolCall
+          const hasServerContentToolCall = !!data.serverContent?.toolCall;
+          
+          const hasToolCall = hasToolCallInParts || hasToolCallInCandidates || 
+                            hasToolCallInToolCallField || hasDirectFunctionCall || 
+                            hasSnakeCaseToolCall || hasServerContentToolCall;
           
           if (hasToolCall) {
             console.log('*'.repeat(60));
             console.log('[GEMINI EVENT] TOOL CALL DETECTADO!');
-            console.log('[GEMINI EVENT] data.toolCall:', data.toolCall ? 'PRESENTE' : 'AUSENTE');
-            console.log('[GEMINI EVENT] data.functionCall:', data.functionCall ? 'PRESENTE' : 'AUSENTE');
             console.log('[GEMINI EVENT] hasToolCallInParts:', hasToolCallInParts);
             console.log('[GEMINI EVENT] hasToolCallInCandidates:', hasToolCallInCandidates);
+            console.log('[GEMINI EVENT] hasToolCallInToolCallField:', hasToolCallInToolCallField);
+            console.log('[GEMINI EVENT] hasDirectFunctionCall:', hasDirectFunctionCall);
+            console.log('[GEMINI EVENT] hasSnakeCaseToolCall:', hasSnakeCaseToolCall);
+            console.log('[GEMINI EVENT] hasServerContentToolCall:', hasServerContentToolCall);
             console.log('[GEMINI EVENT] Dados completos:', JSON.stringify(data, null, 2));
             console.log('*'.repeat(60));
           } else {
             // Log resumido para outros eventos
             const eventType = data.setupComplete ? 'SETUP' : 
                             data.serverContent?.modelTurn ? 'MODEL_TURN' : 
-                            data.serverContent?.interrupted ? 'INTERRUPTED' : 'OTHER';
-            console.log('[GEMINI EVENT]', eventType, '-', JSON.stringify(data).substring(0, 200));
+                            data.serverContent?.interrupted ? 'INTERRUPTED' : 
+                            data.serverContent?.turnComplete ? 'TURN_COMPLETE' : 'OTHER';
+            console.log('[GEMINI EVENT]', eventType);
           }
           
           // Handle audio response
@@ -425,30 +443,47 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
             }
           }
           
-          // Handle tool calls in toolCall field (alternative format)
+          // Handle tool calls in toolCall field (camelCase)
           if (data.toolCall?.functionCalls) {
             console.log('[GEMINI EVENT] functionCalls encontrado em toolCall!');
-            console.log('[GEMINI EVENT] Total de calls:', data.toolCall.functionCalls.length);
             for (const fc of data.toolCall.functionCalls) {
-              console.log('[GEMINI EVENT] Processando functionCall:', JSON.stringify(fc, null, 2));
               handleToolCall(fc);
             }
           }
           
-          // Handle tool calls directly on data (another alternative format)
+          // Handle tool calls in tool_call field (snake_case variant)
+          if (data.tool_call?.function_calls) {
+            console.log('[GEMINI EVENT] function_calls encontrado em tool_call!');
+            for (const fc of data.tool_call.function_calls) {
+              handleToolCall(fc);
+            }
+          }
+          
+          // Handle serverContent.toolCall
+          if (data.serverContent?.toolCall?.functionCalls) {
+            console.log('[GEMINI EVENT] functionCalls encontrado em serverContent.toolCall!');
+            for (const fc of data.serverContent.toolCall.functionCalls) {
+              handleToolCall(fc);
+            }
+          }
+          
+          // Handle tool calls directly on data
           if (data.functionCall) {
             console.log('[GEMINI EVENT] functionCall encontrado diretamente em data!');
-            console.log('[GEMINI EVENT] functionCall:', JSON.stringify(data.functionCall, null, 2));
             handleToolCall(data.functionCall);
+          }
+          
+          // Handle function_call (snake_case variant)
+          if (data.function_call) {
+            console.log('[GEMINI EVENT] function_call (snake_case) encontrado!');
+            handleToolCall(data.function_call);
           }
           
           // Handle tool calls in candidates format
           if (data.candidates?.[0]?.content?.parts) {
-            console.log('[GEMINI EVENT] Processando candidates com', data.candidates[0].content.parts.length, 'parts');
             for (const part of data.candidates[0].content.parts) {
               if (part.functionCall) {
                 console.log('[GEMINI EVENT] functionCall encontrado em candidates!');
-                console.log('[GEMINI EVENT] functionCall:', JSON.stringify(part.functionCall, null, 2));
                 handleToolCall(part.functionCall);
               }
             }
@@ -464,7 +499,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
           // Handle setup complete
           if (data.setupComplete) {
-            console.log('[GEMINI EVENT] Setup completo');
+            console.log('[GEMINI EVENT] Setup completo - tools configuradas');
           }
         } catch (e) {
           // Only log if it's not a parse error from binary data
