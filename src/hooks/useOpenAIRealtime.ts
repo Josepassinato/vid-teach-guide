@@ -235,117 +235,182 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           }
 
           const runFunctionCall = async (name: string, callId: string, argsJson?: string) => {
-            if (!callId) return;
-            if (processedCallIdsRef.current.has(callId)) return;
+            // Detailed debug logging
+            console.log('='.repeat(60));
+            console.log('[OPENAI TOOL CALL] Recebido');
+            console.log('[OPENAI TOOL CALL] Funcao:', name);
+            console.log('[OPENAI TOOL CALL] Call ID:', callId);
+            console.log('[OPENAI TOOL CALL] Args JSON:', argsJson);
+            
+            if (!callId) {
+              console.error('[OPENAI TOOL CALL] ERRO: callId esta vazio/undefined');
+              console.log('='.repeat(60));
+              return;
+            }
+            
+            if (processedCallIdsRef.current.has(callId)) {
+              console.log('[OPENAI TOOL CALL] IGNORADO - Call ID ja processado:', callId);
+              console.log('='.repeat(60));
+              return;
+            }
             processedCallIdsRef.current.add(callId);
+            console.log('[OPENAI TOOL CALL] Call ID adicionado ao set de processados');
 
             let args: any = {};
             try {
               args = argsJson ? JSON.parse(argsJson) : {};
-            } catch {
-              // Some realtime responses occasionally produce partial JSON.
-              // For our tools, empty args is fine (except seek).
+              console.log('[OPENAI TOOL CALL] Args parseados:', JSON.stringify(args, null, 2));
+            } catch (e) {
+              console.warn('[OPENAI TOOL CALL] Erro ao parsear args, usando {}:', e);
               args = {};
             }
 
-            console.log('[realtime:tool-call]', name, args, callId);
-            console.log('[realtime:tool-call] videoControlsRef.current:', videoControlsRef.current ? 'EXISTS' : 'NULL');
+            console.log('[OPENAI TOOL CALL] Video Controls:', videoControlsRef.current ? 'DISPONIVEL' : 'INDISPONIVEL');
+            
+            if (videoControlsRef.current) {
+              console.log('[OPENAI TOOL CALL] Video Status - isPaused:', videoControlsRef.current.isPaused());
+              console.log('[OPENAI TOOL CALL] Video Status - currentTime:', videoControlsRef.current.getCurrentTime());
+            }
 
             let result: any = { ok: true };
 
             if (videoControlsRef.current) {
+              const beforePaused = videoControlsRef.current.isPaused();
+              const beforeTime = videoControlsRef.current.getCurrentTime();
+              
               switch (name) {
                 case "play_video":
-                  console.log('[realtime:tool-call] Executing play_video');
-                  toast.success('▶️ Dando play no vídeo...');
+                  console.log('[OPENAI TOOL CALL] EXECUTANDO: play_video');
+                  console.log('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
+                  toast.success('Dando play no video...');
                   videoControlsRef.current.play();
-                  result = { ok: true, message: "Vídeo iniciado" };
+                  setTimeout(() => {
+                    console.log('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
+                  }, 100);
+                  result = { ok: true, message: "Video iniciado" };
                   break;
                 case "pause_video":
-                  console.log('[realtime:tool-call] Executing pause_video');
-                  toast.success('⏸️ Pausando vídeo...');
+                  console.log('[OPENAI TOOL CALL] EXECUTANDO: pause_video');
+                  console.log('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
+                  toast.success('Pausando video...');
                   videoControlsRef.current.pause();
-                  result = { ok: true, message: "Vídeo pausado" };
+                  setTimeout(() => {
+                    console.log('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
+                  }, 100);
+                  result = { ok: true, message: "Video pausado" };
                   break;
                 case "restart_video":
-                  console.log('[realtime:tool-call] Executing restart_video');
-                  toast.success('🔄 Reiniciando vídeo...');
+                  console.log('[OPENAI TOOL CALL] EXECUTANDO: restart_video');
+                  console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime);
+                  toast.success('Reiniciando video...');
                   videoControlsRef.current.restart();
-                  result = { ok: true, message: "Vídeo reiniciado" };
+                  setTimeout(() => {
+                    console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+                  }, 100);
+                  result = { ok: true, message: "Video reiniciado" };
                   break;
                 case "seek_video":
-                  console.log('[realtime:tool-call] Executing seek_video to', args.seconds);
-                  toast.success(`⏩ Pulando para ${Number(args.seconds) || 0}s...`);
-                  videoControlsRef.current.seekTo(Number(args.seconds) || 0);
-                  result = { ok: true, message: `Vídeo pulou para ${Number(args.seconds) || 0} segundos` };
+                  const targetSeconds = Number(args.seconds) || 0;
+                  console.log('[OPENAI TOOL CALL] EXECUTANDO: seek_video');
+                  console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Destino:', targetSeconds);
+                  toast.success(`Pulando para ${targetSeconds}s...`);
+                  videoControlsRef.current.seekTo(targetSeconds);
+                  setTimeout(() => {
+                    console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+                  }, 100);
+                  result = { ok: true, message: `Video pulou para ${targetSeconds} segundos` };
                   break;
                 default:
-                  console.warn('[realtime:tool-call] Unknown function:', name);
-                  result = { ok: false, message: `Função desconhecida: ${name}` };
+                  console.warn('[OPENAI TOOL CALL] ERRO: Funcao desconhecida:', name);
+                  result = { ok: false, message: `Funcao desconhecida: ${name}` };
               }
             } else {
-              console.warn('[realtime:tool-call] videoControlsRef.current is NULL - cannot execute', name);
-              toast.error('❌ Nenhum vídeo carregado');
-              result = { ok: false, message: "Nenhum vídeo carregado" };
+              console.error('[OPENAI TOOL CALL] ERRO: videoControlsRef.current e NULL');
+              console.error('[OPENAI TOOL CALL] Nao foi possivel executar:', name);
+              toast.error('Nenhum video carregado');
+              result = { ok: false, message: "Nenhum video carregado" };
             }
 
+            console.log('[OPENAI TOOL CALL] Resultado:', JSON.stringify(result));
+
             // Provide function call output back to the model
-            ws.send(JSON.stringify({
+            const outputMessage = {
               type: "conversation.item.create",
               item: {
                 type: "function_call_output",
                 call_id: callId,
                 output: JSON.stringify(result),
               },
-            }));
+            };
+            console.log('[OPENAI TOOL CALL] Enviando output:', JSON.stringify(outputMessage, null, 2));
+            ws.send(JSON.stringify(outputMessage));
 
             // Request a response after function call
+            console.log('[OPENAI TOOL CALL] Solicitando response.create');
             ws.send(JSON.stringify({ type: "response.create" }));
+            console.log('[OPENAI TOOL CALL] Resposta enviada com sucesso');
+            console.log('='.repeat(60));
           };
 
-          const tryHandleFunctionCallItem = async (item: any) => {
+          const tryHandleFunctionCallItem = async (item: any, source: string) => {
             if (!item) return;
+            console.log(`[OPENAI EVENT] tryHandleFunctionCallItem de ${source}:`, item?.type);
+            
             // Shapes we may see:
             // - { type:'function_call', name, call_id, arguments }
             // - { type:'function_call', function:{ name, arguments }, call_id }
-            if (item.type !== 'function_call') return;
+            if (item.type !== 'function_call') {
+              console.log(`[OPENAI EVENT] Item ignorado - tipo ${item.type} != 'function_call'`);
+              return;
+            }
 
             const name = item.name ?? item.function?.name;
             const callId = item.call_id ?? item.callId;
             const args = item.arguments ?? item.function?.arguments;
 
+            console.log(`[OPENAI EVENT] Extraido de ${source}: name=${name}, callId=${callId}, args=${args}`);
+
             if (typeof name === 'string' && typeof callId === 'string') {
+              console.log(`[OPENAI EVENT] Chamando runFunctionCall de ${source}`);
               await runFunctionCall(name, callId, args);
+            } else {
+              console.warn(`[OPENAI EVENT] Dados invalidos de ${source}: name=${typeof name}, callId=${typeof callId}`);
             }
           };
 
           // Function calls (standalone event)
           if (data.type === "response.function_call_arguments.done") {
+            console.log('[OPENAI EVENT] response.function_call_arguments.done detectado!');
+            console.log('[OPENAI EVENT] name:', data.name, 'call_id:', data.call_id);
             await runFunctionCall(data.name, data.call_id, data.arguments);
           }
 
           // Function calls delivered as output_item events (some SDK variants)
           if (data.type === "response.output_item.added" || data.type === "response.output_item.done") {
-            await tryHandleFunctionCallItem(data.item);
-            await tryHandleFunctionCallItem(data.output_item);
+            console.log('[OPENAI EVENT]', data.type, 'detectado!');
+            await tryHandleFunctionCallItem(data.item, `${data.type}.item`);
+            await tryHandleFunctionCallItem(data.output_item, `${data.type}.output_item`);
           }
 
           // Function calls delivered as conversation item events (another common variant)
           if (data.type === "conversation.item.created" || data.type === "conversation.item.updated") {
-            await tryHandleFunctionCallItem(data.item);
+            console.log('[OPENAI EVENT]', data.type, 'detectado!');
+            await tryHandleFunctionCallItem(data.item, data.type);
           }
 
           // Canonical: embedded in response.done
           if (data.type === "response.done") {
+            console.log('[OPENAI EVENT] response.done detectado!');
             const outputs = data.response?.output;
             if (Array.isArray(outputs)) {
+              console.log('[OPENAI EVENT] Processando', outputs.length, 'outputs');
               for (const item of outputs) {
-                await tryHandleFunctionCallItem(item);
+                await tryHandleFunctionCallItem(item, 'response.done');
               }
             }
 
             // Don't clear audio here; let playback finish naturally to avoid cutting the last word
-            console.log('Response done, audio queue length:', audioQueueRef.current.length);
+            console.log('[OPENAI EVENT] Response done, audio queue length:', audioQueueRef.current.length);
           }
 
           // Handle errors
