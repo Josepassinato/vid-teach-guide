@@ -340,14 +340,14 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         
         // Send setup message with Gemini 2.0 Flash
         // Using Kore voice - warm female voice
-        // Other options: Fenrir (energetic male), Puck (playful), Aoede (warm female), Charon (deep/authoritative)
-        // IMPORTANT: responseModalities must include both AUDIO and TEXT for tool calling to work!
-        ws.send(JSON.stringify({
+        // Note: For Gemini Live API with audio, only AUDIO modality is supported
+        // Tool calling works through the modelTurn.parts[].functionCall structure
+        const setupMessage = {
           setup: {
             model: "models/gemini-2.0-flash-exp",
             generationConfig: {
               temperature: 0.7,
-              responseModalities: ["AUDIO", "TEXT"], // TEXT is required for function calling!
+              responseModalities: ["AUDIO"],
               speechConfig: {
                 languageCode: "pt-BR",
                 voiceConfig: {
@@ -364,7 +364,10 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
             },
             tools: tools
           }
-        }));
+        };
+        
+        console.log('[GeminiLive] Enviando setup:', JSON.stringify(setupMessage, null, 2).substring(0, 500));
+        ws.send(JSON.stringify(setupMessage));
         
         updateStatus('connected');
       };
@@ -513,12 +516,27 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       
       ws.onerror = (error) => {
         console.error('[GeminiLive] WebSocket error:', error);
+        console.error('[GeminiLive] WebSocket error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
         updateStatus('error');
-        optionsRef.current.onError?.('Connection error');
+        optionsRef.current.onError?.('Erro de conexao com Gemini');
       };
       
       ws.onclose = (event) => {
-        console.log('[GeminiLive] WebSocket closed:', { code: event.code, reason: event.reason });
+        console.log('[GeminiLive] WebSocket closed');
+        console.log('[GeminiLive] Close code:', event.code);
+        console.log('[GeminiLive] Close reason:', event.reason || 'Nenhuma razao fornecida');
+        console.log('[GeminiLive] Was clean:', event.wasClean);
+        
+        // Common close codes:
+        // 1000 = Normal closure
+        // 1006 = Abnormal closure (connection lost)
+        // 1011 = Server error
+        // 1015 = TLS handshake failure
+        if (event.code !== 1000) {
+          console.error('[GeminiLive] Conexao fechada com erro. Codigo:', event.code);
+          optionsRef.current.onError?.(`Conexao fechada: codigo ${event.code}`);
+        }
+        
         updateStatus('disconnected');
         stopListening();
       };
