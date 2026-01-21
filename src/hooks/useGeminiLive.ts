@@ -586,18 +586,91 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       
       const audioContext = new AudioContext({ sampleRate: 16000 });
       const source = audioContext.createMediaStreamSource(stream);
+      
+      // Create high-pass filter to remove low-frequency noise (AC hum, background rumble)
+      const highpassFilter = audioContext.createBiquadFilter();
+      highpassFilter.type = 'highpass';
+      highpassFilter.frequency.value = 85; // Cut frequencies below 85Hz (human voice starts ~85Hz)
+      highpassFilter.Q.value = 0.7;
+      
+      // Create low-pass filter to remove high-frequency noise (hiss, static)
+      const lowpassFilter = audioContext.createBiquadFilter();
+      lowpassFilter.type = 'lowpass';
+      lowpassFilter.frequency.value = 8000; // Cut frequencies above 8kHz (speech range is 300Hz-3400Hz, keep some headroom)
+      lowpassFilter.Q.value = 0.7;
+      
+      // Create compressor to normalize volume and reduce sudden loud noises
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -24; // Start compressing at -24dB
+      compressor.knee.value = 12; // Soft knee for natural compression
+      compressor.ratio.value = 4; // 4:1 compression ratio
+      compressor.attack.value = 0.005; // Fast attack to catch loud sounds
+      compressor.release.value = 0.1; // Quick release for natural speech
+      
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       
       processorRef.current = processor;
+      
+      // VAD (Voice Activity Detection) parameters for speakerphone resistance
+      const VAD_ENERGY_THRESHOLD = 0.008; // Minimum RMS energy to consider as speech
+      const VAD_ZERO_CROSSING_MIN = 10; // Minimum zero crossings (voice has more variation than noise)
+      const VAD_ZERO_CROSSING_MAX = 800; // Maximum (too high = likely noise/static)
+      let silentFrameCount = 0;
+      const SILENT_FRAMES_BEFORE_MUTE = 3; // Number of silent frames before stopping transmission
+      let noiseFloor = 0.002; // Adaptive noise floor estimation
+      const NOISE_ADAPTATION_RATE = 0.05; // How fast to adapt to ambient noise
       
       processor.onaudioprocess = (e) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           const inputData = e.inputBuffer.getChannelData(0);
           
-          // Convert Float32 to Int16
+          // Calculate RMS energy (volume level)
+          let sumSquares = 0;
+          let zeroCrossings = 0;
+          let prevSample = 0;
+          
+          for (let i = 0; i < inputData.length; i++) {
+            sumSquares += inputData[i] * inputData[i];
+            // Count zero crossings (sign changes)
+            if ((prevSample >= 0 && inputData[i] < 0) || (prevSample < 0 && inputData[i] >= 0)) {
+              zeroCrossings++;
+            }
+            prevSample = inputData[i];
+          }
+          
+          const rmsEnergy = Math.sqrt(sumSquares / inputData.length);
+          
+          // Adaptive noise floor - slowly adjust to ambient noise level
+          if (rmsEnergy < noiseFloor * 2) {
+            noiseFloor = noiseFloor * (1 - NOISE_ADAPTATION_RATE) + rmsEnergy * NOISE_ADAPTATION_RATE;
+          }
+          
+          // Dynamic threshold based on noise floor
+          const dynamicThreshold = Math.max(VAD_ENERGY_THRESHOLD, noiseFloor * 3);
+          
+          // Voice Activity Detection check
+          const hasEnoughEnergy = rmsEnergy > dynamicThreshold;
+          const hasNormalZeroCrossings = zeroCrossings >= VAD_ZERO_CROSSING_MIN && zeroCrossings <= VAD_ZERO_CROSSING_MAX;
+          const isVoiceDetected = hasEnoughEnergy && hasNormalZeroCrossings;
+          
+          if (!isVoiceDetected) {
+            silentFrameCount++;
+            // Skip sending if too many silent frames (reduces bandwidth and noise)
+            if (silentFrameCount > SILENT_FRAMES_BEFORE_MUTE) {
+              return;
+            }
+          } else {
+            silentFrameCount = 0;
+          }
+          
+          // Apply soft gate - reduce volume of quiet sounds (likely noise)
+          const gateMultiplier = rmsEnergy > dynamicThreshold ? 1.0 : Math.pow(rmsEnergy / dynamicThreshold, 2);
+          
+          // Convert Float32 to Int16 with gating applied
           const int16Array = new Int16Array(inputData.length);
           for (let i = 0; i < inputData.length; i++) {
-            int16Array[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+            const gatedSample = inputData[i] * gateMultiplier;
+            int16Array[i] = Math.max(-32768, Math.min(32767, gatedSample * 32768));
           }
           
           // Convert to base64
@@ -620,10 +693,15 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         }
       };
       
-      source.connect(processor);
+      // Connect audio processing chain: source -> highpass -> lowpass -> compressor -> processor
+      source.connect(highpassFilter);
+      highpassFilter.connect(lowpassFilter);
+      lowpassFilter.connect(compressor);
+      compressor.connect(processor);
       processor.connect(audioContext.destination);
       
       setIsListening(true);
+      console.log('[GeminiLive] Audio pipeline com VAD e filtros de ruido ativado');
       
     } catch (error) {
       console.error('Microphone error:', error);
