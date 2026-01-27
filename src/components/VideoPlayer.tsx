@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 're
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { VideoTimeline } from '@/components/VideoTimeline';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Volume1, Maximize, Minimize } from 'lucide-react';
 
 export interface VideoPlayerRef {
@@ -28,14 +29,19 @@ export type VideoPlayerProps = {
   expanded?: boolean;
   /** Callback when video playback ends */
   onEnded?: () => void;
+  /** Teaching moments for timeline markers */
+  teachingMoments?: Array<{ timestamp_seconds: number; topic?: string }>;
+  /** Quiz timestamps for timeline markers */
+  quizTimestamps?: number[];
 };
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  function VideoPlayer({ videoId, title, expanded = false, onEnded }, ref) {
+  function VideoPlayer({ videoId, title, expanded = false, onEnded, teachingMoments = [], quizTimestamps = [] }, ref) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [volume, setVolume] = useState(100);
     const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
     const playerRef = useRef<any>(null);
     const [isReady, setIsReady] = useState(false);
     const isReadyRef = useRef(false);
@@ -109,6 +115,14 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           onReady: () => {
             setIsReady(true);
             isReadyRef.current = true;
+
+            // Get duration
+            try {
+              const dur = playerRef.current?.getDuration?.() || 0;
+              setDuration(dur);
+            } catch {
+              // ignore
+            }
 
             // Start with full volume unmuted
             try {
@@ -382,24 +396,34 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
         
         {/* Custom Controls */}
         <div className={`p-2 sm:p-3 border-t ${isFullscreen ? 'bg-black/90' : 'bg-card'}`}>
+          {/* Timeline with markers */}
+          <VideoTimeline
+            currentTime={currentTime}
+            duration={duration}
+            onSeek={(seconds) => playerRef.current?.seekTo(seconds, true)}
+            teachingMoments={teachingMoments}
+            quizTimestamps={quizTimestamps}
+            className="mb-3"
+          />
+          
           <div className="flex items-center justify-between gap-2 sm:gap-3">
             <div className="flex items-center gap-1 sm:gap-2">
               {isPlaying ? (
-                <Button size="sm" variant="outline" onClick={handlePause} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
-                  <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <Button size="sm" variant="outline" onClick={handlePause} className="h-11 w-11 sm:h-9 sm:w-9 p-0">
+                  <Pause className="h-4 w-4" />
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={handlePlay} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
-                  <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <Button size="sm" variant="outline" onClick={handlePlay} className="h-11 w-11 sm:h-9 sm:w-9 p-0">
+                  <Play className="h-4 w-4" />
                 </Button>
               )}
-              <Button size="sm" variant="ghost" onClick={handleRestart} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
-                <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <Button size="sm" variant="ghost" onClick={handleRestart} className="h-11 w-11 sm:h-9 sm:w-9 p-0">
+                <RotateCcw className="h-4 w-4" />
               </Button>
               
               {/* Volume Control */}
               <div className="flex items-center gap-1 sm:gap-2">
-                <Button size="sm" variant="ghost" onClick={handleMute} className="h-8 w-8 sm:h-9 sm:w-9 p-0">
+                <Button size="sm" variant="ghost" onClick={handleMute} className="h-11 w-11 sm:h-9 sm:w-9 p-0">
                   {getVolumeIcon()}
                 </Button>
                 <Slider
@@ -413,16 +437,12 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             </div>
             
             <div className="flex items-center gap-1 sm:gap-2">
-              <span className="text-xs sm:text-sm text-muted-foreground font-mono">
-                {formatTime(currentTime)}
-              </span>
-              
               {/* Fullscreen Button */}
-              <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-8 w-8 sm:h-9 sm:w-9 p-0" title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}>
+              <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-11 w-11 sm:h-9 sm:w-9 p-0" title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}>
                 {isFullscreen ? (
-                  <Minimize className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Minimize className="h-4 w-4" />
                 ) : (
-                  <Maximize className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <Maximize className="h-4 w-4" />
                 )}
               </Button>
             </div>
