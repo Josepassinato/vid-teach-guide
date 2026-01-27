@@ -110,7 +110,8 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
       }
       mediaPipe.stop();
     };
-  }, [mediaPipe]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Request camera access and enable vision
   const enableVision = useCallback(async () => {
@@ -214,8 +215,8 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
     signals,
     isEnabled,
     hasConsent,
-    isLoading: isLoading || mediaPipe.isRunning && !mediaPipe.isLoaded,
-    error: error || mediaPipe.error,
+    isLoading: isLoading || (mediaPipe.isRunning && !mediaPipe.isLoaded),
+    error: error ?? mediaPipe.error,
     enableVision,
     disableVision,
     grantConsent,
