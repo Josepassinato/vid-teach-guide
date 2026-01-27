@@ -14,6 +14,113 @@ export type Database = {
   }
   public: {
     Tables: {
+      missions: {
+        Row: {
+          created_at: string
+          description: string
+          difficulty_level: string
+          evaluation_criteria: Json | null
+          evidence_type: string
+          id: string
+          instructions: string
+          is_active: boolean
+          mission_order: number | null
+          points_reward: number
+          time_limit_minutes: number | null
+          title: string
+          updated_at: string
+          video_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          difficulty_level?: string
+          evaluation_criteria?: Json | null
+          evidence_type?: string
+          id?: string
+          instructions: string
+          is_active?: boolean
+          mission_order?: number | null
+          points_reward?: number
+          time_limit_minutes?: number | null
+          title: string
+          updated_at?: string
+          video_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          difficulty_level?: string
+          evaluation_criteria?: Json | null
+          evidence_type?: string
+          id?: string
+          instructions?: string
+          is_active?: boolean
+          mission_order?: number | null
+          points_reward?: number
+          time_limit_minutes?: number | null
+          title?: string
+          updated_at?: string
+          video_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_achievements: {
+        Row: {
+          average_score: number | null
+          badges: Json | null
+          created_at: string
+          current_streak: number
+          id: string
+          last_activity_at: string | null
+          level: number
+          longest_streak: number
+          missions_attempted: number
+          missions_completed: number
+          student_id: string
+          total_points: number
+          updated_at: string
+        }
+        Insert: {
+          average_score?: number | null
+          badges?: Json | null
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_activity_at?: string | null
+          level?: number
+          longest_streak?: number
+          missions_attempted?: number
+          missions_completed?: number
+          student_id: string
+          total_points?: number
+          updated_at?: string
+        }
+        Update: {
+          average_score?: number | null
+          badges?: Json | null
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_activity_at?: string | null
+          level?: number
+          longest_streak?: number
+          missions_attempted?: number
+          missions_completed?: number
+          student_id?: string
+          total_points?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       student_lesson_progress: {
         Row: {
           completed_at: string | null
@@ -54,6 +161,65 @@ export type Database = {
             columns: ["video_id"]
             isOneToOne: false
             referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_mission_submissions: {
+        Row: {
+          ai_evaluation: Json | null
+          ai_feedback: string | null
+          attempt_number: number
+          created_at: string
+          evaluated_at: string | null
+          evidence_text: string | null
+          evidence_url: string | null
+          id: string
+          mission_id: string
+          score: number | null
+          status: string
+          student_id: string
+          submitted_at: string
+          updated_at: string
+        }
+        Insert: {
+          ai_evaluation?: Json | null
+          ai_feedback?: string | null
+          attempt_number?: number
+          created_at?: string
+          evaluated_at?: string | null
+          evidence_text?: string | null
+          evidence_url?: string | null
+          id?: string
+          mission_id: string
+          score?: number | null
+          status?: string
+          student_id: string
+          submitted_at?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_evaluation?: Json | null
+          ai_feedback?: string | null
+          attempt_number?: number
+          created_at?: string
+          evaluated_at?: string | null
+          evidence_text?: string | null
+          evidence_url?: string | null
+          id?: string
+          mission_id?: string
+          score?: number | null
+          status?: string
+          student_id?: string
+          submitted_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_mission_submissions_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
             referencedColumns: ["id"]
           },
         ]
