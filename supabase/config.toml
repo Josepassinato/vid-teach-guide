@@ -17,3 +17,12 @@ verify_jwt = false
 
 [functions.content-manager]
 verify_jwt = false
+
+[functions.agent-evaluator]
+verify_jwt = false
+
+[functions.agent-feedback]
+verify_jwt = false
+
+[functions.agent-achievements]
+verify_jwt = false
