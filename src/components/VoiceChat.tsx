@@ -815,7 +815,7 @@ INSTRUÇÕES:
   // Calculate time remaining until next pause
   const timeUntilNextPause = nextPauseInfo ? Math.max(0, nextPauseInfo.time - currentVideoTime) : null;
 
-  const getStatusColor = () => {
+  const statusColor = useMemo(() => {
     if (agentMode === 'playing' && status === 'disconnected') return 'bg-google-blue';
     switch (status) {
       case 'connected': return 'bg-google-green';
@@ -823,9 +823,9 @@ INSTRUÇÕES:
       case 'error': return 'bg-google-red';
       default: return 'bg-muted';
     }
-  };
+  }, [status, agentMode]);
 
-  const getStatusText = () => {
+  const statusText = useMemo(() => {
     if (agentMode === 'playing' && status === 'disconnected') return '▶️ Assistindo';
     if (agentMode === 'intro') return '👋 Introdução';
     if (agentMode === 'teaching') return '🎓 Ensinando';
@@ -835,7 +835,7 @@ INSTRUÇÕES:
       case 'error': return 'Erro de conexão';
       default: return 'Aguardando';
     }
-  };
+  }, [status, agentMode]);
 
   return (
     <>
@@ -849,7 +849,7 @@ INSTRUÇÕES:
         <CardHeader className="py-2 px-3 sm:px-6 flex-shrink-0 bg-card/95 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+            <div className={`w-2 h-2 rounded-full ${statusColor}`} />
               <span className="text-sm font-medium truncate max-w-[200px]">{videoTitle}</span>
             </div>
             <div className="flex items-center gap-2">
@@ -875,7 +875,7 @@ INSTRUÇÕES:
         <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+              <div className={`w-2 h-2 rounded-full ${statusColor}`} />
               Professor IA
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -897,7 +897,7 @@ INSTRUÇÕES:
                   Analisando...
                 </Badge>
               )}
-              <span className="text-[10px] sm:text-xs text-muted-foreground">{getStatusText()}</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">{statusText}</span>
             </div>
           </div>
         </CardHeader>
