@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Users, Clock, BookOpen, CheckCircle, Settings, Play, Pause, Target, Lightbulb, Loader2, Sparkles, HelpCircle, GripVertical, ArrowUp, ArrowDown, Unlock, ListOrdered } from 'lucide-react';
 import { QuizEditor } from '@/components/QuizEditor';
+import { MissionsAdmin } from '@/components/MissionsAdmin';
 import { Switch } from '@/components/ui/switch';
 
 interface TeachingMoment {
@@ -54,6 +55,7 @@ export default function Admin() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isGeneratingMoments, setIsGeneratingMoments] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
+  const [adminSection, setAdminSection] = useState<'lessons' | 'missions'>('lessons');
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   
   // Form states for new lesson
@@ -434,19 +436,25 @@ export default function Admin() {
               <BookOpen className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Gerenciador de Aulas</h1>
-              <p className="text-xs text-muted-foreground">{lessons.length} aulas cadastradas</p>
+              <h1 className="text-xl font-bold">Painel Administrativo</h1>
+              <p className="text-xs text-muted-foreground">
+                {adminSection === 'lessons' ? `${lessons.length} aulas` : 'Gerenciar missões'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setIsOrderDialogOpen(true)}>
-              <ListOrdered className="h-4 w-4 mr-2" />
-              Organizar Aulas
-            </Button>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Aula
-            </Button>
+            {adminSection === 'lessons' && (
+              <>
+                <Button variant="outline" onClick={() => setIsOrderDialogOpen(true)}>
+                  <ListOrdered className="h-4 w-4 mr-2" />
+                  Organizar Aulas
+                </Button>
+                <Button onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Aula
+                </Button>
+              </>
+            )}
             <Button variant="outline" onClick={() => navigate('/aluno')}>
               <Users className="h-4 w-4 mr-2" />
               Painel do Aluno
@@ -457,11 +465,39 @@ export default function Admin() {
             </Button>
           </div>
         </div>
+        
+        {/* Section Tabs */}
+        <div className="container mx-auto px-4 border-t">
+          <div className="flex gap-1">
+            <Button
+              variant={adminSection === 'lessons' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none rounded-t-lg mt-1"
+              onClick={() => setAdminSection('lessons')}
+            >
+              <Video className="h-4 w-4 mr-2" />
+              Aulas
+            </Button>
+            <Button
+              variant={adminSection === 'missions' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none rounded-t-lg mt-1"
+              onClick={() => setAdminSection('missions')}
+            >
+              <Target className="h-4 w-4 mr-2" />
+              Missões
+            </Button>
+          </div>
+        </div>
       </header>
 
-      {/* Main Content - Lesson Gallery */}
+      {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
-        {lessons.length === 0 ? (
+        {adminSection === 'missions' ? (
+          <MissionsAdmin />
+        ) : (
+          <>
+            {lessons.length === 0 ? (
           <Card className="p-12 text-center">
             <Video className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
             <h2 className="text-xl font-semibold mb-2">Nenhuma aula cadastrada</h2>
@@ -558,6 +594,8 @@ export default function Admin() {
               </Card>
             ))}
           </div>
+        )}
+          </>
         )}
       </main>
 
