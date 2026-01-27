@@ -7,11 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
+import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
 import { ProcessingIndicator } from './ProcessingIndicator';
 import { MiniQuiz } from './MiniQuiz';
 import { LessonEndScreen } from './LessonEndScreen';
+import { EngagementPanel } from './EngagementPanel';
+import { VisionConsentDialog } from './VisionConsentDialog';
 import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
@@ -51,6 +54,7 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
   const [lessonEndData, setLessonEndData] = useState<{ weeklyTask?: string; summaryPoints?: string[] }>({});
+  const [showVisionConsent, setShowVisionConsent] = useState(false);
   const videoPlayerRef = useRef<VideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
@@ -101,6 +105,22 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
     markQuizTriggered,
     recordAttempt,
   } = useTimestampQuizzes({ videoId: videoDbId, studentId });
+
+  // Engagement detection system (Audio + Behavioral + Vision opt-in)
+  // Note: The intervention handler will be set up after useGeminiLive is initialized
+  const engagementInterventionHandlerRef = useRef<((reason: InterventionReason) => void) | null>(null);
+  
+  const engagement = useEngagementDetection({
+    enabled: true,
+    onInterventionTriggered: (reason) => {
+      // Use ref to avoid stale closure
+      engagementInterventionHandlerRef.current?.(reason);
+    },
+    config: {
+      attentionThreshold: 0.4,
+      attentionDurationMs: 4000,
+    },
+  });
 
   // Load pre-configured moments or analyze content when video changes
   useEffect(() => {
@@ -351,6 +371,95 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     sendTextRef.current = sendText;
     statusRef.current = status;
   }, [sendText, status]);
+
+  // Set up engagement intervention handler after status and connect are available
+  useEffect(() => {
+    engagementInterventionHandlerRef.current = (reason: InterventionReason) => {
+      console.log('[VoiceChat] Intervention triggered:', reason);
+      
+      // Only intervene when video is playing and agent is not connected
+      if (agentMode !== 'playing' || statusRef.current === 'connected') {
+        console.log('[VoiceChat] Intervention skipped - not in playing mode or agent connected');
+        return;
+      }
+
+      switch (reason.type) {
+        case 'low_attention':
+          // Pause video and ask check-in question
+          videoPlayerRef.current?.pause();
+          setAgentMode('teaching');
+          setIsVideoExpanded(false);
+          setPendingReconnect({ 
+            type: 'moment', 
+            data: { 
+              topic: 'Verificação de atenção',
+              key_insight: 'Parece que você se distraiu. Vamos retomar?',
+              questions_to_ask: ['Está conseguindo acompanhar?', 'Quer que eu repita algo?'],
+              discussion_points: [],
+              timestamp_seconds: currentVideoTime,
+            } as TeachingMoment 
+          });
+          connect();
+          toast.info('🎯 O professor notou que você se distraiu...', { duration: 3000 });
+          break;
+
+        case 'tab_switch':
+          // Just pause the video silently
+          videoPlayerRef.current?.pause();
+          toast.info('⏸️ Vídeo pausado - você saiu da aba', { duration: 2000 });
+          break;
+
+        case 'high_confusion':
+          // Pause and offer help
+          videoPlayerRef.current?.pause();
+          setAgentMode('teaching');
+          setIsVideoExpanded(false);
+          setPendingReconnect({ 
+            type: 'moment', 
+            data: { 
+              topic: 'Momento de dúvida',
+              key_insight: 'Percebi que você pode estar com dúvidas. Vamos esclarecer!',
+              questions_to_ask: ['O que não ficou claro?', 'Quer que eu explique de outra forma?'],
+              discussion_points: [],
+              timestamp_seconds: currentVideoTime,
+            } as TeachingMoment 
+          });
+          connect();
+          toast.info('💡 O professor quer te ajudar com uma dúvida...', { duration: 3000 });
+          break;
+
+        case 'fatigue':
+          toast.info('😴 Você parece cansado. Que tal uma pausa?', { duration: 5000 });
+          break;
+
+        default:
+          console.log('[VoiceChat] Unhandled intervention type:', reason.type);
+      }
+    };
+  }, [agentMode, currentVideoTime, connect]);
+
+  // Feed audio signals from transcripts
+  useEffect(() => {
+    // Analyze transcripts for engagement signals
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      engagement.audio.analyzeTranscript(lastMessage.text, lastMessage.role);
+    }
+  }, [messages, engagement.audio]);
+
+  // Track voice detection for engagement
+  useEffect(() => {
+    if (isVoiceDetected) {
+      engagement.audio.onUserSpeechStart();
+    }
+  }, [isVoiceDetected, engagement.audio]);
+
+  // Track agent speaking for engagement
+  useEffect(() => {
+    if (!isSpeaking) {
+      engagement.audio.onAgentSpeechEnd();
+    }
+  }, [isSpeaking, engagement.audio]);
 
   // Handle agent connection events - process pending actions
   useEffect(() => {
@@ -1210,6 +1319,17 @@ INSTRUÇÕES:
         lastCheckedMomentRef.current = -1;
         videoPlayerRef.current?.restart();
       }}
+    />
+    
+    {/* Vision Consent Dialog */}
+    <VisionConsentDialog
+      isOpen={showVisionConsent}
+      onGrantConsent={() => {
+        engagement.vision.grantConsent();
+        engagement.vision.enableVision();
+        setShowVisionConsent(false);
+      }}
+      onDeny={() => setShowVisionConsent(false)}
     />
     </>
   );
