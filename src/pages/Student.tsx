@@ -270,11 +270,11 @@ const Student = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-background"
+                  className="h-11 w-11 sm:h-8 sm:w-8 rounded-full hover:bg-background"
                   onClick={goToPreviousLesson}
                   disabled={currentLessonIndex === 0}
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-5 w-5 sm:h-4 sm:w-4" />
                 </Button>
                 <span className="text-xs font-medium px-2">
                   {currentLessonIndex + 1}/{savedVideos.length}
@@ -282,11 +282,11 @@ const Student = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-background"
+                  className="h-11 w-11 sm:h-8 sm:w-8 rounded-full hover:bg-background"
                   onClick={goToNextLesson}
                   disabled={currentLessonIndex === savedVideos.length - 1}
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-5 w-5 sm:h-4 sm:w-4" />
                 </Button>
               </div>
             )}
@@ -294,11 +294,11 @@ const Student = () => {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-9 w-9 rounded-full" 
+              className="h-11 w-11 sm:h-9 sm:w-9 rounded-full" 
               asChild
             >
               <Link to="/aluno/dashboard">
-                <BarChart3 className="h-4 w-4" />
+                <BarChart3 className="h-5 w-5 sm:h-4 sm:w-4" />
               </Link>
             </Button>
             

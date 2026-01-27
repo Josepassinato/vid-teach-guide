@@ -9,6 +9,7 @@ import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
+import { ProcessingIndicator } from './ProcessingIndicator';
 import { MiniQuiz } from './MiniQuiz';
 import { LessonEndScreen } from './LessonEndScreen';
 import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
@@ -1097,12 +1098,12 @@ INSTRUÇÕES:
         <div className="space-y-2 sm:space-y-3 pt-2 border-t flex-shrink-0">
           <div className="flex gap-2">
             {status === 'disconnected' && agentMode !== 'playing' ? (
-              <Button onClick={handleStartClass} className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
-                <Phone className="h-4 w-4 mr-2" />
+              <Button onClick={handleStartClass} className="flex-1 h-12 sm:h-11 text-sm sm:text-base">
+                <Phone className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
                 Iniciar Aula
               </Button>
             ) : status === 'connecting' ? (
-              <Button disabled className="flex-1 h-10 sm:h-11 text-sm sm:text-base">
+              <Button disabled className="flex-1 h-12 sm:h-11 text-sm sm:text-base">
                 Conectando...
               </Button>
             ) : agentMode === 'intro' && status === 'connected' ? (
@@ -1145,30 +1146,41 @@ INSTRUÇÕES:
             ) : status === 'connected' ? (
               <>
                 {/* Connected and teaching */}
-                <div className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-11 bg-primary/10 rounded-md px-3">
+                <div className="flex-1 flex items-center justify-center gap-2 h-12 sm:h-11 bg-primary/10 rounded-md px-3">
                   {isListening ? (
-                    <>
-                      <div className={`w-2 h-2 rounded-full ${isVoiceDetected ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/50'}`} />
-                      <span className={`text-sm ${isVoiceDetected ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-                        {isVoiceDetected ? 'Voz detectada' : 'Ouvindo...'}
-                      </span>
-                      <VoiceIndicator isActive={true} type="listening" isVoiceDetected={isVoiceDetected} />
-                    </>
+                    isSpeaking ? (
+                      <>
+                        <div className="w-2 h-2 bg-google-blue rounded-full animate-pulse" />
+                        <span className="text-sm text-primary">Professor falando...</span>
+                        <VoiceIndicator isActive={true} type="speaking" />
+                      </>
+                    ) : isVoiceDetected ? (
+                      <>
+                        <div className="w-2 h-2 bg-google-green rounded-full animate-pulse" />
+                        <span className="text-sm text-google-green">Voz detectada</span>
+                        <VoiceIndicator isActive={true} type="listening" isVoiceDetected={true} />
+                      </>
+                    ) : (
+                      <>
+                        <ProcessingIndicator size="sm" />
+                        <span className="text-sm text-google-yellow">Processando...</span>
+                      </>
+                    )
                   ) : isSpeaking ? (
                     <>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                      <div className="w-2 h-2 bg-google-blue rounded-full animate-pulse" />
                       <span className="text-sm text-primary">Professor falando...</span>
                       <VoiceIndicator isActive={true} type="speaking" />
                     </>
                   ) : (
                     <>
-                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      <div className="w-2 h-2 bg-google-green rounded-full" />
                       <span className="text-sm text-muted-foreground">Momento de aprendizado</span>
                     </>
                   )}
                 </div>
-                <Button onClick={disconnect} variant="destructive" className="h-10 sm:h-11 px-4">
-                  <PhoneOff className="h-4 w-4 mr-2" />
+                <Button onClick={disconnect} variant="destructive" className="h-12 sm:h-11 px-4">
+                  <PhoneOff className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
                   <span className="hidden sm:inline">Encerrar</span>
                 </Button>
               </>

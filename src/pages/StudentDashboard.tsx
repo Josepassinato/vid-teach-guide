@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { 
   GraduationCap, 
   Trophy, 
@@ -21,6 +22,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
 
 interface QuizResult {
   id: string;
@@ -155,6 +157,37 @@ const StudentDashboard = () => {
     ? Math.round((stats.passedQuizzes / stats.totalQuizzes) * 100)
     : 0;
 
+  // Chart data
+  const quizScoresData = quizResults.slice(0, 10).map((q, index) => ({
+    name: `Aula ${getVideoOrder(q.video_id)}`,
+    score: q.score_percentage,
+    passed: q.passed,
+  })).reverse();
+
+  const pieData = [
+    { name: 'Aprovados', value: stats.passedQuizzes, color: 'hsl(var(--google-green))' },
+    { name: 'Reprovados', value: stats.totalQuizzes - stats.passedQuizzes, color: 'hsl(var(--google-red))' },
+  ].filter(d => d.value > 0);
+
+  const progressData = lessonProgress
+    .filter(p => p.completed_at)
+    .map((p, index) => ({
+      date: new Date(p.completed_at!).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      completed: index + 1,
+    }));
+
+  // Chart configuration
+  const chartConfig = {
+    score: {
+      label: 'Nota',
+      color: 'hsl(var(--primary))',
+    },
+    completed: {
+      label: 'Aulas Concluídas',
+      color: 'hsl(var(--google-blue))',
+    },
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -192,7 +225,7 @@ const StudentDashboard = () => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" asChild>
+              <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-10 sm:w-10" asChild>
                 <Link to="/aluno">
                   <ArrowLeft className="h-5 w-5" />
                 </Link>
@@ -238,14 +271,14 @@ const StudentDashboard = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Target className="h-4 w-4 text-orange-500" />
+                <Target className="h-4 w-4 text-google-yellow" />
                 Média dos Quizzes
               </CardTitle>
             </CardHeader>
             <CardContent>
               <span className={cn(
                 "text-3xl font-bold",
-                stats.averageScore >= 70 ? "text-green-600" : "text-red-500"
+                stats.averageScore >= 70 ? "text-google-green" : "text-google-red"
               )}>
                 {stats.averageScore}%
               </span>
@@ -259,7 +292,7 @@ const StudentDashboard = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-500" />
+                <Clock className="h-4 w-4 text-google-blue" />
                 Tempo de Estudo
               </CardTitle>
             </CardHeader>
@@ -274,13 +307,139 @@ const StudentDashboard = () => {
           </Card>
         </div>
 
+        {/* Charts Row */}
+        {stats.totalQuizzes > 0 && (
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Quiz Scores Bar Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  Notas por Aula
+                </CardTitle>
+                <CardDescription>Desempenho nos quizzes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={chartConfig} className="h-[200px]">
+                  <BarChart data={quizScoresData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{ fontSize: 10 }} 
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      domain={[0, 100]} 
+                      tick={{ fontSize: 10 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar 
+                      dataKey="score" 
+                      radius={[4, 4, 0, 0]}
+                      fill="hsl(var(--primary))"
+                    />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Pie Chart - Pass Rate */}
+            {pieData.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Trophy className="h-5 w-5 text-google-yellow" />
+                    Taxa de Aprovação
+                  </CardTitle>
+                  <CardDescription>{quizPassRate}% de aprovação</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[200px] flex items-center justify-center">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ name, value }) => `${name}: ${value}`}
+                          labelLine={false}
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex justify-center gap-4 mt-2">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <div className="w-3 h-3 rounded bg-google-green" />
+                      <span>Aprovados ({stats.passedQuizzes})</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <div className="w-3 h-3 rounded bg-google-red" />
+                      <span>Reprovados ({stats.totalQuizzes - stats.passedQuizzes})</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Progress Over Time */}
+        {progressData.length > 1 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="h-5 w-5 text-google-green" />
+                Progresso ao Longo do Tempo
+              </CardTitle>
+              <CardDescription>Aulas concluídas por data</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={chartConfig} className="h-[200px]">
+                <LineChart data={progressData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 10 }} 
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="completed" 
+                    stroke="hsl(var(--google-blue))"
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--google-blue))' }}
+                  />
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Performance Summary */}
         <div className="grid md:grid-cols-2 gap-4">
           {/* Quiz Performance */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-yellow-500" />
+                <Trophy className="h-5 w-5 text-google-yellow" />
                 Desempenho nos Quizzes
               </CardTitle>
               <CardDescription>
@@ -290,20 +449,20 @@ const StudentDashboard = () => {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <span className="text-sm">Taxa de Aprovação</span>
-                <Badge variant={quizPassRate >= 70 ? "default" : "destructive"}>
+                <Badge variant={quizPassRate >= 70 ? "success" : "error"}>
                   {quizPassRate}%
                 </Badge>
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-green-500/10 rounded-lg text-center">
-                  <CheckCircle className="h-6 w-6 text-green-600 mx-auto mb-1" />
-                  <p className="text-2xl font-bold text-green-600">{stats.passedQuizzes}</p>
+                <div className="p-3 bg-google-green/10 rounded-lg text-center">
+                  <CheckCircle className="h-6 w-6 text-google-green mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-google-green">{stats.passedQuizzes}</p>
                   <p className="text-xs text-muted-foreground">Aprovados</p>
                 </div>
-                <div className="p-3 bg-red-500/10 rounded-lg text-center">
-                  <XCircle className="h-6 w-6 text-red-500 mx-auto mb-1" />
-                  <p className="text-2xl font-bold text-red-500">
+                <div className="p-3 bg-google-red/10 rounded-lg text-center">
+                  <XCircle className="h-6 w-6 text-google-red mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-google-red">
                     {stats.totalQuizzes - stats.passedQuizzes}
                   </p>
                   <p className="text-xs text-muted-foreground">Reprovados</p>
@@ -313,7 +472,7 @@ const StudentDashboard = () => {
               {stats.totalQuizzes > 0 && (
                 <div className="flex justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
+                    <TrendingUp className="h-4 w-4 text-google-green" />
                     <span>Melhor: <strong>{stats.bestScore}%</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -328,7 +487,7 @@ const StudentDashboard = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-purple-500" />
+                <Award className="h-5 w-5 text-primary" />
                 Progresso por Aula
               </CardTitle>
               <CardDescription>
@@ -347,12 +506,12 @@ const StudentDashboard = () => {
                       key={video.id}
                       className={cn(
                         "flex items-center gap-3 p-2 rounded-lg border",
-                        isCompleted ? "bg-green-500/5 border-green-500/30" : "bg-muted/30"
+                        isCompleted ? "bg-google-green/5 border-google-green/30" : "bg-muted/30"
                       )}
                     >
                       <div className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-                        isCompleted ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
+                        isCompleted ? "bg-google-green text-white" : "bg-muted text-muted-foreground"
                       )}>
                         {isCompleted ? <CheckCircle className="h-4 w-4" /> : video.lesson_order}
                       </div>
@@ -361,7 +520,7 @@ const StudentDashboard = () => {
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           {quiz && (
                             <Badge 
-                              variant={quiz.passed ? "default" : "destructive"} 
+                              variant={quiz.passed ? "success" : "error"} 
                               className="text-[10px] h-4"
                             >
                               Quiz: {quiz.score_percentage}%
@@ -405,18 +564,18 @@ const StudentDashboard = () => {
                     key={result.id}
                     className={cn(
                       "flex items-center justify-between p-3 rounded-lg border",
-                      result.passed ? "bg-green-500/5 border-green-500/30" : "bg-red-500/5 border-red-500/30"
+                      result.passed ? "bg-google-green/5 border-google-green/30" : "bg-google-red/5 border-google-red/30"
                     )}
                   >
                     <div className="flex items-center gap-3">
                       <div className={cn(
                         "w-10 h-10 rounded-full flex items-center justify-center",
-                        result.passed ? "bg-green-500/20" : "bg-red-500/20"
+                        result.passed ? "bg-google-green/20" : "bg-google-red/20"
                       )}>
                         {result.passed ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <CheckCircle className="h-5 w-5 text-google-green" />
                         ) : (
-                          <XCircle className="h-5 w-5 text-red-500" />
+                          <XCircle className="h-5 w-5 text-google-red" />
                         )}
                       </div>
                       <div>
@@ -431,7 +590,7 @@ const StudentDashboard = () => {
                     <div className="text-right">
                       <p className={cn(
                         "text-lg font-bold",
-                        result.passed ? "text-green-600" : "text-red-500"
+                        result.passed ? "text-google-green" : "text-google-red"
                       )}>
                         {result.score_percentage}%
                       </p>
@@ -448,7 +607,7 @@ const StudentDashboard = () => {
 
         {/* Back to Classroom */}
         <div className="text-center pt-4">
-          <Button asChild size="lg">
+          <Button asChild size="lg" className="h-12 sm:h-11">
             <Link to="/aluno">
               <GraduationCap className="h-5 w-5 mr-2" />
               Voltar para Sala de Aula
