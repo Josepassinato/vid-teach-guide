@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { VisionSignals } from './types';
+import { useMediaPipeFace, FaceDetectionResult } from './useMediaPipeFace';
 
 interface UseVisionSignalsOptions {
   onSignalsUpdate?: (signals: VisionSignals) => void;
@@ -25,10 +26,7 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const detectionIntervalRef = useRef<number | null>(null);
   const optionsRef = useRef(options);
 
   // Track time looking at screen vs away for ratio calculation
@@ -36,11 +34,73 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
     onScreenTime: 0,
     totalTime: 0,
     lastUpdate: Date.now(),
+    detectionCount: 0,
+    onScreenCount: 0,
   });
 
   useEffect(() => {
     optionsRef.current = options;
   }, [options]);
+
+  // Handle MediaPipe detection results
+  const handleDetection = useCallback((result: FaceDetectionResult) => {
+    const now = Date.now();
+    const deltaTime = now - gazeTrackingRef.current.lastUpdate;
+    gazeTrackingRef.current.lastUpdate = now;
+    gazeTrackingRef.current.totalTime += deltaTime;
+    gazeTrackingRef.current.detectionCount++;
+
+    if (result.faceDetected && result.isLookingAtScreen) {
+      gazeTrackingRef.current.onScreenTime += deltaTime;
+      gazeTrackingRef.current.onScreenCount++;
+    }
+
+    const gazeRatio = gazeTrackingRef.current.detectionCount > 0
+      ? gazeTrackingRef.current.onScreenCount / gazeTrackingRef.current.detectionCount
+      : 0;
+
+    // Estimate expression based on head pose (simplified)
+    let expression: VisionSignals['expression'] = 'neutral';
+    if (result.headPose) {
+      const { pitch, yaw } = result.headPose;
+      // Tilted head down with furrowed brow = confused
+      if (pitch > 15) expression = 'confused';
+      // Looking away frequently = distracted/tired
+      if (Math.abs(yaw) > 30) expression = 'tired';
+    }
+
+    // Estimate distance from face size (larger face = closer)
+    let distanceFromScreen = 1;
+    if (result.landmarks) {
+      const faceWidth = Math.abs(
+        (result.landmarks[454]?.[0] ?? 0) - (result.landmarks[234]?.[0] ?? 0)
+      );
+      // Normalize: 0.3 = close, 0.15 = normal, 0.08 = far
+      distanceFromScreen = Math.max(0.3, Math.min(1.5, 0.15 / Math.max(faceWidth, 0.01)));
+    }
+
+    setSignals(prev => {
+      const updated: VisionSignals = {
+        ...prev,
+        enabled: true,
+        faceDetected: result.faceDetected,
+        gazeDirection: result.gazeDirection,
+        gazeOnVideoRatio: gazeRatio,
+        isLookingAtScreen: result.isLookingAtScreen,
+        expression,
+        blinkRate: result.eyeAspectRatio > 0 ? Math.round(15 / result.eyeAspectRatio) : 15,
+        distanceFromScreen,
+      };
+      optionsRef.current.onSignalsUpdate?.(updated);
+      return updated;
+    });
+  }, []);
+
+  // MediaPipe Face hook
+  const mediaPipe = useMediaPipeFace({
+    onDetection: handleDetection,
+    detectionIntervalMs: 200, // 5 FPS for balance of accuracy and performance
+  });
 
   // Cleanup on unmount
   useEffect(() => {
@@ -48,11 +108,9 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-      if (detectionIntervalRef.current) {
-        clearInterval(detectionIntervalRef.current);
-      }
+      mediaPipe.stop();
     };
-  }, []);
+  }, [mediaPipe]);
 
   // Request camera access and enable vision
   const enableVision = useCallback(async () => {
@@ -76,26 +134,15 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
 
       streamRef.current = stream;
 
-      // Create video element for processing
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.setAttribute('playsinline', 'true');
-      await video.play();
-      videoRef.current = video;
-
-      // Create canvas for analysis
-      const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
-      canvasRef.current = canvas;
+      // Start MediaPipe detection
+      const started = await mediaPipe.start(stream);
+      if (!started) {
+        throw new Error('Failed to start face detection');
+      }
 
       setIsEnabled(true);
       setSignals(prev => ({ ...prev, enabled: true }));
-
-      // Start detection loop
-      // Note: In a full implementation, this would use TensorFlow.js or MediaPipe
-      // For now, we'll use a simplified detection based on available browser APIs
-      startDetectionLoop();
+      console.log('[VisionSignals] Enabled with MediaPipe');
 
       return true;
     } catch (err) {
@@ -106,26 +153,21 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [hasConsent]);
+  }, [hasConsent, mediaPipe]);
 
   // Disable vision and cleanup
   const disableVision = useCallback(() => {
+    mediaPipe.stop();
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
 
-    if (detectionIntervalRef.current) {
-      clearInterval(detectionIntervalRef.current);
-      detectionIntervalRef.current = null;
-    }
-
-    videoRef.current = null;
-    canvasRef.current = null;
-    
     setIsEnabled(false);
     setSignals(DEFAULT_VISION_SIGNALS);
-  }, []);
+    console.log('[VisionSignals] Disabled');
+  }, [mediaPipe]);
 
   // Grant consent for vision
   const grantConsent = useCallback(() => {
@@ -148,77 +190,16 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
     }
   }, []);
 
-  // Simplified detection loop
-  // In production, integrate TensorFlow.js face-landmarks-detection or MediaPipe
-  const startDetectionLoop = useCallback(() => {
-    if (detectionIntervalRef.current) {
-      clearInterval(detectionIntervalRef.current);
-    }
-
-    // For MVP: simulate basic detection
-    // Real implementation would use:
-    // - @tensorflow-models/face-landmarks-detection for face/gaze
-    // - @mediapipe/face_mesh for expressions
-    detectionIntervalRef.current = window.setInterval(() => {
-      if (!videoRef.current || !canvasRef.current) return;
-
-      const now = Date.now();
-      const deltaTime = now - gazeTrackingRef.current.lastUpdate;
-      gazeTrackingRef.current.lastUpdate = now;
-      gazeTrackingRef.current.totalTime += deltaTime;
-
-      // Simulated detection (placeholder for real ML inference)
-      // In real implementation:
-      // 1. Draw video frame to canvas
-      // 2. Run face detection model
-      // 3. Analyze landmarks for gaze direction
-      // 4. Classify expression from facial landmarks
-      
-      const ctx = canvasRef.current.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, 640, 480);
-        
-        // Placeholder: In real implementation, analyze the frame
-        // For now, we'll set reasonable defaults that indicate face is detected
-        const simulatedFaceDetected = true;
-        const simulatedOnScreen = Math.random() > 0.1; // 90% on screen
-
-        if (simulatedOnScreen) {
-          gazeTrackingRef.current.onScreenTime += deltaTime;
-        }
-
-        const gazeRatio = gazeTrackingRef.current.totalTime > 0
-          ? gazeTrackingRef.current.onScreenTime / gazeTrackingRef.current.totalTime
-          : 1;
-
-        setSignals(prev => {
-          const updated: VisionSignals = {
-            ...prev,
-            enabled: true,
-            faceDetected: simulatedFaceDetected,
-            gazeDirection: simulatedOnScreen ? 'on-screen' : 'off-screen',
-            gazeOnVideoRatio: gazeRatio,
-            isLookingAtScreen: simulatedOnScreen,
-            // These would come from real ML inference:
-            expression: 'neutral',
-            blinkRate: 15, // Normal is 15-20 per minute
-            distanceFromScreen: 1,
-          };
-          optionsRef.current.onSignalsUpdate?.(updated);
-          return updated;
-        });
-      }
-    }, 500); // 2 FPS for detection (balance between accuracy and performance)
-  }, []);
-
   // Reset signals for new session
   const resetSignals = useCallback(() => {
     gazeTrackingRef.current = {
       onScreenTime: 0,
       totalTime: 0,
       lastUpdate: Date.now(),
+      detectionCount: 0,
+      onScreenCount: 0,
     };
-    
+
     if (isEnabled) {
       setSignals(prev => ({
         ...prev,
@@ -233,8 +214,8 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
     signals,
     isEnabled,
     hasConsent,
-    isLoading,
-    error,
+    isLoading: isLoading || mediaPipe.isRunning && !mediaPipe.isLoaded,
+    error: error || mediaPipe.error,
     enableVision,
     disableVision,
     grantConsent,
