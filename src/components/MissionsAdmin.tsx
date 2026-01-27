@@ -56,6 +56,7 @@ export function MissionsAdmin() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [filterVideoId, setFilterVideoId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -292,7 +293,7 @@ export function MissionsAdmin() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Target className="w-6 h-6 text-primary" />
@@ -300,14 +301,40 @@ export function MissionsAdmin() {
           </h2>
           <p className="text-muted-foreground">{missions.length} missões cadastradas</p>
         </div>
-        <Button onClick={openCreateDialog}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Missão
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select 
+            value={filterVideoId || 'all'} 
+            onValueChange={(val) => setFilterVideoId(val === 'all' ? null : val)}
+          >
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filtrar por aula" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as aulas</SelectItem>
+              <SelectItem value="general">Geral (sem vídeo)</SelectItem>
+              {videos.map(video => (
+                <SelectItem key={video.id} value={video.id}>
+                  Aula {video.lesson_order}: {video.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={openCreateDialog}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Missão
+          </Button>
+        </div>
       </div>
 
       {/* Missions Grid */}
-      {missions.length === 0 ? (
+      {(() => {
+        const filteredMissions = missions.filter(m => {
+          if (!filterVideoId) return true;
+          if (filterVideoId === 'general') return !m.video_id;
+          return m.video_id === filterVideoId;
+        });
+        
+        return filteredMissions.length === 0 ? (
         <Card className="p-12 text-center">
           <Target className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
           <h3 className="text-xl font-semibold mb-2">Nenhuma missão cadastrada</h3>
@@ -319,7 +346,7 @@ export function MissionsAdmin() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {missions.map((mission) => {
+          {filteredMissions.map((mission) => {
             const diffConfig = DIFFICULTY_LEVELS.find(d => d.value === mission.difficulty_level);
             const EvidenceIcon = EVIDENCE_TYPES.find(e => e.value === mission.evidence_type)?.icon || FileText;
 
@@ -413,7 +440,8 @@ export function MissionsAdmin() {
             );
           })}
         </div>
-      )}
+        );
+      })()}
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) resetForm(); }}>
