@@ -1203,6 +1203,24 @@ INSTRUÇÕES:
           </div>
         )}
         
+        {/* Engagement Panel - shows attention metrics */}
+        <EngagementPanel
+          stateVector={engagement.stateVector}
+          visionEnabled={engagement.vision.isEnabled}
+          visionConsent={engagement.vision.hasConsent}
+          onToggleVision={() => {
+            if (engagement.vision.isEnabled) {
+              engagement.vision.disableVision();
+            } else if (engagement.vision.hasConsent) {
+              engagement.vision.enableVision();
+            } else {
+              setShowVisionConsent(true);
+            }
+          }}
+          isInterventionTriggered={engagement.isInterventionTriggered}
+          className="flex-shrink-0"
+        />
+        
         {/* Controls */}
         <div className="space-y-2 sm:space-y-3 pt-2 border-t flex-shrink-0">
           <div className="flex gap-2">

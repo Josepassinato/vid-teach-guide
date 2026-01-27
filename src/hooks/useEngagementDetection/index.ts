@@ -12,6 +12,8 @@ export { useAudioSignals } from './useAudioSignals';
 export { useBehavioralSignals } from './useBehavioralSignals';
 export { useVisionSignals } from './useVisionSignals';
 export { useStateVector } from './useStateVector';
+export { useMediaPipeFace } from './useMediaPipeFace';
+export type { FaceDetectionResult } from './useMediaPipeFace';
 
 interface UseEngagementDetectionOptions {
   enabled?: boolean;
