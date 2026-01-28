@@ -205,6 +205,15 @@ const Student = () => {
     }
   };
 
+  const handleVideoEnded = useCallback(async () => {
+    const currentVideo = savedVideos[currentLessonIndex];
+    if (currentVideo) {
+      console.log('[Student] Video ended, saving progress for:', currentVideo.id);
+      await markLessonComplete(currentVideo.id);
+      refreshProgress();
+    }
+  }, [savedVideos, currentLessonIndex, markLessonComplete, refreshProgress]);
+
   const handleQuizComplete = async (passed: boolean) => {
     if (passed) {
       await handleMarkComplete();
@@ -452,6 +461,7 @@ const Student = () => {
                     setShowMissions(true);
                     setMobileTab('missions');
                   }}
+                  onVideoEnded={handleVideoEnded}
                 />
               </div>
 
