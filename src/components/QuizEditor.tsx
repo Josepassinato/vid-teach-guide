@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Clock, HelpCircle, Check, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Clock, HelpCircle, Check, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Quiz {
@@ -19,15 +19,26 @@ interface Quiz {
   question_order: number;
 }
 
+interface TeachingMoment {
+  timestamp_seconds: number;
+  topic: string;
+  key_insight: string;
+}
+
 interface QuizEditorProps {
   videoId: string;
   password: string;
+  transcript?: string;
+  title?: string;
+  videoDurationMinutes?: number;
+  teachingMoments?: TeachingMoment[];
 }
 
-export function QuizEditor({ videoId, password }: QuizEditorProps) {
+export function QuizEditor({ videoId, password, transcript, title, videoDurationMinutes, teachingMoments }: QuizEditorProps) {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   // New quiz form
   const [newQuestion, setNewQuestion] = useState('');
@@ -152,8 +163,94 @@ export function QuizEditor({ videoId, password }: QuizEditorProps) {
     );
   }
 
+  const generateQuizzes = async () => {
+    if (!transcript?.trim()) {
+      toast.error('Adicione a transcrição primeiro para gerar quizzes automaticamente');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('quiz-generator', {
+        body: {
+          transcript,
+          title: title || 'Aula',
+          videoDurationMinutes,
+          numberOfQuestions: 5,
+          teachingMoments,
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data.quizzes && data.quizzes.length > 0) {
+        // Insert generated quizzes into database
+        const currentCount = quizzes.length;
+        for (let i = 0; i < data.quizzes.length; i++) {
+          const quiz = data.quizzes[i];
+          await supabase.from('video_quizzes').insert({
+            video_id: videoId,
+            question: quiz.question,
+            options: quiz.options,
+            correct_option_index: quiz.correct_option_index,
+            explanation: quiz.explanation,
+            timestamp_seconds: quiz.timestamp_seconds,
+            question_order: currentCount + i,
+          });
+        }
+        
+        toast.success(`${data.quizzes.length} quizzes gerados com sucesso!`);
+        loadQuizzes();
+      } else {
+        toast.error('Não foi possível gerar quizzes');
+      }
+    } catch (err: any) {
+      console.error('Error generating quizzes:', err);
+      toast.error(err.message || 'Erro ao gerar quizzes');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Auto-generate section */}
+      {transcript && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Geração Automática de Quizzes
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use IA para criar perguntas baseadas no conteúdo da aula
+                </p>
+              </div>
+              <Button 
+                onClick={generateQuizzes} 
+                disabled={isGenerating}
+                variant="default"
+                size="sm"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Gerar 5 Quizzes
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Existing Quizzes */}
       <div className="space-y-3">
         <h3 className="font-medium flex items-center gap-2">
@@ -162,7 +259,7 @@ export function QuizEditor({ videoId, password }: QuizEditorProps) {
         </h3>
 
         {quizzes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum quiz cadastrado ainda.</p>
+          <p className="text-sm text-muted-foreground">Nenhum quiz cadastrado ainda. {transcript ? 'Use o botão acima para gerar automaticamente!' : 'Adicione a transcrição para gerar automaticamente.'}</p>
         ) : (
           <div className="space-y-2">
             {quizzes.map((quiz, idx) => (
