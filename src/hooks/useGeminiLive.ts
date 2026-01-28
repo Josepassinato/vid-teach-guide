@@ -288,7 +288,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       
       const currentOptions = optionsRef.current;
       
-      // Get API key from edge function
+       // Get API key (and preferred Live model) from backend function
       console.log('[GeminiLive] Requesting token from edge function...');
       const { data, error } = await supabase.functions.invoke('gemini-token', {
         body: { systemInstruction: currentOptions.systemInstruction }
@@ -308,7 +308,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
       
-      ws.onopen = () => {
+       const preferredModel = (() => {
+         const m = (data as any)?.model as string | undefined;
+         if (!m) return 'models/gemini-live-2.5-flash-preview';
+         return m.startsWith('models/') ? m : `models/${m}`;
+       })();
+
+       ws.onopen = () => {
         console.log('WebSocket connected to Gemini');
         processedCallIdsRef.current.clear();
         
@@ -350,8 +356,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         // Tool calling works through the modelTurn.parts[].functionCall structure
         const setupMessage = {
           setup: {
-            // Gemini Live model for v1alpha BidiGenerateContent
-            model: "models/gemini-2.0-flash-exp",
+            model: preferredModel,
             generationConfig: {
               temperature: 0.7,
               responseModalities: ["AUDIO"],
