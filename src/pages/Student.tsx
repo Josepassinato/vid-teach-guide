@@ -5,12 +5,13 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play, LogOut, Lock } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play, LogOut, Lock, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TeachingMoment } from '@/hooks/useContentManager';
 import { useStudentProgress } from '@/hooks/useStudentProgress';
 import { LessonQuiz } from '@/components/LessonQuiz';
 import { TeachingMomentsList } from '@/components/TeachingMomentsList';
+import { MissionsPanel } from '@/components/MissionsPanel';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -58,6 +59,7 @@ const Student = () => {
   const [showVideoList, setShowVideoList] = useState(true);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [showQuiz, setShowQuiz] = useState(false);
+  const [showMissions, setShowMissions] = useState(false);
   const [generatedMoments, setGeneratedMoments] = useState<TeachingMoment[] | null>(null);
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   
@@ -552,6 +554,23 @@ const Student = () => {
                 )}
               </AnimatePresence>
 
+              {/* Missions Section */}
+              <AnimatePresence>
+                {showMissions && savedVideos[currentLessonIndex] && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="border-t bg-card/50 backdrop-blur-sm p-4 max-h-[500px] overflow-y-auto"
+                  >
+                    <MissionsPanel
+                      videoId={savedVideos[currentLessonIndex].id}
+                      studentId={studentId}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Bottom Action Bar */}
               <div className="border-t bg-card/80 backdrop-blur-sm p-3">
                 <div className="flex items-center justify-between">
@@ -569,11 +588,22 @@ const Student = () => {
                   </div>
                   
                   <div className="flex items-center gap-2">
+                    {/* Missions Button */}
+                    <Button 
+                      size="sm" 
+                      variant={showMissions ? "default" : "outline"}
+                      onClick={() => { setShowMissions(!showMissions); if (!showMissions) setShowQuiz(false); }}
+                      className="rounded-full"
+                    >
+                      <Target className="h-4 w-4 mr-1.5" />
+                      Missões
+                    </Button>
+
                     {!isLessonCompleted(savedVideos[currentLessonIndex]?.id) && !showQuiz && (
                       <Button 
                         size="sm" 
                         variant="outline" 
-                        onClick={handleOpenQuiz}
+                        onClick={() => { handleOpenQuiz(); setShowMissions(false); }}
                         className="rounded-full"
                       >
                         <ClipboardCheck className="h-4 w-4 mr-1.5" />
