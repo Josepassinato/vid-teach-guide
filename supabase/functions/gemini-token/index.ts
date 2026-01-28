@@ -24,6 +24,8 @@ serve(async (req) => {
     // The WS endpoint (BidiGenerateContent) requires models that include "bidiGenerateContent"
     // in supportedGenerationMethods.
     let chosenModel: string | null = null;
+    let supportsToolCalling = true;
+
     try {
       const listResp = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models?key=${GOOGLE_API_KEY}`,
@@ -35,30 +37,60 @@ serve(async (req) => {
         const models: Array<{ name?: string; supportedGenerationMethods?: string[] }> =
           Array.isArray(listJson?.models) ? listJson.models : [];
 
-        const bidiModels = models
+        // Filter for bidiGenerateContent support
+        const allBidiModels = models
           .filter((m) => (m.supportedGenerationMethods || []).includes("bidiGenerateContent"))
           .map((m) => m.name)
           .filter((n): n is string => typeof n === "string" && n.length > 0);
 
+        console.log("[gemini-token] All bidi models available:", allBidiModels);
+
+        // Filter out models that don't support function calling
+        // - native-audio models: no function calling support
+        // - image-generation models: not suitable for audio conversation
+        const toolCompatibleModels = allBidiModels.filter(
+          (m) =>
+            !m.includes("native-audio") &&
+            !m.includes("native_audio") &&
+            !m.includes("image-generation") &&
+            !m.includes("image_generation")
+        );
+
+        console.log("[gemini-token] Tool-compatible bidi models:", toolCompatibleModels);
+
         // Prefer historically common IDs first if they exist for this key.
+        // These are known to support both bidiGenerateContent AND function calling.
         const preferred = [
           "models/gemini-2.0-flash-exp",
-          "models/gemini-2.0-flash-live-preview",
           "models/gemini-2.0-flash-live-preview-04-09",
+          "models/gemini-2.0-flash-live-preview",
           "models/gemini-live-2.5-flash-preview",
         ];
 
+        // Try to find a tool-compatible model first
         chosenModel =
-          preferred.find((p) => bidiModels.includes(p)) ??
-          bidiModels.find((m) => m.includes("flash")) ??
-          bidiModels[0] ??
+          preferred.find((p) => toolCompatibleModels.includes(p)) ??
+          toolCompatibleModels.find((m) => m.includes("flash") && m.includes("live")) ??
+          toolCompatibleModels.find((m) => m.includes("flash")) ??
+          toolCompatibleModels[0] ??
           null;
 
+        // If no tool-compatible model found, fall back to native-audio (without tools)
+        if (!chosenModel && allBidiModels.length > 0) {
+          console.log("[gemini-token] No tool-compatible model found, falling back to native-audio");
+          // Prefer native-audio-latest or any native-audio model
+          chosenModel = 
+            allBidiModels.find((m) => m.includes("native-audio") && m.includes("latest")) ??
+            allBidiModels.find((m) => m.includes("native-audio")) ??
+            allBidiModels[0];
+          supportsToolCalling = false;
+        }
+
         console.log(
-          "[gemini-token] ListModels OK. bidi models:",
-          bidiModels.length,
-          "chosen:",
+          "[gemini-token] Final selection - model:",
           chosenModel,
+          "supportsToolCalling:",
+          supportsToolCalling,
         );
       } else {
         const t = await listResp.text();
@@ -69,21 +101,20 @@ serve(async (req) => {
     }
 
     if (!chosenModel) {
-      // Fail fast with actionable message.
       throw new Error(
-        "Nenhum modelo compatível com bidiGenerateContent foi encontrado para esta chave. Verifique se a API Live/Reatime está habilitada para a chave e tente novamente.",
+        "Nenhum modelo compatível com bidiGenerateContent foi encontrado. " +
+        "Verifique se a API Live/Realtime está habilitada para a chave e tente novamente.",
       );
     }
 
-    // Return the API key directly for Live API WebSocket connection
-    // The Live API uses the API key in the WebSocket URL
-    console.log("Returning API key for Live API connection");
+    console.log("[gemini-token] Returning token with model:", chosenModel);
     
     return new Response(
       JSON.stringify({ 
         token: GOOGLE_API_KEY,
         expiresAt: expireTime,
         model: chosenModel,
+        supportsToolCalling,
         systemInstruction: systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Quando o aluno mencionar um vídeo ou conteúdo, analise e explique os pontos principais de forma acessível. Fale em português brasileiro.",
       }),
       {
