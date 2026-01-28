@@ -54,45 +54,67 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   }, []);
 
   const playQueue = useCallback(async (ctx: AudioContext) => {
-    // Ensure we have an output chain: source -> gain -> compressor/limiter -> destination
-    // This boosts volume while reducing clipping/distortion.
+    // Audio chain: source -> gain -> compressor -> destination
+    // Reduced gain to prevent crackling/distortion
     if (!compressorNodeRef.current) {
       const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.value = -24;
-      compressor.knee.value = 30;
-      compressor.ratio.value = 12;
-      compressor.attack.value = 0.003;
-      compressor.release.value = 0.25;
+      compressor.threshold.value = -12; // Higher threshold (less aggressive)
+      compressor.knee.value = 20;
+      compressor.ratio.value = 4; // Lower ratio for more natural sound
+      compressor.attack.value = 0.01; // Slower attack to avoid pumping
+      compressor.release.value = 0.15;
       compressor.connect(ctx.destination);
       compressorNodeRef.current = compressor;
     }
 
     if (!gainNodeRef.current) {
       const gain = ctx.createGain();
-      gain.gain.value = 8.0; // Increase loudness; compressor limits peaks
+      gain.gain.value = 2.0; // Reduced from 8.0 to prevent distortion
       gain.connect(compressorNodeRef.current);
       gainNodeRef.current = gain;
     }
     
+    // Collect all queued samples into one buffer for smoother playback
+    const allSamples: Float32Array[] = [];
     while (audioQueueRef.current.length > 0) {
-      const samples = audioQueueRef.current.shift()!;
-      const buffer = ctx.createBuffer(1, samples.length, 24000);
-      const channelData = buffer.getChannelData(0);
-      for (let i = 0; i < samples.length; i++) {
-        channelData[i] = samples[i];
-      }
-      
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(gainNodeRef.current!); // Connect to gain node instead of destination
-      source.start();
-      
-      await new Promise(resolve => {
-        source.onended = resolve;
-      });
+      allSamples.push(audioQueueRef.current.shift()!);
     }
-    isPlayingRef.current = false;
-    setIsSpeaking(false);
+    
+    if (allSamples.length === 0) {
+      isPlayingRef.current = false;
+      setIsSpeaking(false);
+      return;
+    }
+    
+    // Merge all samples into one continuous buffer
+    const totalLength = allSamples.reduce((acc, arr) => acc + arr.length, 0);
+    const mergedSamples = new Float32Array(totalLength);
+    let offset = 0;
+    for (const samples of allSamples) {
+      mergedSamples.set(samples, offset);
+      offset += samples.length;
+    }
+    
+    const buffer = ctx.createBuffer(1, mergedSamples.length, 24000);
+    const channelData = buffer.getChannelData(0);
+    channelData.set(mergedSamples);
+    
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(gainNodeRef.current!);
+    source.start();
+    
+    await new Promise(resolve => {
+      source.onended = resolve;
+    });
+    
+    // Check if more audio arrived while playing
+    if (audioQueueRef.current.length > 0) {
+      playQueue(ctx);
+    } else {
+      isPlayingRef.current = false;
+      setIsSpeaking(false);
+    }
   }, []);
 
   const playAudioChunk = useCallback(async (base64Audio: string) => {
