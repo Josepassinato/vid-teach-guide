@@ -372,6 +372,7 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     systemInstruction,
     videoControls,
     onTranscript: (text, role) => {
+      console.log(`📝 [VOICECHAT TRANSCRIPT] ${role}: ${text.substring(0, 100)}...`);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         text,
@@ -398,7 +399,13 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
       }
     },
     onError: (error) => {
+      console.error('🚨 [VOICECHAT ERROR] Erro recebido:', error);
       toast.error(error);
+    },
+    onStatusChange: (newStatus) => {
+      console.log(`🔄 [VOICECHAT STATUS] Status mudou para: ${newStatus}`);
+      console.log(`🔄 [VOICECHAT STATUS] agentMode atual: ${agentMode}`);
+      console.log(`🔄 [VOICECHAT STATUS] Stack trace:`, new Error().stack?.split('\n').slice(0, 5).join('\n'));
     }
   });
 
@@ -554,18 +561,25 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
   useEffect(() => {
     let introTimeout: ReturnType<typeof setTimeout> | null = null;
     
+    console.log(`🎬 [VOICECHAT EFFECT] Status changed effect - status: ${status}, agentMode: ${agentMode}`);
+    
     if (status === 'connected') {
+      console.log('🎬 [VOICECHAT EFFECT] ✅ Conectado! isListening:', isListening);
+      
       // Start microphone when connected
       if (!isListening) {
+        console.log('🎤 [VOICECHAT EFFECT] Iniciando microfone...');
         startListening();
       }
       
       // Process any pending reconnect actions
       if (pendingReconnect) {
+        console.log('🎬 [VOICECHAT EFFECT] Processando pendingReconnect:', pendingReconnect.type);
         const { type, data } = pendingReconnect;
         setPendingReconnect(null);
         
         if (type === 'moment') {
+          console.log('🎬 [VOICECHAT EFFECT] Configurando teaching moment:', data.topic);
           setActiveMoment(data);
           const instruction = generateTeacherInstructions(data);
           setTimeout(() => sendText(instruction), 500);
@@ -591,10 +605,12 @@ INSTRUÇÕES:
       
       // Handle intro mode - agent starts class only if custom intro is configured
       if (agentMode === 'intro' && !introCompletedRef.current) {
+        console.log('🎬 [VOICECHAT EFFECT] Modo intro detectado, configurando...');
         introCompletedRef.current = true;
         
         // Only send intro if admin configured a custom teacher intro
         const customIntro = teacherIntro?.trim();
+        console.log('🎬 [VOICECHAT EFFECT] Custom intro:', customIntro ? 'SIM' : 'NÃO');
         
         if (customIntro) {
           const introInstruction = `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
