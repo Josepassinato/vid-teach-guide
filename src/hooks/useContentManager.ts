@@ -242,8 +242,26 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
     const firstQuestion = moment.questions_to_ask[0] || 'O que você entendeu deste conceito?';
     const remainingQuestions = moment.questions_to_ask.slice(1);
     
+    // Natural pause introduction phrases to make it feel less like a technical glitch
+    const pauseIntroductions = [
+      "Opa! Vou pausar o vídeo um pouquinho aqui, quero ver uma coisa com você...",
+      "Peraí, deixa eu pausar aqui rapidinho porque esse ponto é importante...",
+      "Ei, vou dar uma paradinha aqui porque quero conversar sobre isso...",
+      "Olha só, vou pausar aqui um instantinho pra gente trocar uma ideia...",
+      "Calma aí! Esse trecho merece uma pausa pra gente discutir...",
+      "Espera, deixa eu pausar aqui porque quero ter certeza que você pegou isso...",
+      "Opa, para tudo! Esse conceito aqui é muito bom, vamos conversar...",
+      "Hm, vou dar um pause aqui porque esse ponto vale a pena explorar mais...",
+    ];
+    
+    // Pick a random introduction for variety
+    const randomIntro = pauseIntroductions[Math.floor(Math.random() * pauseIntroductions.length)];
+    
     return `
 MOMENTO DE APROFUNDAMENTO - ${moment.topic}
+
+INTRODUÇÃO NATURAL (use exatamente esta frase ou algo muito parecido para começar):
+"${randomIntro}"
 
 REGRA CRÍTICA - UMA PERGUNTA POR VEZ:
 Você DEVE fazer APENAS UMA pergunta e ESPERAR a resposta do aluno antes de continuar.
@@ -253,10 +271,11 @@ INSIGHT PRINCIPAL:
 ${moment.key_insight}
 
 INSTRUÇÃO:
-1. Explique brevemente o insight principal (2-3 frases no máximo)
-2. Faça APENAS esta pergunta e PARE de falar: "${firstQuestion}"
-3. AGUARDE em silêncio a resposta do aluno
-4. Só depois da resposta, responda ao aluno e faça a próxima pergunta SE necessário
+1. PRIMEIRO: Use a frase de introdução natural acima para explicar a pausa
+2. Explique brevemente o insight principal (2-3 frases no máximo)
+3. Faça APENAS esta pergunta e PARE de falar: "${firstQuestion}"
+4. AGUARDE em silêncio a resposta do aluno
+5. Só depois da resposta, responda ao aluno e faça a próxima pergunta SE necessário
 
 ${remainingQuestions.length > 0 ? `PERGUNTAS ADICIONAIS (use apenas se necessário, uma por vez):
 ${remainingQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}` : ''}
@@ -264,7 +283,7 @@ ${remainingQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}` : ''}
 ${moment.discussion_points?.length > 0 ? `PONTOS PARA APROFUNDAR (apenas se o aluno demonstrar interesse):
 ${moment.discussion_points.map((p) => `- ${p}`).join('\n')}` : ''}
 
-APÓS a conversa, pergunte: "Pronto para continuar o vídeo?"
+APÓS a conversa, pergunte de forma natural: "Beleza, podemos continuar o vídeo?" ou "Pronto pra seguir?"
 `;
   }, []);
 
