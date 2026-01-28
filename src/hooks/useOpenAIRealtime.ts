@@ -227,14 +227,14 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         ];
         
         // Send session update with configuration and tools
-        // Using "coral" voice - warm, natural and expressive, ideal for empathetic teaching
-        // Other options: "nova" (warm female), "sage" (wise male), "alloy" (neutral)
+        // Using "echo" voice - young masculine voice, energetic and friendly
+        // Other options: "coral" (warm female), "nova" (warm female), "alloy" (neutral), "onyx" (deep male)
         ws.send(JSON.stringify({
           type: "session.update",
           session: {
             modalities: ["text", "audio"],
-            instructions: currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro.",
-            voice: "coral",
+            instructions: currentOptions.systemInstruction || "Você é um professor jovem, descontraído e didático. Fale de forma natural como um amigo mais experiente que quer ajudar. Use gírias leves e seja animado. Fale em português brasileiro.",
+            voice: "echo",
             input_audio_format: "pcm16",
             output_audio_format: "pcm16",
             input_audio_transcription: {
