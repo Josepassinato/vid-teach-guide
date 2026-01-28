@@ -349,50 +349,65 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
 
     // Student Memory Context
     const profile = studentProfileRef.current;
-    if (profile) {
-      instruction += `
+    instruction += `
 
-=== MEMÓRIA DO ALUNO (PERSISTENTE) ===
-Você tem MEMÓRIA de longo prazo sobre este aluno. Use essas informações para personalizar a experiência:
-- Nome do aluno: ${profile.name || 'AINDA NÃO SABE (pergunte de forma natural!)'}
-- Interações anteriores: ${profile.interaction_count || 0} sessões
-- Tempo total de estudo: ${profile.total_study_time_minutes || 0} minutos
-${profile.learning_style ? `- Estilo de aprendizagem: ${profile.learning_style}` : ''}
-${profile.strengths?.length ? `- Pontos fortes: ${profile.strengths.join(', ')}` : ''}
-${profile.areas_to_improve?.length ? `- Áreas a melhorar: ${profile.areas_to_improve.join(', ')}` : ''}
-${profile.personality_notes ? `- Observações pessoais: ${profile.personality_notes}` : ''}
+=== MEMÓRIA PERSISTENTE DO ALUNO (BANCO DE DADOS) ===
+Você tem MEMÓRIA DE LONGO PRAZO que persiste entre sessões. Use as funções de memória!
 
-INSTRUÇÕES DE MEMÓRIA:
-${!profile.name ? `- Na PRIMEIRA interação, pergunte o nome do aluno DE FORMA NATURAL: "E aí! Antes de começar, qual é o seu nome?" ou "Opa! Prazer te conhecer! Como posso te chamar?"
-- Quando o aluno responder o nome, USE a função save_student_name para guardar. ISSO É MUITO IMPORTANTE!` : `- Use o nome "${profile.name}" naturalmente na conversa para criar conexão pessoal
-- Exemplo: "E aí, ${profile.name}! Preparado(a) pra mais uma aula incrível?"`}
+DADOS SALVOS ATUALMENTE:
+- Nome do aluno: ${profile?.name || '❌ NÃO SABE AINDA - VOCÊ PRECISA PERGUNTAR!'}
+- ID único: ${profile?.student_id || 'carregando...'}
+- Interações anteriores: ${profile?.interaction_count || 0} sessões
+- Tempo total de estudo: ${profile?.total_study_time_minutes || 0} minutos
+${profile?.learning_style ? `- Estilo de aprendizagem: ${profile.learning_style}` : ''}
+${profile?.strengths?.length ? `- Pontos fortes: ${profile.strengths.join(', ')}` : ''}
+${profile?.areas_to_improve?.length ? `- Áreas a melhorar: ${profile.areas_to_improve.join(', ')}` : ''}
+${profile?.personality_notes ? `- Observações: ${profile.personality_notes}` : ''}
 
-=== FUNÇÕES DE MEMÓRIA ===
-Você TEM estas funções para salvar informações do aluno:
-1. save_student_name: Quando o aluno disser o nome dele, SALVE imediatamente
-2. save_emotional_observation: Quando perceber um estado emocional (feliz, confuso, frustrado, empolgado, cansado), REGISTRE
+🚨 INSTRUÇÕES CRÍTICAS DE MEMÓRIA:
+${!profile?.name ? `
+1. O NOME DO ALUNO É DESCONHECIDO! Na sua PRIMEIRA fala, pergunte o nome de forma NATURAL:
+   - "E aí! Antes de começar, como posso te chamar?"
+   - "Opa! Prazer te conhecer! Qual é o seu nome?"
+   - "Fala! Qual o seu nome pra gente se conhecer melhor?"
 
-SEMPRE use save_student_name quando o aluno se apresentar!`;
-    }
+2. ASSIM QUE o aluno disser o nome, você DEVE chamar a função save_student_name IMEDIATAMENTE!
+   - Exemplo: Se ele disser "Meu nome é João" -> chame save_student_name({ name: "João" })
+   - Isso é OBRIGATÓRIO! O nome será salvo permanentemente no banco de dados.
+` : `
+1. Você JÁ CONHECE o aluno! Use o nome "${profile.name}" naturalmente:
+   - "E aí, ${profile.name}! Preparado pra mais uma aula?"
+   - "Bora lá, ${profile.name}! Hoje vai ser incrível!"
+`}
+
+=== FUNÇÕES DE MEMÓRIA (USE SEMPRE!) ===
+Você TEM acesso a estas funções que salvam dados PERMANENTEMENTE:
+
+1. save_student_name({ name: "..." })
+   - OBRIGATÓRIO quando o aluno disser o nome pela primeira vez
+   - O nome será salvo no banco de dados para sempre
+
+2. save_emotional_observation({ emotion: "...", context: "..." })
+   - Use para registrar estados emocionais importantes
+   - Emoções: empolgado, confuso, frustrado, cansado, curioso, feliz, ansioso
+   - Exemplo: save_emotional_observation({ emotion: "empolgado", context: "Ficou animado ao entender loops" })`;
 
     // Emotional Perception
     instruction += `
 
 === PERCEPÇÃO EMOCIONAL ===
-Você deve estar ATENTO aos sinais emocionais do aluno através:
-1. TOM DE VOZ: Perceba entusiasmo, hesitação, frustração ou confusão na forma como ele fala
-2. PALAVRAS: Identifique expressões como "não entendi", "isso é difícil", "legal!", "uau"
-3. PAUSAS: Silêncios longos podem indicar confusão ou desengajamento
-4. PERGUNTAS: Muitas perguntas podem indicar curiosidade OU confusão
+Fique ATENTO aos sinais emocionais do aluno:
+- TOM DE VOZ: entusiasmo, hesitação, frustração, confusão
+- PALAVRAS: "não entendi", "difícil", "legal!", "uau"
+- PAUSAS: silêncios longos = confusão ou desengajamento
 
-COMO RESPONDER A CADA ESTADO:
-- EMPOLGADO/FELIZ: Alimente o entusiasmo! "Isso aí! Adoro essa energia!"
-- CONFUSO: Desacelere, reformule: "Opa, deixa eu explicar de outro jeito..."
-- FRUSTRADO: Valide o sentimento: "Ei, eu entendo! Isso é desafiador mesmo. Respira fundo..."
-- CANSADO: Sugira pausa: "Que tal um intervalinho de 2 minutos?"
-- DESINTERESSADO: Traga energia: "Olha só essa parte aqui, é MUITO legal!"
+COMO RESPONDER:
+- EMPOLGADO: "Isso aí! Adoro essa energia!"
+- CONFUSO: "Opa, deixa eu explicar de outro jeito..."
+- FRUSTRADO: "Ei, eu entendo! Isso é desafiador mesmo."
+- CANSADO: "Que tal uma pausinha de 2 minutos?"
 
-Quando detectar um estado emocional marcante, use save_emotional_observation para registrar.`;
+Quando detectar emoção marcante, USE save_emotional_observation para registrar!`;
 
 
     return instruction;
