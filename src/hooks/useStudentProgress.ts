@@ -20,6 +20,7 @@ interface ProgressStats {
 
 interface UseStudentProgressOptions {
   onProgressUpdate?: (stats: ProgressStats) => void;
+  userId?: string; // Optional: use authenticated user ID
 }
 
 export function useStudentProgress(options: UseStudentProgressOptions = {}) {
@@ -37,17 +38,21 @@ export function useStudentProgress(options: UseStudentProgressOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  // Initialize student ID
+  // Initialize student ID - prefer authenticated user ID
   useEffect(() => {
-    const storedId = localStorage.getItem('student_id');
-    if (storedId) {
-      setStudentId(storedId);
+    if (options.userId) {
+      setStudentId(options.userId);
     } else {
-      const newId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('student_id', newId);
-      setStudentId(newId);
+      const storedId = localStorage.getItem('student_id');
+      if (storedId) {
+        setStudentId(storedId);
+      } else {
+        const newId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('student_id', newId);
+        setStudentId(newId);
+      }
     }
-  }, []);
+  }, [options.userId]);
 
   // Load progress from database
   const loadProgress = useCallback(async () => {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VoiceChat } from '@/components/VoiceChat';
-import { X, ChevronLeft, ChevronRight, CheckCircle, Lock, Target, ClipboardCheck, Video } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, CheckCircle, Lock, Target, ClipboardCheck, Video, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -13,6 +13,7 @@ import { TeachingMomentsList } from '@/components/TeachingMomentsList';
 import { MissionsPanel } from '@/components/MissionsPanel';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/hooks/useAuth';
 
 // New student components
 import { StudentHeader } from '@/components/student/StudentHeader';
@@ -59,6 +60,8 @@ interface VideoInfo {
 }
 
 const Student = () => {
+  const { user, profile, signOut } = useAuth();
+  
   const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
@@ -70,13 +73,8 @@ const Student = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('video');
 
-  const [studentId] = useState(() => {
-    const stored = localStorage.getItem('studentId');
-    if (stored) return stored;
-    const newId = `student_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    localStorage.setItem('studentId', newId);
-    return newId;
-  });
+  // Use authenticated user ID as student ID
+  const studentId = user?.id || '';
 
   const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
     if (newStats.progressPercentage === 100) {
@@ -86,6 +84,7 @@ const Student = () => {
 
   const { stats, isLessonCompleted, markLessonComplete, refreshProgress } = useStudentProgress({
     onProgressUpdate: handleProgressUpdate,
+    userId: studentId,
   });
 
   const {
@@ -370,6 +369,9 @@ const Student = () => {
         progressPercentage={stats.progressPercentage}
         onMenuClick={() => setSidebarOpen(true)}
         showMenuButton={!!selectedVideo}
+        userName={profile?.full_name}
+        userAvatar={profile?.avatar_url}
+        onSignOut={signOut}
       />
 
       {/* Main layout */}
