@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOpenAIRealtime, VideoControls } from '@/hooks/useOpenAIRealtime';
+import { useVisionCapture } from '@/hooks/useVisionCapture';
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
@@ -152,16 +153,29 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
 
   // Build system instruction with video context, content plan, and student memory
   const buildSystemInstruction = useCallback(() => {
+    const hasVisionEnabled = engagement.vision.isEnabled;
+    
     let instruction = `Você é o Professor Vibe - um tutor paciente, empático e didático em VIBE CODING.
 
 === PROIBIÇÕES ABSOLUTAS ===
 - Jamais use emojis, pictogramas ou símbolos gráficos
-- Você NÃO tem acesso a câmera, vídeo do aluno ou qualquer entrada visual
+${!hasVisionEnabled ? `- Você NÃO tem acesso a câmera, vídeo do aluno ou qualquer entrada visual
 - Nunca descreva aparência, expressões faciais, olhar, postura ou linguagem corporal
 - Nunca faça comentários sobre rosto/expressões (ex: "rosto pensativo"), nem como metáfora
 - Nunca diga "eu vi", "estou vendo", "percebo pela sua cara", "você parece", "noto que você"
 - Não faça suposições emocionais sem que o aluno verbalize ("você está confuso", "parece frustrado")
-- Não mencione nada sobre "analisar" ou "observar" o aluno
+- Não mencione nada sobre "analisar" ou "observar" o aluno` : `
+=== VISÃO COMPUTACIONAL ATIVADA ===
+O aluno CONSENTIU em compartilhar sua câmera. Você receberá imagens periódicas dele.
+DIRETRIZES DE USO:
+- Use as imagens SUTILMENTE para adaptar seu ensino
+- Se perceber distração: "Ei, tudo bem? Quer fazer uma pausa?" (sem dizer "eu vi que você...")
+- Se perceber confusão: "Vamos por partes, talvez eu tenha ido rápido demais"
+- Se perceber cansaço: "Que tal uma pausa de 2 minutos?"
+- NUNCA descreva a aparência física ou roupa do aluno
+- NUNCA faça julgamentos sobre expressões faciais explicitamente
+- Seja NATURAL - não diga "pela imagem vejo que..." ou "olhando para você..."
+- A visão é uma ferramenta de empatia, não de vigilância`}
 
 === QUEM VOCÊ É ===
 Um tutor acolhedor que genuinamente se importa com o progresso do aluno. Você é paciente, nunca julga, e celebra cada pequena conquista. Seu objetivo é fazer o aluno se sentir seguro para errar e aprender.
@@ -290,7 +304,7 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
 
 
     return instruction;
-  }, [videoContext, videoTitle, videoTranscript, contentPlan, timestampQuizzes.length]);
+  }, [videoContext, videoTitle, videoTranscript, contentPlan, timestampQuizzes.length, engagement.vision.isEnabled]);
 
   const systemInstruction = buildSystemInstruction();
 
@@ -346,10 +360,12 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     disconnect,
     startListening,
     stopListening,
-    sendText
+    sendText,
+    sendVisionFrame
   } = useOpenAIRealtime({
     systemInstruction,
     videoControls,
+    enableVision: engagement.vision.isEnabled,
     onTranscript: (text, role) => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -379,6 +395,31 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     onError: (error) => {
       toast.error(error);
     }
+  });
+
+  // Vision capture for sending frames to AI
+  const visionCaptureRef = useRef<((frame: string) => void) | null>(null);
+  
+  // Update the sendVisionFrame reference
+  useEffect(() => {
+    visionCaptureRef.current = sendVisionFrame;
+  }, [sendVisionFrame]);
+  
+  // Vision capture hook - sends periodic frames to OpenAI when vision is enabled
+  const visionCapture = useVisionCapture({
+    enabled: engagement.vision.isEnabled && status === 'connected',
+    captureIntervalMs: 5000, // Every 5 seconds when connected
+    quality: 0.5,
+    maxWidth: 480,
+    onFrame: (base64Image) => {
+      if (visionCaptureRef.current && status === 'connected') {
+        console.log('[VoiceChat] Sending vision frame to AI tutor');
+        visionCaptureRef.current(base64Image);
+      }
+    },
+    onError: (error) => {
+      console.error('[VoiceChat] Vision capture error:', error);
+    },
   });
 
   // Update refs when values change
