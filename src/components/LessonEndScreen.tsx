@@ -36,6 +36,7 @@ interface LessonEndScreenProps {
   onRestartLesson?: () => void;
   onStartMission?: () => void;
   isVisible: boolean;
+  isProfessorSpeaking?: boolean;
 }
 
 export function LessonEndScreen({
@@ -47,6 +48,7 @@ export function LessonEndScreen({
   onRestartLesson,
   onStartMission,
   isVisible,
+  isProfessorSpeaking = false,
 }: LessonEndScreenProps) {
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -111,6 +113,35 @@ export function LessonEndScreen({
             className="w-full max-w-2xl"
           >
             <Card className="border-2 border-primary/20 shadow-2xl overflow-hidden">
+              {/* Professor Speaking Indicator */}
+              {isProfessorSpeaking && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-primary/10 border-b border-primary/20 px-4 py-3 flex items-center justify-center gap-3"
+                >
+                  <div className="flex items-center gap-1">
+                    {[0, 1, 2, 3].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="w-1 bg-primary rounded-full"
+                        animate={{
+                          height: [8, 16, 8],
+                        }}
+                        transition={{
+                          duration: 0.5,
+                          repeat: Infinity,
+                          delay: i * 0.1,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm font-medium text-primary">
+                    Professor Vibe está explicando...
+                  </span>
+                </motion.div>
+              )}
+
               {/* Header with Trophy */}
               <CardHeader className="text-center pb-4 bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/10">
                 <motion.div
