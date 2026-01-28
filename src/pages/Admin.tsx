@@ -60,6 +60,7 @@ export default function Admin() {
   
   // Form states for new lesson
   const [newVideoUrl, setNewVideoUrl] = useState('');
+  const [newVideoType, setNewVideoType] = useState<'youtube' | 'direct' | 'external'>('youtube');
   const [newVideoTitle, setNewVideoTitle] = useState('');
   const [newVideoDescription, setNewVideoDescription] = useState('');
   const [newVideoDuration, setNewVideoDuration] = useState('');
@@ -124,10 +125,21 @@ export default function Admin() {
   };
 
   const handleAddLesson = async () => {
-    const youtubeId = extractYoutubeId(newVideoUrl);
-    if (!youtubeId) {
-      toast.error('URL do YouTube inválida');
-      return;
+    let youtubeId: string | null = null;
+    let videoUrl: string | null = null;
+
+    if (newVideoType === 'youtube') {
+      youtubeId = extractYoutubeId(newVideoUrl);
+      if (!youtubeId) {
+        toast.error('URL do YouTube inválida');
+        return;
+      }
+    } else {
+      if (!newVideoUrl.trim()) {
+        toast.error('URL do vídeo é obrigatória');
+        return;
+      }
+      videoUrl = newVideoUrl.trim();
     }
 
     if (!newVideoTitle.trim()) {
@@ -143,6 +155,8 @@ export default function Admin() {
           password,
           video: {
             youtube_id: youtubeId,
+            video_url: videoUrl,
+            video_type: newVideoType,
             title: newVideoTitle.trim(),
             description: newVideoDescription.trim() || null,
             duration_minutes: newVideoDuration ? parseInt(newVideoDuration) : null,
@@ -273,6 +287,7 @@ export default function Admin() {
 
   const resetNewForm = () => {
     setNewVideoUrl('');
+    setNewVideoType('youtube');
     setNewVideoTitle('');
     setNewVideoDescription('');
     setNewVideoDuration('');
@@ -609,13 +624,53 @@ export default function Admin() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Video Type Selection */}
             <div className="space-y-2">
-              <Label>URL do YouTube *</Label>
+              <Label>Tipo de Vídeo *</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={newVideoType === 'youtube' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setNewVideoType('youtube')}
+                >
+                  YouTube
+                </Button>
+                <Button
+                  type="button"
+                  variant={newVideoType === 'external' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setNewVideoType('external')}
+                >
+                  HeyGen / Externo
+                </Button>
+                <Button
+                  type="button"
+                  variant={newVideoType === 'direct' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setNewVideoType('direct')}
+                >
+                  Link Direto (MP4)
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{newVideoType === 'youtube' ? 'URL do YouTube *' : 'URL do Vídeo *'}</Label>
               <Input
-                placeholder="https://www.youtube.com/watch?v=..."
+                placeholder={newVideoType === 'youtube' 
+                  ? 'https://www.youtube.com/watch?v=...' 
+                  : newVideoType === 'external'
+                  ? 'https://app.heygen.com/share/...'
+                  : 'https://storage.example.com/video.mp4'
+                }
                 value={newVideoUrl}
                 onChange={(e) => setNewVideoUrl(e.target.value)}
               />
+              {newVideoType !== 'youtube' && (
+                <p className="text-xs text-muted-foreground">
+                  Cole a URL completa do vídeo. Para HeyGen, use o link de compartilhamento.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Título da Aula *</Label>
@@ -700,10 +755,10 @@ export default function Admin() {
           </DialogHeader>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="info" className="flex items-center gap-1">
                 <Video className="h-3.5 w-3.5" />
-                Informações
+                Info
               </TabsTrigger>
               <TabsTrigger value="transcript" className="flex items-center gap-1">
                 <FileText className="h-3.5 w-3.5" />
@@ -711,7 +766,11 @@ export default function Admin() {
               </TabsTrigger>
               <TabsTrigger value="moments" className="flex items-center gap-1">
                 <Target className="h-3.5 w-3.5" />
-                Momentos ({editMoments.length})
+                Momentos
+              </TabsTrigger>
+              <TabsTrigger value="quizzes" className="flex items-center gap-1">
+                <HelpCircle className="h-3.5 w-3.5" />
+                Quizzes
               </TabsTrigger>
             </TabsList>
             
@@ -916,6 +975,19 @@ export default function Admin() {
                     </div>
                   )}
                 </div>
+              </TabsContent>
+              
+              <TabsContent value="quizzes" className="m-0">
+                {selectedLesson && (
+                  <QuizEditor 
+                    videoId={selectedLesson.id} 
+                    password={password}
+                    transcript={editTranscript}
+                    title={editTitle}
+                    videoDurationMinutes={editDuration ? parseInt(editDuration) : undefined}
+                    teachingMoments={editMoments}
+                  />
+                )}
               </TabsContent>
             </ScrollArea>
           </Tabs>

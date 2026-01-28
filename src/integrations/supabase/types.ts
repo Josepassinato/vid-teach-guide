@@ -460,7 +460,9 @@ export type Database = {
           title: string
           transcript: string | null
           updated_at: string
-          youtube_id: string
+          video_type: string | null
+          video_url: string | null
+          youtube_id: string | null
         }
         Insert: {
           analysis?: string | null
@@ -477,7 +479,9 @@ export type Database = {
           title: string
           transcript?: string | null
           updated_at?: string
-          youtube_id: string
+          video_type?: string | null
+          video_url?: string | null
+          youtube_id?: string | null
         }
         Update: {
           analysis?: string | null
@@ -494,7 +498,9 @@ export type Database = {
           title?: string
           transcript?: string | null
           updated_at?: string
-          youtube_id?: string
+          video_type?: string | null
+          video_url?: string | null
+          youtube_id?: string | null
         }
         Relationships: []
       }

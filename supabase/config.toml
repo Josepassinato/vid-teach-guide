@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.agent-achievements]
 verify_jwt = false
+
+[functions.quiz-generator]
+verify_jwt = false
