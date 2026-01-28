@@ -8,6 +8,7 @@ import { useOpenAIRealtime, VideoControls, ConnectionStep } from '@/hooks/useOpe
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
+import { useMissions, Mission } from '@/hooks/useMissions';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { DirectVideoPlayer, DirectVideoPlayerRef } from './DirectVideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
@@ -39,9 +40,10 @@ interface VoiceChatProps {
   teacherIntro?: string | null;
   isStudentMode?: boolean;
   onContentPlanReady?: (moments: TeachingMoment[]) => void;
+  onOpenMissions?: () => void;
 }
 
-export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady, onOpenMissions }: VoiceChatProps) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
@@ -56,7 +58,7 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
   const [pendingReconnect, setPendingReconnect] = useState<{type: 'moment' | 'quiz', data: any} | null>(null);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
-  const [lessonEndData, setLessonEndData] = useState<{ weeklyTask?: string; summaryPoints?: string[] }>({});
+  const [lessonEndData, setLessonEndData] = useState<{ weeklyTask?: string; summaryPoints?: string[]; mission?: Mission }>({});
   const [showVisionConsent, setShowVisionConsent] = useState(false);
   const [connectionStep, setConnectionStep] = useState<'idle' | 'fetching_key' | 'connecting_ws' | 'configuring' | 'ready'>('idle');
   const videoPlayerRef = useRef<VideoPlayerRef | DirectVideoPlayerRef>(null);
@@ -109,6 +111,19 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
     markQuizTriggered,
     recordAttempt,
   } = useTimestampQuizzes({ videoId: videoDbId, studentId });
+
+  // Missions for this lesson
+  const {
+    missions: lessonMissions,
+    loadMissions,
+  } = useMissions(studentId);
+
+  // Load missions when videoDbId changes
+  useEffect(() => {
+    if (videoDbId) {
+      loadMissions(videoDbId);
+    }
+  }, [videoDbId, loadMissions]);
 
   // Engagement detection system (Audio + Behavioral + Vision opt-in)
   // Note: The intervention handler will be set up after useGeminiLive is initialized
@@ -805,18 +820,30 @@ INSTRUÇÕES:
   const handleVideoEnded = useCallback(() => {
     console.log('[VoiceChat] Video ended, triggering class wrap-up');
     
+    // Get the first mission for this lesson (if any)
+    const lessonMission = lessonMissions.length > 0 ? lessonMissions[0] : null;
+    
     // Start capturing end data
     isCapturingEndDataRef.current = true;
     endMessageBufferRef.current = '';
-    setLessonEndData({});
+    setLessonEndData({ mission: lessonMission || undefined });
     
     // Collapse video and set to teaching mode for wrap-up
     setIsVideoExpanded(false);
     setAgentMode('teaching');
     
+    // Build wrap-up prompt with mission info
+    let wrapUpPrompt = '[SISTEMA] O vídeo terminou. Hora de encerrar a aula! Diga "Aula concluída!", faça um resumo breve marcando cada ponto com "PONTO:", celebre o progresso';
+    
+    if (lessonMission) {
+      wrapUpPrompt += `, e apresente a MISSÃO PRÁTICA da aula: "${lessonMission.title}" - ${lessonMission.description}. Diga que o aluno pode clicar no botão para ver os detalhes e submeter a evidência.`;
+    } else {
+      wrapUpPrompt += ', proponha a TAREFA DA SEMANA, e despeça-se.';
+    }
+    
     // If agent is connected, send the wrap-up instruction
     if (statusRef.current === 'connected' && sendTextRef.current) {
-      sendTextRef.current('[SISTEMA] O vídeo terminou. Hora de encerrar a aula! Diga "Aula concluída!", faça um resumo breve marcando cada ponto com "PONTO:", celebre o progresso, proponha a TAREFA DA SEMANA, e despeça-se.');
+      sendTextRef.current(wrapUpPrompt);
       
       // The end screen will be shown when professor finishes speaking (see useEffect below)
       // isCapturingEndDataRef stays true to capture all content
@@ -825,7 +852,7 @@ INSTRUÇÕES:
       setPendingReconnect({ type: 'moment', data: { topic: 'Encerramento da aula' } as any });
       connect();
     }
-  }, [connect]);
+  }, [connect, lessonMissions]);
   
   // Watch for professor to finish speaking during wrap-up, then show end screen
   const wrapUpSpeechEndedRef = useRef<NodeJS.Timeout | null>(null);
@@ -1495,6 +1522,7 @@ INSTRUÇÕES:
       videoTitle={videoTitle}
       weeklyTask={lessonEndData.weeklyTask}
       summaryPoints={lessonEndData.summaryPoints}
+      mission={lessonEndData.mission}
       onGoHome={() => navigate('/aluno/dashboard')}
       onRestartLesson={() => {
         setAgentMode('idle');
@@ -1502,6 +1530,10 @@ INSTRUÇÕES:
         introCompletedRef.current = false;
         lastCheckedMomentRef.current = -1;
         videoPlayerRef.current?.restart();
+      }}
+      onStartMission={() => {
+        setAgentMode('idle');
+        onOpenMissions?.();
       }}
     />
     
