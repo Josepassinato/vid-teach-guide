@@ -28,6 +28,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<Float32Array[]>([]);
@@ -52,6 +53,13 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   }, []);
 
   const playQueue = useCallback(async (ctx: AudioContext) => {
+    // Ensure gain node exists
+    if (!gainNodeRef.current) {
+      gainNodeRef.current = ctx.createGain();
+      gainNodeRef.current.gain.value = 3.0; // Amplify volume 3x
+      gainNodeRef.current.connect(ctx.destination);
+    }
+    
     while (audioQueueRef.current.length > 0) {
       const samples = audioQueueRef.current.shift()!;
       const buffer = ctx.createBuffer(1, samples.length, 24000);
@@ -62,7 +70,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(ctx.destination);
+      source.connect(gainNodeRef.current!); // Connect to gain node instead of destination
       source.start();
       
       await new Promise(resolve => {
