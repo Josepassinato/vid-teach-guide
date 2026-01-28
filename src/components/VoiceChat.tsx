@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useOpenAIRealtime, VideoControls } from '@/hooks/useOpenAIRealtime';
-import { useVisionCapture } from '@/hooks/useVisionCapture';
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
@@ -361,11 +360,9 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     startListening,
     stopListening,
     sendText,
-    sendVisionFrame
   } = useOpenAIRealtime({
     systemInstruction,
     videoControls,
-    enableVision: engagement.vision.isEnabled,
     onTranscript: (text, role) => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -397,30 +394,58 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     }
   });
 
-  // Vision capture for sending frames to AI
-  const visionCaptureRef = useRef<((frame: string) => void) | null>(null);
+  // Send MediaPipe analysis (text) to OpenAI instead of raw frames (cheaper & more private)
+  const lastVisionUpdateRef = useRef<number>(0);
+  const lastVisionStateRef = useRef<string>('');
   
-  // Update the sendVisionFrame reference
+  // Periodically send MediaPipe vision analysis to OpenAI as text context
   useEffect(() => {
-    visionCaptureRef.current = sendVisionFrame;
-  }, [sendVisionFrame]);
-  
-  // Vision capture hook - sends periodic frames to OpenAI when vision is enabled
-  const visionCapture = useVisionCapture({
-    enabled: engagement.vision.isEnabled && status === 'connected',
-    captureIntervalMs: 5000, // Every 5 seconds when connected
-    quality: 0.5,
-    maxWidth: 480,
-    onFrame: (base64Image) => {
-      if (visionCaptureRef.current && status === 'connected') {
-        console.log('[VoiceChat] Sending vision frame to AI tutor');
-        visionCaptureRef.current(base64Image);
+    if (!engagement.vision.isEnabled || status !== 'connected') return;
+    
+    const intervalId = setInterval(() => {
+      const now = Date.now();
+      // Rate limit: max 1 update every 8 seconds
+      if (now - lastVisionUpdateRef.current < 8000) return;
+      
+      const visionSignals = engagement.vision.signals;
+      if (!visionSignals.enabled || !visionSignals.faceDetected) return;
+      
+      // Build a text description of the student's state
+      let stateDescription = '';
+      
+      // Gaze analysis
+      if (!visionSignals.isLookingAtScreen) {
+        stateDescription = 'O aluno está olhando para fora da tela.';
+      } else if (visionSignals.gazeOnVideoRatio < 0.5) {
+        stateDescription = 'O aluno parece distraído, olhando pouco para a tela.';
       }
-    },
-    onError: (error) => {
-      console.error('[VoiceChat] Vision capture error:', error);
-    },
-  });
+      
+      // Expression/fatigue analysis
+      if (visionSignals.expression === 'confused') {
+        stateDescription = 'O aluno parece confuso ou pensativo.';
+      } else if (visionSignals.expression === 'tired') {
+        stateDescription = 'O aluno parece cansado.';
+      }
+      
+      // Distance analysis
+      if (visionSignals.distanceFromScreen > 1.2) {
+        stateDescription = 'O aluno está se afastando da tela.';
+      }
+      
+      // Only send if there's something noteworthy AND it's different from last update
+      if (stateDescription && stateDescription !== lastVisionStateRef.current) {
+        lastVisionUpdateRef.current = now;
+        lastVisionStateRef.current = stateDescription;
+        
+        console.log('[VoiceChat] Sending MediaPipe analysis to tutor:', stateDescription);
+        
+        // Send as silent context (the AI won't read this aloud but will use it)
+        sendText(`[CONTEXTO VISUAL SILENCIOSO - NÃO LEIA EM VOZ ALTA, apenas adapte seu comportamento] ${stateDescription}`);
+      }
+    }, 3000); // Check every 3 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [engagement.vision.isEnabled, engagement.vision.signals, status, sendText]);
 
   // Update refs when values change
   useEffect(() => {
