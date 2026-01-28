@@ -309,19 +309,25 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       wsRef.current = ws;
       
        const preferredModel = (() => {
-         const m = (data as any)?.model as string | undefined;
-         if (!m) return 'models/gemini-live-2.5-flash-preview';
-         return m.startsWith('models/') ? m : `models/${m}`;
-       })();
+          const m = (data as any)?.model as string | undefined;
+          if (!m) return 'models/gemini-live-2.5-flash-preview';
+          return m.startsWith('models/') ? m : `models/${m}`;
+        })();
 
-       console.log('[GeminiLive] Using model:', preferredModel);
+        const supportsToolCalling = (data as any)?.supportsToolCalling !== false;
+
+        console.log('[GeminiLive] Using model:', preferredModel, 'supportsToolCalling:', supportsToolCalling);
+
+        if (!supportsToolCalling) {
+          toast.warning('Modelo atual não suporta controle de vídeo por voz. Use os botões na tela.', { duration: 5000 });
+        }
 
        ws.onopen = () => {
         console.log('WebSocket connected to Gemini');
         processedCallIdsRef.current.clear();
         
-        // Define tools for video control - use detailed descriptions for better understanding
-        const tools = [{
+        // Define tools for video control - only if model supports it
+        const tools = supportsToolCalling ? [{
           functionDeclarations: [
             {
               name: "play_video",
@@ -350,13 +356,18 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
               }
             }
           ]
-        }];
+        }] : undefined;
         
-        // Send setup message with Gemini 2.0 Flash
+        // Build system instruction - add note about video control if tools not supported
+        let systemText = currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro.";
+        if (!supportsToolCalling) {
+          systemText += "\n\nNOTA: O controle de vídeo por voz não está disponível neste momento. Quando o aluno pedir para pausar, dar play ou reiniciar o vídeo, oriente-o a usar os botões na interface.";
+        }
+
+        // Send setup message
         // Using Kore voice - warm female voice
         // Note: For Gemini Live API with audio, only AUDIO modality is supported
-        // Tool calling works through the modelTurn.parts[].functionCall structure
-        const setupMessage = {
+        const setupMessage: any = {
           setup: {
             model: preferredModel,
             generationConfig: {
@@ -373,12 +384,16 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
             },
             systemInstruction: {
               parts: [{
-                text: stripEmojis(currentOptions.systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Fale em português brasileiro.")
+                text: stripEmojis(systemText)
               }]
             },
-            tools: tools
           }
         };
+        
+        // Only add tools if model supports function calling
+        if (tools) {
+          setupMessage.setup.tools = tools;
+        }
         
         console.log('[GeminiLive] Enviando setup:', JSON.stringify(setupMessage, null, 2).substring(0, 500));
         ws.send(JSON.stringify(setupMessage));
