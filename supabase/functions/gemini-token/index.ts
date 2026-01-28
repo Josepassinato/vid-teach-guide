@@ -28,7 +28,8 @@ serve(async (req) => {
       JSON.stringify({ 
         token: GOOGLE_API_KEY,
         expiresAt: expireTime,
-        model: "gemini-2.0-flash-live-001",
+        // Keep this in sync with the Live WS client (v1alpha BidiGenerateContent)
+        model: "gemini-2.0-flash-exp",
         systemInstruction: systemInstruction || "Você é um professor amigável e didático. Seu objetivo é ensinar de forma clara e envolvente. Quando o aluno mencionar um vídeo ou conteúdo, analise e explique os pontos principais de forma acessível. Fale em português brasileiro.",
       }),
       {
