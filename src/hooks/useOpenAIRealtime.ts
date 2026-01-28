@@ -164,22 +164,31 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   }, []);
 
   const connect = useCallback(async () => {
+    console.log('🔌 [OPENAI CONNECT] Iniciando conexão...');
+    console.log('🔌 [OPENAI CONNECT] Status atual antes de conectar:', status);
+    
     try {
       updateStatus('connecting');
+      console.log('🔌 [OPENAI CONNECT] Status atualizado para: connecting');
       
       const currentOptions = optionsRef.current;
       
       // Get API key from edge function
+      console.log('🔌 [OPENAI CONNECT] Buscando API key...');
       const { data, error } = await supabase.functions.invoke('openai-realtime-token', {
         body: { systemInstruction: currentOptions.systemInstruction }
       });
       
       if (error || !data?.apiKey) {
+        console.error('🔌 [OPENAI CONNECT] ❌ Erro ao buscar API key:', error);
         throw new Error(error?.message || 'Failed to get API key');
       }
       
+      console.log('🔌 [OPENAI CONNECT] ✅ API key obtida, conectando WebSocket...');
+      
       // Connect to OpenAI Realtime API
       const wsUrl = `wss://api.openai.com/v1/realtime?model=${data.model}`;
+      console.log('🔌 [OPENAI CONNECT] URL:', wsUrl);
       
       const ws = new WebSocket(wsUrl, [
         "realtime",
@@ -187,6 +196,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         "openai-beta.realtime-v1"
       ]);
       wsRef.current = ws;
+      console.log('🔌 [OPENAI CONNECT] WebSocket criado');
       
       ws.onopen = () => {
         console.log('WebSocket connected to OpenAI');
@@ -488,46 +498,75 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
           // Handle errors
           if (data.type === "error") {
-            console.error('OpenAI Realtime error:', data.error);
+            console.error('🚨 [OPENAI ERROR] Erro recebido do OpenAI:', data.error);
+            console.error('🚨 [OPENAI ERROR] Código:', data.error?.code);
+            console.error('🚨 [OPENAI ERROR] Mensagem:', data.error?.message);
+            console.error('🚨 [OPENAI ERROR] Detalhes:', JSON.stringify(data.error, null, 2));
             optionsRef.current.onError?.(data.error?.message || 'Unknown error');
           }
+          
+          // Handle session created/updated
+          if (data.type === "session.created" || data.type === "session.updated") {
+            console.log('🔌 [OPENAI SESSION]', data.type);
+          }
         } catch (e) {
-          console.error('Error processing message:', e);
+          console.error('🚨 [OPENAI ERROR] Erro ao processar mensagem:', e);
         }
       };
 
       
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('🚨 [WEBSOCKET ERROR] Erro no WebSocket:', error);
+        console.error('🚨 [WEBSOCKET ERROR] Detalhes:', JSON.stringify(error, null, 2));
         updateStatus('error');
         optionsRef.current.onError?.('Connection error');
       };
       
-      ws.onclose = () => {
-        console.log('WebSocket closed');
+      ws.onclose = (event) => {
+        console.log('🔌 [WEBSOCKET CLOSE] WebSocket fechado');
+        console.log('🔌 [WEBSOCKET CLOSE] Código:', event.code);
+        console.log('🔌 [WEBSOCKET CLOSE] Motivo:', event.reason || '(sem motivo)');
+        console.log('🔌 [WEBSOCKET CLOSE] wasClean:', event.wasClean);
+        
+        // Códigos comuns:
+        // 1000 = fechamento normal
+        // 1001 = going away (navegador fechando)
+        // 1006 = abnormal closure (sem close frame)
+        // 1011 = unexpected condition
+        // 4000+ = application-specific
+        if (event.code !== 1000) {
+          console.warn('🚨 [WEBSOCKET CLOSE] Fechamento anormal! Código:', event.code);
+        }
+        
         updateStatus('disconnected');
         stopListening();
       };
       
     } catch (error) {
-      console.error('Connection error:', error);
+      console.error('🚨 [OPENAI CONNECT] Erro na conexão:', error);
       updateStatus('error');
       optionsRef.current.onError?.(error instanceof Error ? error.message : 'Connection failed');
     }
   }, [updateStatus, playAudioChunk, stopListening]);
 
   const disconnect = useCallback(() => {
+    console.log('🔌 [OPENAI DISCONNECT] Desconectando manualmente...');
+    console.log('🔌 [OPENAI DISCONNECT] Stack trace:', new Error().stack);
     stopListening();
     
     if (wsRef.current) {
-      wsRef.current.close();
+      console.log('🔌 [OPENAI DISCONNECT] Fechando WebSocket (readyState:', wsRef.current.readyState, ')');
+      wsRef.current.close(1000, 'User disconnect');
       wsRef.current = null;
+    } else {
+      console.log('🔌 [OPENAI DISCONNECT] WebSocket já era null');
     }
     
     audioQueueRef.current = [];
     isPlayingRef.current = false;
     setIsSpeaking(false);
     updateStatus('disconnected');
+    console.log('🔌 [OPENAI DISCONNECT] Desconexão completa');
   }, [updateStatus, stopListening]);
 
   const startListening = useCallback(async () => {
