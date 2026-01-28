@@ -304,10 +304,10 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                   console.log('[OPENAI TOOL CALL] EXECUTANDO: play_video');
                   console.log('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
                   console.log('[OPENAI TOOL CALL] Aguardando agente terminar de falar antes de dar play...');
-                  toast.info('Aguardando professor terminar de falar...');
+                  toast.info('Aguardando professor terminar de falar...', { duration: 2000 });
                   await waitForSpeechToEnd();
                   console.log('[OPENAI TOOL CALL] Agente terminou de falar, dando play agora!');
-                  toast.success('Dando play no video...');
+                  toast.success('Dando play no video...', { duration: 2000 });
                   videoControlsRef.current.play();
                   setTimeout(() => {
                     console.log('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
@@ -317,7 +317,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 case "pause_video":
                   console.log('[OPENAI TOOL CALL] EXECUTANDO: pause_video');
                   console.log('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
-                  toast.success('Pausando video...');
+                  toast.success('Pausando video...', { duration: 2000 });
                   videoControlsRef.current.pause();
                   setTimeout(() => {
                     console.log('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
@@ -328,10 +328,10 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                   console.log('[OPENAI TOOL CALL] EXECUTANDO: restart_video');
                   console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime);
                   console.log('[OPENAI TOOL CALL] Aguardando agente terminar de falar antes de reiniciar...');
-                  toast.info('Aguardando professor terminar de falar...');
+                  toast.info('Aguardando professor terminar de falar...', { duration: 2000 });
                   await waitForSpeechToEnd();
                   console.log('[OPENAI TOOL CALL] Agente terminou de falar, reiniciando agora!');
-                  toast.success('Reiniciando video...');
+                  toast.success('Reiniciando video...', { duration: 2000 });
                   videoControlsRef.current.restart();
                   setTimeout(() => {
                     console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
@@ -342,7 +342,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                   const targetSeconds = Number(args.seconds) || 0;
                   console.log('[OPENAI TOOL CALL] EXECUTANDO: seek_video');
                   console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Destino:', targetSeconds);
-                  toast.success(`Pulando para ${targetSeconds}s...`);
+                  toast.success(`Pulando para ${targetSeconds}s...`, { duration: 2000 });
                   videoControlsRef.current.seekTo(targetSeconds);
                   setTimeout(() => {
                     console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
