@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useGeminiLive, VideoControls } from '@/hooks/useGeminiLive';
+import { useOpenAIRealtime, VideoControls } from '@/hooks/useOpenAIRealtime';
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
@@ -332,7 +332,7 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     startListening,
     stopListening,
     sendText
-  } = useGeminiLive({
+  } = useOpenAIRealtime({
     systemInstruction,
     videoControls,
     onTranscript: (text, role) => {

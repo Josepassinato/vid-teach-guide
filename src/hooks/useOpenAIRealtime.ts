@@ -585,6 +585,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     status,
     isListening,
     isSpeaking,
+    isVoiceDetected: isListening, // Approximation: voice detected when listening is active
     connect,
     disconnect,
     startListening,
