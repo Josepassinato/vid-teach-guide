@@ -428,9 +428,9 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 console.log('[OPENAI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
                 
                 if (queueLength === 0 && !isPlaying) {
-                  console.log('[OPENAI] Fala terminou, prosseguindo...');
-                  // Add small buffer to ensure audio fully finished
-                  setTimeout(resolve, 300);
+                  console.log('[OPENAI] Fala terminou, aguardando 2 segundos...');
+                  // 2 second buffer after speech ends
+                  setTimeout(resolve, 2000);
                 } else {
                   setTimeout(checkSpeech, 100);
                 }
