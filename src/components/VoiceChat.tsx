@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useOpenAIRealtime, VideoControls } from '@/hooks/useOpenAIRealtime';
+import { useOpenAIRealtime, VideoControls, ConnectionStep } from '@/hooks/useOpenAIRealtime';
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
@@ -58,6 +58,7 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
   const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
   const [lessonEndData, setLessonEndData] = useState<{ weeklyTask?: string; summaryPoints?: string[] }>({});
   const [showVisionConsent, setShowVisionConsent] = useState(false);
+  const [connectionStep, setConnectionStep] = useState<'idle' | 'fetching_key' | 'connecting_ws' | 'configuring' | 'ready'>('idle');
   const videoPlayerRef = useRef<VideoPlayerRef | DirectVideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
@@ -405,7 +406,13 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     onStatusChange: (newStatus) => {
       console.log(`🔄 [VOICECHAT STATUS] Status mudou para: ${newStatus}`);
       console.log(`🔄 [VOICECHAT STATUS] agentMode atual: ${agentMode}`);
-      console.log(`🔄 [VOICECHAT STATUS] Stack trace:`, new Error().stack?.split('\n').slice(0, 5).join('\n'));
+      if (newStatus === 'disconnected') {
+        setConnectionStep('idle');
+      }
+    },
+    onConnectionStepChange: (step) => {
+      console.log(`🔄 [VOICECHAT STEP] Etapa de conexão: ${step}`);
+      setConnectionStep(step);
     }
   });
 
@@ -942,6 +949,17 @@ INSTRUÇÕES:
     }
   }, [status, agentMode]);
 
+  // Detailed connection step text for better UX
+  const connectionStepText = useMemo(() => {
+    switch (connectionStep) {
+      case 'fetching_key': return 'Buscando credenciais...';
+      case 'connecting_ws': return 'Conectando ao tutor...';
+      case 'configuring': return 'Configurando sessão...';
+      case 'ready': return 'Pronto!';
+      default: return 'Conectando...';
+    }
+  }, [connectionStep]);
+
   return (
     <>
     <Card className={`flex flex-col transition-all duration-500 ${
@@ -1345,8 +1363,11 @@ INSTRUÇÕES:
                 Iniciar Aula
               </Button>
             ) : status === 'connecting' ? (
-              <Button disabled className="flex-1 h-12 sm:h-11 text-sm sm:text-base">
-                Conectando...
+              <Button disabled className="flex-1 h-12 sm:h-11 text-sm sm:text-base gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  <span>{connectionStepText}</span>
+                </div>
               </Button>
             ) : agentMode === 'intro' && status === 'connected' ? (
               <>
