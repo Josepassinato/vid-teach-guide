@@ -133,6 +133,134 @@ export type Database = {
         }
         Relationships: []
       }
+      squad_members: {
+        Row: {
+          id: string
+          joined_at: string
+          role: string
+          squad_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          role?: string
+          squad_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          role?: string
+          squad_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_members_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squad_mission_submissions: {
+        Row: {
+          ai_evaluation: Json | null
+          ai_feedback: string | null
+          created_at: string
+          evaluated_at: string | null
+          evidence_text: string | null
+          evidence_url: string | null
+          id: string
+          mission_id: string
+          score: number | null
+          squad_id: string
+          status: string
+          submitted_at: string
+          submitted_by: string
+          updated_at: string
+        }
+        Insert: {
+          ai_evaluation?: Json | null
+          ai_feedback?: string | null
+          created_at?: string
+          evaluated_at?: string | null
+          evidence_text?: string | null
+          evidence_url?: string | null
+          id?: string
+          mission_id: string
+          score?: number | null
+          squad_id: string
+          status?: string
+          submitted_at?: string
+          submitted_by: string
+          updated_at?: string
+        }
+        Update: {
+          ai_evaluation?: Json | null
+          ai_feedback?: string | null
+          created_at?: string
+          evaluated_at?: string | null
+          evidence_text?: string | null
+          evidence_url?: string | null
+          id?: string
+          mission_id?: string
+          score?: number | null
+          squad_id?: string
+          status?: string
+          submitted_at?: string
+          submitted_by?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "squad_mission_submissions_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "squad_mission_submissions_squad_id_fkey"
+            columns: ["squad_id"]
+            isOneToOne: false
+            referencedRelation: "squads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      squads: {
+        Row: {
+          created_at: string
+          current_members: number
+          id: string
+          is_active: boolean
+          max_members: number
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_members?: number
+          id?: string
+          is_active?: boolean
+          max_members?: number
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_members?: number
+          id?: string
+          is_active?: boolean
+          max_members?: number
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       student_achievements: {
         Row: {
           average_score: number | null
