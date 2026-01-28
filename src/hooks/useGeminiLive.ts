@@ -141,12 +141,12 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         console.log('[GEMINI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
         
         if (queueLength === 0 && !isPlaying) {
-          console.log('[GEMINI] Fala terminou, aguardando 5 segundos...');
-          // 5 second buffer after speech ends for natural pause
+          console.log('[GEMINI] Fala terminou, aguardando 2 segundos...');
+          // 2 second buffer after speech ends for natural pause
           setTimeout(() => {
-            console.log('[GEMINI] Buffer de 5s concluído, prosseguindo...');
+            console.log('[GEMINI] Buffer de 2s concluído, prosseguindo...');
             resolve();
-          }, 5000);
+          }, 2000);
         } else {
           setTimeout(checkSpeech, 100);
         }
