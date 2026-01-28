@@ -14,9 +14,17 @@ import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
 
+// DEV BYPASS CHECK
+const isDevBypass = () => localStorage.getItem('dev_bypass_auth') === 'true';
+
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+
+  // Allow dev bypass
+  if (isDevBypass()) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
@@ -36,6 +44,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // Public route - redirect to /aluno if already logged in
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+
+  // Allow dev bypass to still see login page (for switching modes)
+  if (isDevBypass()) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
