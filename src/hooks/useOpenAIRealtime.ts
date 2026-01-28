@@ -20,6 +20,9 @@ interface UseOpenAIRealtimeOptions {
   onStatusChange?: (status: ConnectionStatus) => void;
   onConnectionStepChange?: (step: ConnectionStep) => void;
   videoControls?: VideoControls | null;
+  // Memory callbacks
+  onSaveStudentName?: (name: string) => void;
+  onSaveEmotionalObservation?: (emotion: string, context: string) => void;
 }
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -300,7 +303,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         processedCallIdsRef.current.clear();
         optionsRef.current.onConnectionStepChange?.('configuring');
         
-        // Define tools for video control - use detailed descriptions for better understanding
+        // Define tools for video control and memory - use detailed descriptions for better understanding
         const tools = [
           {
             type: "function",
@@ -354,6 +357,38 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 seconds: { type: "number", description: "Quantos segundos avancar. Padrao: 10 segundos" }
               },
               required: []
+            }
+          },
+          // Memory tools
+          {
+            type: "function",
+            name: "save_student_name",
+            description: "MUITO IMPORTANTE: Salva o nome do aluno na memoria de longo prazo. SEMPRE chame esta funcao quando o aluno disser o nome dele. Exemplo: se o aluno disser 'Meu nome é João' ou 'Pode me chamar de Maria', extraia o nome e salve.",
+            parameters: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "O nome do aluno extraido da conversa" }
+              },
+              required: ["name"]
+            }
+          },
+          {
+            type: "function",
+            name: "save_emotional_observation",
+            description: "Registra uma observacao sobre o estado emocional do aluno. Use quando perceber estados emocionais marcantes como: empolgado, confuso, frustrado, cansado, entediado, curioso, feliz, ansioso. Isso ajuda a personalizar futuras interacoes.",
+            parameters: {
+              type: "object",
+              properties: {
+                emotion: { 
+                  type: "string", 
+                  description: "O estado emocional detectado: empolgado, confuso, frustrado, cansado, entediado, curioso, feliz, ansioso, neutro" 
+                },
+                context: { 
+                  type: "string", 
+                  description: "Contexto breve de quando/porque o estado foi detectado. Ex: 'Ficou empolgado ao entender o conceito de variaveis'" 
+                }
+              },
+              required: ["emotion", "context"]
             }
           }
         ];
@@ -562,8 +597,34 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                   console.warn('[OPENAI TOOL CALL] ERRO: Funcao desconhecida:', name);
                   result = { ok: false, message: `Funcao desconhecida: ${name}` };
               }
-            } else {
-              console.error('[OPENAI TOOL CALL] ERRO: videoControlsRef.current e NULL');
+            } 
+            // Handle memory functions (don't require video controls)
+            else if (name === "save_student_name") {
+              const studentName = args.name as string;
+              console.log('[OPENAI TOOL CALL] EXECUTANDO: save_student_name');
+              console.log('[OPENAI TOOL CALL] Nome do aluno:', studentName);
+              if (studentName && optionsRef.current.onSaveStudentName) {
+                optionsRef.current.onSaveStudentName(studentName);
+                toast.success(`Nome salvo: ${studentName}`, { duration: 2000 });
+                result = { ok: true, message: `Nome "${studentName}" salvo na memoria` };
+              } else {
+                result = { ok: false, message: "Nao foi possivel salvar o nome" };
+              }
+            } 
+            else if (name === "save_emotional_observation") {
+              const emotion = args.emotion as string;
+              const context = args.context as string;
+              console.log('[OPENAI TOOL CALL] EXECUTANDO: save_emotional_observation');
+              console.log('[OPENAI TOOL CALL] Emocao:', emotion, 'Contexto:', context);
+              if (emotion && context && optionsRef.current.onSaveEmotionalObservation) {
+                optionsRef.current.onSaveEmotionalObservation(emotion, context);
+                result = { ok: true, message: `Observacao emocional registrada: ${emotion}` };
+              } else {
+                result = { ok: false, message: "Nao foi possivel registrar a observacao" };
+              }
+            }
+            else {
+              console.error('[OPENAI TOOL CALL] ERRO: videoControlsRef.current e NULL para funcao de video');
               console.error('[OPENAI TOOL CALL] Nao foi possivel executar:', name);
               toast.error('Nenhum video carregado');
               result = { ok: false, message: "Nenhum video carregado" };

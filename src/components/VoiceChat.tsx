@@ -9,6 +9,7 @@ import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
 import { useMissions, Mission } from '@/hooks/useMissions';
+import { useStudentMemory, StudentProfile } from '@/hooks/useStudentMemory';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { DirectVideoPlayer, DirectVideoPlayerRef } from './DirectVideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
@@ -118,6 +119,20 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
     missions: lessonMissions,
     loadMissions,
   } = useMissions(studentId);
+
+  // Student Memory - long-term memory for name, emotional patterns, learning style
+  const {
+    profile: studentProfile,
+    updateProfile: updateStudentProfile,
+    recordObservation,
+    buildMemoryContext,
+  } = useStudentMemory();
+
+  // Ref for memory context to avoid stale closures
+  const studentProfileRef = useRef<StudentProfile | null>(null);
+  useEffect(() => {
+    studentProfileRef.current = studentProfile;
+  }, [studentProfile]);
 
   // Load missions when videoDbId changes
   useEffect(() => {
@@ -332,9 +347,56 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
    - Ex: "TAREFA DA SEMANA: criar um projeto simples usando X" ou "TAREFA DA SEMANA: Pratique Y fazendo Z"
 5. Despeça-se de forma motivadora e informal`;
 
+    // Student Memory Context
+    const profile = studentProfileRef.current;
+    if (profile) {
+      instruction += `
+
+=== MEMÓRIA DO ALUNO (PERSISTENTE) ===
+Você tem MEMÓRIA de longo prazo sobre este aluno. Use essas informações para personalizar a experiência:
+- Nome do aluno: ${profile.name || 'AINDA NÃO SABE (pergunte de forma natural!)'}
+- Interações anteriores: ${profile.interaction_count || 0} sessões
+- Tempo total de estudo: ${profile.total_study_time_minutes || 0} minutos
+${profile.learning_style ? `- Estilo de aprendizagem: ${profile.learning_style}` : ''}
+${profile.strengths?.length ? `- Pontos fortes: ${profile.strengths.join(', ')}` : ''}
+${profile.areas_to_improve?.length ? `- Áreas a melhorar: ${profile.areas_to_improve.join(', ')}` : ''}
+${profile.personality_notes ? `- Observações pessoais: ${profile.personality_notes}` : ''}
+
+INSTRUÇÕES DE MEMÓRIA:
+${!profile.name ? `- Na PRIMEIRA interação, pergunte o nome do aluno DE FORMA NATURAL: "E aí! Antes de começar, qual é o seu nome?" ou "Opa! Prazer te conhecer! Como posso te chamar?"
+- Quando o aluno responder o nome, USE a função save_student_name para guardar. ISSO É MUITO IMPORTANTE!` : `- Use o nome "${profile.name}" naturalmente na conversa para criar conexão pessoal
+- Exemplo: "E aí, ${profile.name}! Preparado(a) pra mais uma aula incrível?"`}
+
+=== FUNÇÕES DE MEMÓRIA ===
+Você TEM estas funções para salvar informações do aluno:
+1. save_student_name: Quando o aluno disser o nome dele, SALVE imediatamente
+2. save_emotional_observation: Quando perceber um estado emocional (feliz, confuso, frustrado, empolgado, cansado), REGISTRE
+
+SEMPRE use save_student_name quando o aluno se apresentar!`;
+    }
+
+    // Emotional Perception
+    instruction += `
+
+=== PERCEPÇÃO EMOCIONAL ===
+Você deve estar ATENTO aos sinais emocionais do aluno através:
+1. TOM DE VOZ: Perceba entusiasmo, hesitação, frustração ou confusão na forma como ele fala
+2. PALAVRAS: Identifique expressões como "não entendi", "isso é difícil", "legal!", "uau"
+3. PAUSAS: Silêncios longos podem indicar confusão ou desengajamento
+4. PERGUNTAS: Muitas perguntas podem indicar curiosidade OU confusão
+
+COMO RESPONDER A CADA ESTADO:
+- EMPOLGADO/FELIZ: Alimente o entusiasmo! "Isso aí! Adoro essa energia!"
+- CONFUSO: Desacelere, reformule: "Opa, deixa eu explicar de outro jeito..."
+- FRUSTRADO: Valide o sentimento: "Ei, eu entendo! Isso é desafiador mesmo. Respira fundo..."
+- CANSADO: Sugira pausa: "Que tal um intervalinho de 2 minutos?"
+- DESINTERESSADO: Traga energia: "Olha só essa parte aqui, é MUITO legal!"
+
+Quando detectar um estado emocional marcante, use save_emotional_observation para registrar.`;
+
 
     return instruction;
-  }, [videoContext, videoTitle, videoTranscript, contentPlan, timestampQuizzes.length, engagement.vision.isEnabled]);
+  }, [videoContext, videoTitle, videoTranscript, contentPlan, timestampQuizzes.length, engagement.vision.isEnabled, studentProfile]);
 
   const systemInstruction = buildSystemInstruction();
 
@@ -381,6 +443,27 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
     };
   }, [hasVideo]);
 
+  // Memory callbacks for agent tool calls
+  const handleSaveStudentName = useCallback((name: string) => {
+    console.log('[VoiceChat] Salvando nome do aluno:', name);
+    updateStudentProfile({ name });
+  }, [updateStudentProfile]);
+
+  const handleSaveEmotionalObservation = useCallback((emotion: string, context: string) => {
+    console.log('[VoiceChat] Registrando observação emocional:', emotion, context);
+    recordObservation({
+      observation_type: 'engagement',
+      observation_data: { 
+        emotion, 
+        context,
+        detected_at: new Date().toISOString(),
+        video_title: videoTitle,
+      },
+      context: `Emoção: ${emotion} - ${context}`,
+      video_id: videoDbId,
+    });
+  }, [recordObservation, videoTitle, videoDbId]);
+
   const {
     status,
     isListening,
@@ -394,6 +477,8 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
   } = useOpenAIRealtime({
     systemInstruction,
     videoControls,
+    onSaveStudentName: handleSaveStudentName,
+    onSaveEmotionalObservation: handleSaveEmotionalObservation,
     onTranscript: (text, role) => {
       console.log(`📝 [VOICECHAT TRANSCRIPT] ${role}: ${text.substring(0, 100)}...`);
       setMessages(prev => [...prev, {
