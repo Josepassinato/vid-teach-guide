@@ -314,6 +314,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
          return m.startsWith('models/') ? m : `models/${m}`;
        })();
 
+       console.log('[GeminiLive] Using model:', preferredModel);
+
        ws.onopen = () => {
         console.log('WebSocket connected to Gemini');
         processedCallIdsRef.current.clear();
@@ -533,7 +535,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         optionsRef.current.onError?.('Erro de conexao com Gemini');
       };
       
-      ws.onclose = (event) => {
+       ws.onclose = (event) => {
         console.log('[GeminiLive] WebSocket closed');
         console.log('[GeminiLive] Close code:', event.code);
         console.log('[GeminiLive] Close reason:', event.reason || 'Nenhuma razao fornecida');
@@ -544,10 +546,11 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         // 1006 = Abnormal closure (connection lost)
         // 1011 = Server error
         // 1015 = TLS handshake failure
-        if (event.code !== 1000) {
-          console.error('[GeminiLive] Conexao fechada com erro. Codigo:', event.code);
-          optionsRef.current.onError?.(`Conexao fechada: codigo ${event.code}`);
-        }
+         if (event.code !== 1000) {
+           console.error('[GeminiLive] Conexao fechada com erro. Codigo:', event.code);
+           const reason = event.reason ? ` (${event.reason})` : '';
+           optionsRef.current.onError?.(`Conexao fechada: codigo ${event.code}${reason}`);
+         }
         
         updateStatus('disconnected');
         stopListening();

@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { motion } from 'framer-motion';
 
 interface VoiceIndicatorProps {
@@ -6,7 +7,8 @@ interface VoiceIndicatorProps {
   isVoiceDetected?: boolean; // Shows when voice is actively detected vs silence
 }
 
-export function VoiceIndicator({ isActive, type, isVoiceDetected = true }: VoiceIndicatorProps) {
+export const VoiceIndicator = forwardRef<HTMLDivElement, VoiceIndicatorProps>(
+  ({ isActive, type, isVoiceDetected = true }, ref) => {
   const barCount = 5;
   
   // When listening, use different visual based on voice detection
@@ -59,7 +61,7 @@ export function VoiceIndicator({ isActive, type, isVoiceDetected = true }: Voice
   };
   
   return (
-    <div className="flex items-center justify-center gap-1 h-8 relative">
+    <div ref={ref} className="flex items-center justify-center gap-1 h-8 relative">
       {Array.from({ length: barCount }).map((_, i) => {
         const anim = getAnimation();
         return (
@@ -100,4 +102,7 @@ export function VoiceIndicator({ isActive, type, isVoiceDetected = true }: Voice
       )}
     </div>
   );
-}
+  }
+);
+
+VoiceIndicator.displayName = 'VoiceIndicator';
