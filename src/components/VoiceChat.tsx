@@ -240,9 +240,11 @@ ${contentPlan.teaching_moments.map((m, i) =>
 ).join('\n')}
 
 Quando receber "MOMENTO DE APROFUNDAMENTO":
-1. Explore o conceito com clareza
-2. Faça perguntas para verificar entendimento
-3. Só continue quando o aluno confirmar`;
+1. Explique o insight principal em 2-3 frases
+2. Faça APENAS UMA pergunta e PARE DE FALAR
+3. ESPERE em silêncio a resposta do aluno
+4. Só depois que o aluno responder, continue a conversa
+5. NUNCA faça múltiplas perguntas consecutivas - isso confunde o aluno`;
     }
 
     // Quizzes

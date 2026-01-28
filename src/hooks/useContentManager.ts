@@ -238,24 +238,33 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
   }, [contentPlan, currentMomentIndex]);
 
   const generateTeacherInstructions = useCallback((moment: TeachingMoment): string => {
+    // Get just the FIRST question to ask
+    const firstQuestion = moment.questions_to_ask[0] || 'O que você entendeu deste conceito?';
+    const remainingQuestions = moment.questions_to_ask.slice(1);
+    
     return `
 MOMENTO DE APROFUNDAMENTO - ${moment.topic}
-Nível: ${moment.difficulty_level || 'intermediário'}
 
-INSTRUÇÃO PARA O PROFESSOR IA:
-${moment.teaching_approach || 'Pause o vídeo e explore este conceito com o aluno.'}
+REGRA CRÍTICA - UMA PERGUNTA POR VEZ:
+Você DEVE fazer APENAS UMA pergunta e ESPERAR a resposta do aluno antes de continuar.
+NÃO faça múltiplas perguntas seguidas. Isso é proibido.
 
 INSIGHT PRINCIPAL:
 ${moment.key_insight}
 
-PERGUNTAS PARA FAZER AO ALUNO:
-${moment.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+INSTRUÇÃO:
+1. Explique brevemente o insight principal (2-3 frases no máximo)
+2. Faça APENAS esta pergunta e PARE de falar: "${firstQuestion}"
+3. AGUARDE em silêncio a resposta do aluno
+4. Só depois da resposta, responda ao aluno e faça a próxima pergunta SE necessário
 
-${moment.discussion_points?.length > 0 ? `PONTOS DE DISCUSSÃO:\n${moment.discussion_points.map((p) => `- ${p}`).join('\n')}` : ''}
+${remainingQuestions.length > 0 ? `PERGUNTAS ADICIONAIS (use apenas se necessário, uma por vez):
+${remainingQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}` : ''}
 
-Tempo sugerido: ${moment.estimated_discussion_minutes || 2} minutos
+${moment.discussion_points?.length > 0 ? `PONTOS PARA APROFUNDAR (apenas se o aluno demonstrar interesse):
+${moment.discussion_points.map((p) => `- ${p}`).join('\n')}` : ''}
 
-Após explorar este momento, pergunte ao aluno se está pronto para continuar o vídeo.
+APÓS a conversa, pergunte: "Pronto para continuar o vídeo?"
 `;
   }, []);
 
