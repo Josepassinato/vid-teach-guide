@@ -45,14 +45,35 @@ vi.mock('@/integrations/supabase/client', () => ({
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         order: vi.fn(() => Promise.resolve({ data: [], error: null })),
-        eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
+        eq: vi.fn(() => ({
+          single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        })),
       })),
       insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
-      update: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      update: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      })),
       upsert: vi.fn(() => Promise.resolve({ data: null, error: null })),
     })),
     functions: {
       invoke: vi.fn(() => Promise.resolve({ data: null, error: null })),
     },
+    auth: {
+      getSession: vi.fn(() => Promise.resolve({ data: { session: null }, error: null })),
+      onAuthStateChange: vi.fn(() => ({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      })),
+      signUp: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      signInWithPassword: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      signOut: vi.fn(() => Promise.resolve({ error: null })),
+    },
   },
 }));
+
+// Mock useAuth hook - can be overridden in individual tests
+vi.mock('@/hooks/useAuth', async () => {
+  const { mockAuthAuthenticated } = await import('./mocks/auth');
+  return {
+    useAuth: vi.fn(() => mockAuthAuthenticated),
+  };
+});
