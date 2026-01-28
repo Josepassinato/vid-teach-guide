@@ -312,13 +312,37 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
           {
             type: "function",
             name: "seek_video",
-            description: "Pula para um momento especifico do video em segundos. Use quando o aluno mencionar um tempo especifico.",
+            description: "Pula para um momento especifico do video em segundos. Use quando o aluno mencionar um tempo especifico como 'vai para 30 segundos' ou 'pula pro minuto 2'.",
             parameters: {
               type: "object",
               properties: {
                 seconds: { type: "number", description: "O tempo em segundos para pular" }
               },
               required: ["seconds"]
+            }
+          },
+          {
+            type: "function",
+            name: "seek_backward",
+            description: "OBRIGATORIO: Volta o video alguns segundos. Gatilhos: 'volta', 'volte', 'retrocede', 'volta X segundos', 'volta um pouco', 'repete essa parte', 'nao entendi volta'. Quando o aluno pedir para voltar sem especificar quanto, use 10 segundos como padrao.",
+            parameters: {
+              type: "object",
+              properties: {
+                seconds: { type: "number", description: "Quantos segundos voltar. Padrao: 10 segundos" }
+              },
+              required: []
+            }
+          },
+          {
+            type: "function",
+            name: "seek_forward",
+            description: "OBRIGATORIO: Avanca o video alguns segundos. Gatilhos: 'avanca', 'adianta', 'pula', 'pula X segundos', 'avanca um pouco', 'vai pra frente', 'skip'. Quando o aluno pedir para avancar sem especificar quanto, use 10 segundos como padrao.",
+            parameters: {
+              type: "object",
+              properties: {
+                seconds: { type: "number", description: "Quantos segundos avancar. Padrao: 10 segundos" }
+              },
+              required: []
             }
           }
         ];
@@ -498,6 +522,30 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                     console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
                   }, 100);
                   result = { ok: true, message: `Video pulou para ${targetSeconds} segundos` };
+                  break;
+                case "seek_backward":
+                  const backwardSeconds = Number(args.seconds) || 10;
+                  const newTimeBack = Math.max(0, beforeTime - backwardSeconds);
+                  console.log('[OPENAI TOOL CALL] EXECUTANDO: seek_backward');
+                  console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Voltando:', backwardSeconds, 's -> Novo tempo:', newTimeBack);
+                  toast.success(`Voltando ${backwardSeconds} segundos...`, { duration: 2000 });
+                  videoControlsRef.current.seekTo(newTimeBack);
+                  setTimeout(() => {
+                    console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+                  }, 100);
+                  result = { ok: true, message: `Video voltou ${backwardSeconds} segundos para ${newTimeBack}s` };
+                  break;
+                case "seek_forward":
+                  const forwardSeconds = Number(args.seconds) || 10;
+                  const newTimeForward = beforeTime + forwardSeconds;
+                  console.log('[OPENAI TOOL CALL] EXECUTANDO: seek_forward');
+                  console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Avancando:', forwardSeconds, 's -> Novo tempo:', newTimeForward);
+                  toast.success(`Avançando ${forwardSeconds} segundos...`, { duration: 2000 });
+                  videoControlsRef.current.seekTo(newTimeForward);
+                  setTimeout(() => {
+                    console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+                  }, 100);
+                  result = { ok: true, message: `Video avancou ${forwardSeconds} segundos para ${newTimeForward}s` };
                   break;
                 default:
                   console.warn('[OPENAI TOOL CALL] ERRO: Funcao desconhecida:', name);
