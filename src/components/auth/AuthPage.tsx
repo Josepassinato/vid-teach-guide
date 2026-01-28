@@ -7,7 +7,7 @@ import { SignupForm } from './SignupForm';
 import { Button } from '@/components/ui/button';
 
 // DEV MODE - Set to false in production
-const DEV_BYPASS_AUTH = true;
+const DEV_BYPASS_AUTH = false;
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
