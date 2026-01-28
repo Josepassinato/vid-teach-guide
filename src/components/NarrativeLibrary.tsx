@@ -134,22 +134,44 @@ export function NarrativeLibrary({ password }: NarrativeLibraryProps) {
     return lessons.filter(l => !l.module_id);
   };
 
+  // ~150 palavras/minuto, ~6 chars/palavra = ~900 chars/minuto
+  // 5 minutos = ~4500 caracteres mínimo
+  const MIN_CHARS_5MIN = 4500;
+  const CHARS_PER_MINUTE = 900;
+
+  const estimateDuration = (text: string | null) => {
+    if (!text) return 0;
+    const words = text.trim().split(/\s+/).length;
+    return Math.round(words / 150); // minutos baseado em 150 palavras/min
+  };
+
+  const getCharProgress = (text: string | null) => {
+    if (!text) return 0;
+    return Math.min(100, Math.round((text.length / MIN_CHARS_5MIN) * 100));
+  };
+
   const getLessonStatus = (lesson: Lesson) => {
-    if (lesson.transcript && lesson.transcript.length > 100) {
-      return { status: 'complete', label: 'Narrativa Completa', color: 'bg-green-500' };
+    const charCount = lesson.transcript?.length || 0;
+    const duration = estimateDuration(lesson.transcript);
+    
+    if (charCount >= MIN_CHARS_5MIN) {
+      return { status: 'complete', label: `~${duration} min`, color: 'bg-green-500' };
     }
-    if (lesson.transcript && lesson.transcript.length > 0) {
-      return { status: 'partial', label: 'Rascunho', color: 'bg-yellow-500' };
+    if (charCount > 500) {
+      return { status: 'partial', label: `~${duration} min (mín. 5)`, color: 'bg-yellow-500' };
     }
-    return { status: 'empty', label: 'Pendente', color: 'bg-red-500/60' };
+    return { status: 'empty', label: 'Pendente', color: 'bg-destructive/60' };
   };
 
   const stats = {
     total: lessons.length,
-    complete: lessons.filter(l => l.transcript && l.transcript.length > 100).length,
-    partial: lessons.filter(l => l.transcript && l.transcript.length > 0 && l.transcript.length <= 100).length,
+    complete: lessons.filter(l => (l.transcript?.length || 0) >= MIN_CHARS_5MIN).length,
+    partial: lessons.filter(l => l.transcript && l.transcript.length > 0 && l.transcript.length < MIN_CHARS_5MIN).length,
     empty: lessons.filter(l => !l.transcript).length,
   };
+
+  const currentDuration = estimateDuration(editingNarrative);
+  const currentProgress = getCharProgress(editingNarrative);
 
   if (isLoading) {
     return (
@@ -351,13 +373,38 @@ export function NarrativeLibrary({ password }: NarrativeLibraryProps) {
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Duration Progress */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium flex items-center gap-2">
+                  ⏱️ Duração estimada: ~{currentDuration} min
+                  {currentDuration >= 5 ? (
+                    <Badge className="bg-green-500 text-xs">✓ Mínimo atingido</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs border-amber-500 text-amber-600">
+                      Mínimo: 5 min
+                    </Badge>
+                  )}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {editingNarrative.length.toLocaleString()} / {MIN_CHARS_5MIN.toLocaleString()} caracteres
+                </span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all ${currentProgress >= 100 ? 'bg-green-500' : 'bg-amber-500'}`}
+                  style={{ width: `${currentProgress}%` }}
+                />
+              </div>
+            </div>
+
             <div className="bg-muted/50 rounded-lg p-3 text-sm">
               <p className="font-medium mb-1">💡 Dicas para a narrativa:</p>
               <ul className="text-muted-foreground space-y-1 text-xs">
                 <li>• Escreva como se fosse o roteiro que o avatar vai falar</li>
+                <li>• Mínimo ~750 palavras para gerar 5 minutos de vídeo</li>
                 <li>• Inclua saudações, transições e despedidas naturais</li>
                 <li>• Seja detalhado - esta será a base de conhecimento do tutor IA</li>
-                <li>• Use linguagem acessível e exemplos práticos</li>
               </ul>
             </div>
 
@@ -365,14 +412,14 @@ export function NarrativeLibrary({ password }: NarrativeLibraryProps) {
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium">Narrativa / Roteiro</label>
                 <span className="text-xs text-muted-foreground">
-                  {editingNarrative.length} caracteres
+                  ~{editingNarrative.trim().split(/\s+/).filter(Boolean).length} palavras
                 </span>
               </div>
               <Textarea
                 value={editingNarrative}
                 onChange={(e) => setEditingNarrative(e.target.value)}
-                placeholder="Cole aqui a narrativa/roteiro completo da aula que será usado para criar o vídeo com avatar..."
-                className="min-h-[400px] font-mono text-sm"
+                placeholder="Cole aqui a narrativa/roteiro completo da aula que será usado para criar o vídeo com avatar. Mínimo de ~750 palavras para 5 minutos de vídeo..."
+                className="min-h-[350px] font-mono text-sm"
               />
             </div>
           </div>
