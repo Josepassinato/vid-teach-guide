@@ -21,6 +21,19 @@ interface UseOpenAIRealtimeOptions {
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
+// Silence timeout configuration (ms)
+const SILENCE_TIMEOUT_MS = 3000;
+
+// Proactive prompts to encourage student engagement
+const PROACTIVE_PROMPTS = [
+  "Ei, está tudo bem aí? Quer que eu explique de outro jeito?",
+  "E aí, ficou alguma dúvida? Pode perguntar!",
+  "Está acompanhando? Posso repetir se quiser.",
+  "Opa, está me ouvindo? Quer continuar?",
+  "Alguma pergunta até aqui? Estou aqui pra ajudar!",
+  "Tá difícil? Posso explicar de forma mais simples se preferir.",
+];
+
 export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [isListening, setIsListening] = useState(false);
@@ -37,6 +50,11 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const videoControlsRef = useRef<VideoControls | null>(null);
   const processedCallIdsRef = useRef<Set<string>>(new Set());
   
+  // Silence detection refs
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAgentSpeechEndRef = useRef<number | null>(null);
+  const proactivePromptIndexRef = useRef(0);
+  
   // Store callbacks in refs to avoid dependency issues
   const optionsRef = useRef(options);
   useEffect(() => {
@@ -52,6 +70,68 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     setStatus(newStatus);
     optionsRef.current.onStatusChange?.(newStatus);
   }, []);
+
+  // Clear silence timeout
+  const clearSilenceTimeout = useCallback(() => {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+      console.log('[SILENCE] Timer cancelado');
+    }
+  }, []);
+
+  // Send proactive message to encourage student
+  const sendProactivePrompt = useCallback(() => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log('[SILENCE] WebSocket não conectado, ignorando prompt proativo');
+      return;
+    }
+    
+    // Don't interrupt if agent is speaking
+    if (isPlayingRef.current || audioQueueRef.current.length > 0) {
+      console.log('[SILENCE] Agente ainda falando, adiando prompt proativo');
+      // Retry in 1 second
+      silenceTimeoutRef.current = setTimeout(sendProactivePrompt, 1000);
+      return;
+    }
+
+    const prompt = PROACTIVE_PROMPTS[proactivePromptIndexRef.current % PROACTIVE_PROMPTS.length];
+    proactivePromptIndexRef.current++;
+    
+    console.log('[SILENCE] ⏰ 3 segundos sem resposta - Professor tomando iniciativa!');
+    console.log('[SILENCE] Enviando prompt proativo:', prompt);
+    
+    // Send a system-like message to prompt the agent to speak
+    wsRef.current.send(JSON.stringify({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "user",
+        content: [{
+          type: "input_text",
+          text: `[SISTEMA: O aluno está em silêncio há alguns segundos. Tome a iniciativa e incentive-o a participar. Use uma abordagem amigável como: "${prompt}"]`
+        }]
+      }
+    }));
+    
+    // Request a response
+    wsRef.current.send(JSON.stringify({
+      type: "response.create"
+    }));
+  }, []);
+
+  // Start silence timeout after agent finishes speaking
+  const startSilenceTimeout = useCallback(() => {
+    clearSilenceTimeout();
+    
+    console.log('[SILENCE] Iniciando timer de', SILENCE_TIMEOUT_MS / 1000, 'segundos');
+    lastAgentSpeechEndRef.current = Date.now();
+    
+    silenceTimeoutRef.current = setTimeout(() => {
+      console.log('[SILENCE] ⏰ Timer expirou! Aluno não respondeu em', SILENCE_TIMEOUT_MS / 1000, 'segundos');
+      sendProactivePrompt();
+    }, SILENCE_TIMEOUT_MS);
+  }, [clearSilenceTimeout, sendProactivePrompt]);
 
   const playQueue = useCallback(async (ctx: AudioContext) => {
     // Audio chain: source -> gain -> compressor -> destination
@@ -285,7 +365,15 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
           // Handle user transcript
           if (data.type === "conversation.item.input_audio_transcription.completed" && data.transcript) {
+            console.log('[SILENCE] Aluno falou! Cancelando timer de silêncio');
+            clearSilenceTimeout();
             optionsRef.current.onTranscript?.(data.transcript, 'user');
+          }
+          
+          // Also cancel silence timeout when user starts speaking (speech detected)
+          if (data.type === "input_audio_buffer.speech_started") {
+            console.log('[SILENCE] Aluno começou a falar! Cancelando timer de silêncio');
+            clearSilenceTimeout();
           }
 
           // Helper to wait for agent to finish speaking before playing video
@@ -494,6 +582,18 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
             // Don't clear audio here; let playback finish naturally to avoid cutting the last word
             console.log('[OPENAI EVENT] Response done, audio queue length:', audioQueueRef.current.length);
+            
+            // Start silence timeout when agent finishes speaking
+            // Wait for audio to finish before starting the timer
+            const checkAndStartSilenceTimer = () => {
+              if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
+                console.log('[SILENCE] Agente terminou de falar, iniciando timer de silêncio');
+                startSilenceTimeout();
+              } else {
+                setTimeout(checkAndStartSilenceTimer, 200);
+              }
+            };
+            setTimeout(checkAndStartSilenceTimer, 500);
           }
 
           // Handle errors
@@ -547,11 +647,15 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       updateStatus('error');
       optionsRef.current.onError?.(error instanceof Error ? error.message : 'Connection failed');
     }
-  }, [updateStatus, playAudioChunk, stopListening]);
+  }, [updateStatus, playAudioChunk, stopListening, startSilenceTimeout, clearSilenceTimeout]);
 
   const disconnect = useCallback(() => {
     console.log('🔌 [OPENAI DISCONNECT] Desconectando manualmente...');
     console.log('🔌 [OPENAI DISCONNECT] Stack trace:', new Error().stack);
+    
+    // Clear silence timeout
+    clearSilenceTimeout();
+    
     stopListening();
     
     if (wsRef.current) {
@@ -567,7 +671,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     setIsSpeaking(false);
     updateStatus('disconnected');
     console.log('🔌 [OPENAI DISCONNECT] Desconexão completa');
-  }, [updateStatus, stopListening]);
+  }, [updateStatus, stopListening, clearSilenceTimeout]);
 
   const startListening = useCallback(async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
