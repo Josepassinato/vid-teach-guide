@@ -9,6 +9,7 @@ import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
 import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
+import { DirectVideoPlayer, DirectVideoPlayerRef } from './DirectVideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
 import { ProcessingIndicator } from './ProcessingIndicator';
 import { MiniQuiz } from './MiniQuiz';
@@ -28,7 +29,9 @@ interface Message {
 
 interface VoiceChatProps {
   videoContext?: string;
-  videoId?: string;
+  videoId?: string | null; // YouTube ID
+  videoUrl?: string | null; // Direct video URL
+  videoType?: string | null; // 'youtube' | 'direct' | 'external'
   videoDbId?: string; // UUID for database queries (quizzes, progress)
   videoTitle?: string;
   videoTranscript?: string | null;
@@ -38,7 +41,7 @@ interface VoiceChatProps {
   onContentPlanReady?: (moments: TeachingMoment[]) => void;
 }
 
-export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady }: VoiceChatProps) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
@@ -55,7 +58,7 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
   const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
   const [lessonEndData, setLessonEndData] = useState<{ weeklyTask?: string; summaryPoints?: string[] }>({});
   const [showVisionConsent, setShowVisionConsent] = useState(false);
-  const videoPlayerRef = useRef<VideoPlayerRef>(null);
+  const videoPlayerRef = useRef<VideoPlayerRef | DirectVideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
   const analyzedVideoRef = useRef<string | null>(null);
@@ -122,10 +125,15 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
     },
   });
 
+  // Determine if we have a video to display
+  const hasVideo = videoId || videoUrl;
+  const isDirectVideo = videoType === 'direct' || videoType === 'external';
+
   // Load pre-configured moments or analyze content when video changes
   useEffect(() => {
-    if (videoId && analyzedVideoRef.current !== videoId) {
-      analyzedVideoRef.current = videoId;
+    const videoKey = videoId || videoUrl;
+    if (videoKey && analyzedVideoRef.current !== videoKey) {
+      analyzedVideoRef.current = videoKey;
       // Use pre-configured moments if available, otherwise analyze and auto-save
       // Pass videoDbId for auto-save, and duration (default 10 min)
       analyzeContent(
@@ -141,7 +149,7 @@ export function VoiceChat({ videoContext, videoId, videoDbId, videoTitle, videoT
       setActiveMoment(null);
       setActiveQuiz(null);
     }
-  }, [videoId, videoDbId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent]);
+  }, [videoId, videoUrl, videoDbId, videoTranscript, videoContext, videoTitle, preConfiguredMoments, analyzeContent]);
 
   // Load timestamp quizzes when videoDbId changes
   useEffect(() => {
@@ -322,7 +330,7 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
   // Controls are always available when a video exists; the VideoPlayer will queue commands until ready.
   // Using a getter pattern to always access the current ref value
   const videoControls: VideoControls | null = useMemo(() => {
-    if (!videoId) return null;
+    if (!hasVideo) return null;
 
     return {
       play: () => {
@@ -348,7 +356,7 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
       getCurrentTime: () => videoPlayerRef.current?.getCurrentTime() || 0,
       isPaused: () => videoPlayerRef.current?.isPaused() ?? true,
     };
-  }, [videoId]);
+  }, [hasVideo]);
 
   const {
     status,
@@ -988,20 +996,30 @@ INSTRUÇÕES:
         isVideoExpanded ? 'pt-0' : ''
       }`}>
         {/* Video Player with Quiz Overlay */}
-        {videoId && (
+        {hasVideo && (
           <div className={`relative transition-all duration-500 ${
             isVideoExpanded 
               ? 'flex-1 min-h-0' 
               : 'flex-shrink-0'
           }`}>
             <div className={isVideoExpanded ? 'h-full' : ''}>
-              <VideoPlayer 
-                ref={videoPlayerRef} 
-                videoId={videoId} 
-                title={videoTitle}
-                expanded={isVideoExpanded}
-                onEnded={handleVideoEnded}
-              />
+              {isDirectVideo && videoUrl ? (
+                <DirectVideoPlayer 
+                  ref={videoPlayerRef as React.RefObject<DirectVideoPlayerRef>} 
+                  videoUrl={videoUrl} 
+                  title={videoTitle}
+                  expanded={isVideoExpanded}
+                  onEnded={handleVideoEnded}
+                />
+              ) : videoId ? (
+                <VideoPlayer 
+                  ref={videoPlayerRef as React.RefObject<VideoPlayerRef>} 
+                  videoId={videoId} 
+                  title={videoTitle}
+                  expanded={isVideoExpanded}
+                  onEnded={handleVideoEnded}
+                />
+              ) : null}
             </div>
             
             {/* Next Pause Timer - Discrete overlay at bottom of video */}

@@ -17,7 +17,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface SavedVideo {
   id: string;
-  youtube_id: string;
+  youtube_id: string | null;
+  video_url: string | null;
+  video_type: string | null;
   title: string;
   transcript: string | null;
   analysis: string | null;
@@ -37,7 +39,9 @@ interface QuizResult {
 }
 
 interface VideoInfo {
-  videoId: string;
+  videoId: string | null; // YouTube ID (null for direct videos)
+  videoUrl: string | null; // Direct video URL
+  videoType: string | null;
   dbId: string; // UUID for database queries
   title: string;
   author: string;
@@ -164,12 +168,18 @@ const Student = () => {
     // Clear generated moments when switching videos
     setGeneratedMoments(null);
     
+    // Determine thumbnail based on video type
+    const thumbnail = video.thumbnail_url || 
+      (video.youtube_id ? `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg` : '/placeholder.svg');
+    
     setSelectedVideo({
       videoId: video.youtube_id,
+      videoUrl: video.video_url,
+      videoType: video.video_type,
       dbId: video.id, // UUID for database queries
       title: video.title,
       author: '',
-      thumbnail: video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`,
+      thumbnail,
       hasTranscript: !!video.transcript,
       transcript: video.transcript,
       analysis: video.analysis || `Vídeo: ${video.title}`,
@@ -397,7 +407,7 @@ const Student = () => {
                   <div className="space-y-2">
                     {savedVideos.map((video, index) => {
                       const completed = isLessonCompleted(video.id);
-                      const isActive = selectedVideo?.videoId === video.youtube_id;
+                      const isActive = selectedVideo?.dbId === video.id;
                       const isUnlocked = checkLessonUnlocked(video, index);
                       const colorIndex = index % 4;
                       
@@ -430,7 +440,7 @@ const Student = () => {
                                 {/* Thumbnail with overlay */}
                                 <div className="relative w-20 h-14 rounded-xl overflow-hidden flex-shrink-0">
                                   <img
-                                    src={video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/default.jpg`}
+                                    src={video.thumbnail_url || (video.youtube_id ? `https://img.youtube.com/vi/${video.youtube_id}/default.jpg` : '/placeholder.svg')}
                                     alt={video.title}
                                     className={`w-full h-full object-cover ${!isUnlocked ? 'grayscale' : ''}`}
                                   />
@@ -526,6 +536,8 @@ const Student = () => {
               <VoiceChat
                 videoContext={selectedVideo.transcript || selectedVideo.analysis}
                 videoId={selectedVideo.videoId}
+                videoUrl={selectedVideo.videoUrl}
+                videoType={selectedVideo.videoType}
                 videoDbId={selectedVideo.dbId}
                 videoTitle={selectedVideo.title}
                 videoTranscript={selectedVideo.transcript}
