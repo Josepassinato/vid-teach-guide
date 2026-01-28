@@ -349,7 +349,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         // Tool calling works through the modelTurn.parts[].functionCall structure
         const setupMessage = {
           setup: {
-            model: "models/gemini-2.0-flash-exp",
+            model: "models/gemini-2.0-flash-live-001",
             generationConfig: {
               temperature: 0.7,
               responseModalities: ["AUDIO"],
