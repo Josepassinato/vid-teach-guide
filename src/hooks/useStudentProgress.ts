@@ -38,17 +38,18 @@ export function useStudentProgress(options: UseStudentProgressOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  // Initialize student ID - prefer authenticated user ID
+  // Initialize student ID - prefer authenticated user ID, then check both localStorage keys
   useEffect(() => {
     if (options.userId) {
       setStudentId(options.userId);
     } else {
-      const storedId = localStorage.getItem('student_id');
+      // Support both camelCase (VoiceChat) and snake_case patterns
+      const storedId = localStorage.getItem('studentId') || localStorage.getItem('student_id');
       if (storedId) {
         setStudentId(storedId);
       } else {
         const newId = `student_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem('student_id', newId);
+        localStorage.setItem('studentId', newId);
         setStudentId(newId);
       }
     }

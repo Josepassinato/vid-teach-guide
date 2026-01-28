@@ -41,9 +41,10 @@ interface VoiceChatProps {
   isStudentMode?: boolean;
   onContentPlanReady?: (moments: TeachingMoment[]) => void;
   onOpenMissions?: () => void;
+  onVideoEnded?: () => void;
 }
 
-export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady, onOpenMissions }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady, onOpenMissions, onVideoEnded }: VoiceChatProps) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
@@ -820,6 +821,9 @@ INSTRUÇÕES:
   const handleVideoEnded = useCallback(() => {
     console.log('[VoiceChat] Video ended, triggering class wrap-up');
     
+    // Notify parent that video ended (for progress tracking)
+    onVideoEnded?.();
+    
     // Get the first mission for this lesson (if any)
     const lessonMission = lessonMissions.length > 0 ? lessonMissions[0] : null;
     
@@ -859,7 +863,7 @@ INSTRUÇÕES:
       setPendingReconnect({ type: 'moment', data: { topic: 'Encerramento da aula' } as any });
       connect();
     }
-  }, [connect, lessonMissions, onOpenMissions]);
+  }, [connect, lessonMissions, onOpenMissions, onVideoEnded]);
   
   // Cleanup wrap-up state when agent finishes speaking
   const wrapUpSpeechEndedRef = useRef<NodeJS.Timeout | null>(null);

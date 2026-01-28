@@ -76,7 +76,8 @@ const StudentDashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  const studentId = localStorage.getItem('studentId') || '';
+  // Support both camelCase (VoiceChat) and auth user ID patterns
+  const studentId = localStorage.getItem('studentId') || localStorage.getItem('student_id') || '';
 
   useEffect(() => {
     const loadDashboardData = async () => {
