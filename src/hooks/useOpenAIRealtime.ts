@@ -11,11 +11,14 @@ export interface VideoControls {
   isPaused: () => boolean;
 }
 
+export type ConnectionStep = 'idle' | 'fetching_key' | 'connecting_ws' | 'configuring' | 'ready';
+
 interface UseOpenAIRealtimeOptions {
   systemInstruction?: string;
   onTranscript?: (text: string, role: 'user' | 'assistant') => void;
   onError?: (error: string) => void;
   onStatusChange?: (status: ConnectionStatus) => void;
+  onConnectionStepChange?: (step: ConnectionStep) => void;
   videoControls?: VideoControls | null;
 }
 
@@ -249,6 +252,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     
     try {
       updateStatus('connecting');
+      optionsRef.current.onConnectionStepChange?.('fetching_key');
       console.log('🔌 [OPENAI CONNECT] Status atualizado para: connecting');
       
       const currentOptions = optionsRef.current;
@@ -261,10 +265,12 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       
       if (error || !data?.apiKey) {
         console.error('🔌 [OPENAI CONNECT] ❌ Erro ao buscar API key:', error);
+        optionsRef.current.onConnectionStepChange?.('idle');
         throw new Error(error?.message || 'Failed to get API key');
       }
       
       console.log('🔌 [OPENAI CONNECT] ✅ API key obtida, conectando WebSocket...');
+      optionsRef.current.onConnectionStepChange?.('connecting_ws');
       
       // Connect to OpenAI Realtime API
       const wsUrl = `wss://api.openai.com/v1/realtime?model=${data.model}`;
@@ -281,6 +287,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       ws.onopen = () => {
         console.log('WebSocket connected to OpenAI');
         processedCallIdsRef.current.clear();
+        optionsRef.current.onConnectionStepChange?.('configuring');
         
         // Define tools for video control - use detailed descriptions for better understanding
         const tools = [
@@ -342,6 +349,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         }));
         
         updateStatus('connected');
+        optionsRef.current.onConnectionStepChange?.('ready');
       };
       
       ws.onmessage = async (event) => {
