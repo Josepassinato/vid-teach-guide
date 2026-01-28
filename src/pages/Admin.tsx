@@ -12,10 +12,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Users, Clock, BookOpen, CheckCircle, Settings, Play, Pause, Target, Lightbulb, Loader2, Sparkles, HelpCircle, GripVertical, ArrowUp, ArrowDown, Unlock, ListOrdered, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Users, Clock, BookOpen, CheckCircle, Settings, Play, Pause, Target, Lightbulb, Loader2, Sparkles, HelpCircle, GripVertical, ArrowUp, ArrowDown, Unlock, ListOrdered, FolderOpen, Library } from 'lucide-react';
 import { QuizEditor } from '@/components/QuizEditor';
 import { MissionsAdmin } from '@/components/MissionsAdmin';
 import { ModulesAdmin } from '@/components/ModulesAdmin';
+import { NarrativeLibrary } from '@/components/NarrativeLibrary';
 import { Switch } from '@/components/ui/switch';
 
 interface TeachingMoment {
@@ -56,7 +57,7 @@ export default function Admin() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isGeneratingMoments, setIsGeneratingMoments] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
-  const [adminSection, setAdminSection] = useState<'lessons' | 'missions' | 'modules'>('lessons');
+  const [adminSection, setAdminSection] = useState<'lessons' | 'missions' | 'modules' | 'library'>('lessons');
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   
   // Form states for new lesson
@@ -512,6 +513,15 @@ export default function Admin() {
               <FolderOpen className="h-4 w-4 mr-2" />
               Módulos
             </Button>
+            <Button
+              variant={adminSection === 'library' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none rounded-t-lg mt-1"
+              onClick={() => setAdminSection('library')}
+            >
+              <Library className="h-4 w-4 mr-2" />
+              Biblioteca
+            </Button>
           </div>
         </div>
       </header>
@@ -522,6 +532,8 @@ export default function Admin() {
           <MissionsAdmin />
         ) : adminSection === 'modules' ? (
           <ModulesAdmin password={password} />
+        ) : adminSection === 'library' ? (
+          <NarrativeLibrary password={password} />
         ) : (
           <>
             {lessons.length === 0 ? (
