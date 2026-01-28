@@ -302,7 +302,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       console.log('[GeminiLive] Token received, connecting to WebSocket...');
       
       // Connect to Gemini Live API
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${data.token}`;
+      // IMPORTANT: Live API uses v1alpha for BidiGenerateContent
+      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${data.token}`;
       
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
@@ -349,7 +350,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         // Tool calling works through the modelTurn.parts[].functionCall structure
         const setupMessage = {
           setup: {
-            model: "models/gemini-2.0-flash-live-001",
+            // Gemini Live model for v1alpha BidiGenerateContent
+            model: "models/gemini-2.0-flash-exp",
             generationConfig: {
               temperature: 0.7,
               responseModalities: ["AUDIO"],
