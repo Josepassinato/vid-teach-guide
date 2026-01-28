@@ -818,17 +818,43 @@ INSTRUÇÕES:
     if (statusRef.current === 'connected' && sendTextRef.current) {
       sendTextRef.current('[SISTEMA] O vídeo terminou. Hora de encerrar a aula! Diga "Aula concluída!", faça um resumo breve marcando cada ponto com "PONTO:", celebre o progresso, proponha a TAREFA DA SEMANA, e despeça-se.');
       
-      // Show end screen after a delay for agent to finish
-      setTimeout(() => {
-        setAgentMode('ended');
-        isCapturingEndDataRef.current = false;
-      }, 15000);
+      // The end screen will be shown when professor finishes speaking (see useEffect below)
+      // isCapturingEndDataRef stays true to capture all content
     } else {
       // Reconnect to deliver wrap-up
       setPendingReconnect({ type: 'moment', data: { topic: 'Encerramento da aula' } as any });
       connect();
     }
   }, [connect]);
+  
+  // Watch for professor to finish speaking during wrap-up, then show end screen
+  const wrapUpSpeechEndedRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    // Only trigger when we're capturing end data (wrap-up in progress) and professor stops speaking
+    if (isCapturingEndDataRef.current && !isSpeaking && agentMode === 'teaching') {
+      // Clear any existing timeout
+      if (wrapUpSpeechEndedRef.current) {
+        clearTimeout(wrapUpSpeechEndedRef.current);
+      }
+      
+      // Wait a moment to ensure professor is truly done (not just a brief pause)
+      wrapUpSpeechEndedRef.current = setTimeout(() => {
+        // Double-check we're still in wrap-up mode and professor is not speaking
+        if (isCapturingEndDataRef.current && !isSpeaking) {
+          console.log('[VoiceChat] Professor terminou de falar o encerramento, mostrando tela final');
+          setAgentMode('ended');
+          isCapturingEndDataRef.current = false;
+        }
+      }, 2000); // Wait 2 seconds of silence to confirm professor finished
+    }
+    
+    return () => {
+      if (wrapUpSpeechEndedRef.current) {
+        clearTimeout(wrapUpSpeechEndedRef.current);
+      }
+    };
+  }, [isSpeaking, agentMode]);
 
   // Handle quiz completion
   const handleQuizComplete = useCallback((selectedIndex: number, isCorrect: boolean) => {
