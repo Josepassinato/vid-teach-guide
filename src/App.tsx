@@ -9,8 +9,81 @@ import Student from "./pages/Student";
 import StudentDashboard from "./pages/StudentDashboard";
 import NotFound from "./pages/NotFound";
 import DebugPanel from "./components/DebugPanel";
+import { AuthPage } from "./components/auth";
+import { useAuth } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
+
+// Protected route component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Public route - redirect to /aluno if already logged in
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/aluno" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+const AppRoutes = () => (
+  <Routes>
+    <Route path="/" element={<Navigate to="/aluno" replace />} />
+    <Route
+      path="/login"
+      element={
+        <PublicRoute>
+          <AuthPage />
+        </PublicRoute>
+      }
+    />
+    <Route path="/admin" element={<Admin />} />
+    <Route
+      path="/aluno"
+      element={
+        <ProtectedRoute>
+          <Student />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/aluno/dashboard"
+      element={
+        <ProtectedRoute>
+          <StudentDashboard />
+        </ProtectedRoute>
+      }
+    />
+    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+    <Route path="*" element={<NotFound />} />
+  </Routes>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -19,14 +92,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Navigate to="/aluno" replace />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/aluno" element={<Student />} />
-            <Route path="/aluno/dashboard" element={<StudentDashboard />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AppRoutes />
         </BrowserRouter>
         <DebugPanel />
       </TooltipProvider>
