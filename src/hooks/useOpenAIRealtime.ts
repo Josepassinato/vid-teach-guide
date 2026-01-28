@@ -29,6 +29,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioQueueRef = useRef<Float32Array[]>([]);
@@ -53,11 +54,24 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   }, []);
 
   const playQueue = useCallback(async (ctx: AudioContext) => {
-    // Ensure gain node exists
+    // Ensure we have an output chain: source -> gain -> compressor/limiter -> destination
+    // This boosts volume while reducing clipping/distortion.
+    if (!compressorNodeRef.current) {
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.knee.value = 30;
+      compressor.ratio.value = 12;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+      compressor.connect(ctx.destination);
+      compressorNodeRef.current = compressor;
+    }
+
     if (!gainNodeRef.current) {
-      gainNodeRef.current = ctx.createGain();
-      gainNodeRef.current.gain.value = 3.0; // Amplify volume 3x
-      gainNodeRef.current.connect(ctx.destination);
+      const gain = ctx.createGain();
+      gain.gain.value = 8.0; // Increase loudness; compressor limits peaks
+      gain.connect(compressorNodeRef.current);
+      gainNodeRef.current = gain;
     }
     
     while (audioQueueRef.current.length > 0) {
