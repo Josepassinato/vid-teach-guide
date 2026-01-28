@@ -828,20 +828,24 @@ INSTRUÇÕES:
     endMessageBufferRef.current = '';
     setLessonEndData({ mission: lessonMission || undefined });
     
-    // Collapse video and IMMEDIATELY show end screen with mission
-    // Professor will explain while student sees the screen
+    // Collapse video
     setIsVideoExpanded(false);
     setAgentMode('ended');
     
+    // If there's a mission, open the missions panel so student can see it while professor explains
+    if (lessonMission && onOpenMissions) {
+      onOpenMissions();
+    }
+    
     // Build wrap-up prompt with mission info - professor explains what's on screen
-    let wrapUpPrompt = '[SISTEMA] O vídeo terminou e a tela de conclusão está sendo mostrada ao aluno. ';
+    let wrapUpPrompt = '[SISTEMA] O vídeo terminou. ';
     wrapUpPrompt += 'Diga "Parabéns, você concluiu a aula!" de forma animada. ';
     wrapUpPrompt += 'Faça um resumo BREVE (máximo 3 pontos) do que foi aprendido. ';
     
     if (lessonMission) {
-      wrapUpPrompt += `Depois, apresente a MISSÃO que está aparecendo na tela: "${lessonMission.title}". `;
-      wrapUpPrompt += `Explique brevemente: ${lessonMission.description}. `;
-      wrapUpPrompt += 'Diga que o aluno pode clicar no botão verde "Começar Missão" para ver as instruções completas e enviar a evidência. ';
+      wrapUpPrompt += `Agora o painel de MISSÕES está aberto na tela do aluno. `;
+      wrapUpPrompt += `Apresente a missão "${lessonMission.title}" que ele está vendo. `;
+      wrapUpPrompt += `Explique: ${lessonMission.description}. `;
       wrapUpPrompt += 'Encoraje-o a completar a missão para ganhar pontos e desbloquear a próxima aula!';
     } else {
       wrapUpPrompt += 'Proponha uma TAREFA prática para a semana e despeça-se de forma encorajadora.';
@@ -855,7 +859,7 @@ INSTRUÇÕES:
       setPendingReconnect({ type: 'moment', data: { topic: 'Encerramento da aula' } as any });
       connect();
     }
-  }, [connect, lessonMissions]);
+  }, [connect, lessonMissions, onOpenMissions]);
   
   // Cleanup wrap-up state when agent finishes speaking
   const wrapUpSpeechEndedRef = useRef<NodeJS.Timeout | null>(null);
