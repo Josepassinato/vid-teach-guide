@@ -828,25 +828,28 @@ INSTRUÇÕES:
     endMessageBufferRef.current = '';
     setLessonEndData({ mission: lessonMission || undefined });
     
-    // Collapse video and set to teaching mode for wrap-up
+    // Collapse video and IMMEDIATELY show end screen with mission
+    // Professor will explain while student sees the screen
     setIsVideoExpanded(false);
-    setAgentMode('teaching');
+    setAgentMode('ended');
     
-    // Build wrap-up prompt with mission info
-    let wrapUpPrompt = '[SISTEMA] O vídeo terminou. Hora de encerrar a aula! Diga "Aula concluída!", faça um resumo breve marcando cada ponto com "PONTO:", celebre o progresso';
+    // Build wrap-up prompt with mission info - professor explains what's on screen
+    let wrapUpPrompt = '[SISTEMA] O vídeo terminou e a tela de conclusão está sendo mostrada ao aluno. ';
+    wrapUpPrompt += 'Diga "Parabéns, você concluiu a aula!" de forma animada. ';
+    wrapUpPrompt += 'Faça um resumo BREVE (máximo 3 pontos) do que foi aprendido. ';
     
     if (lessonMission) {
-      wrapUpPrompt += `, e apresente a MISSÃO PRÁTICA da aula: "${lessonMission.title}" - ${lessonMission.description}. Diga que o aluno pode clicar no botão para ver os detalhes e submeter a evidência.`;
+      wrapUpPrompt += `Depois, apresente a MISSÃO que está aparecendo na tela: "${lessonMission.title}". `;
+      wrapUpPrompt += `Explique brevemente: ${lessonMission.description}. `;
+      wrapUpPrompt += 'Diga que o aluno pode clicar no botão verde "Começar Missão" para ver as instruções completas e enviar a evidência. ';
+      wrapUpPrompt += 'Encoraje-o a completar a missão para ganhar pontos e desbloquear a próxima aula!';
     } else {
-      wrapUpPrompt += ', proponha a TAREFA DA SEMANA, e despeça-se.';
+      wrapUpPrompt += 'Proponha uma TAREFA prática para a semana e despeça-se de forma encorajadora.';
     }
     
     // If agent is connected, send the wrap-up instruction
     if (statusRef.current === 'connected' && sendTextRef.current) {
       sendTextRef.current(wrapUpPrompt);
-      
-      // The end screen will be shown when professor finishes speaking (see useEffect below)
-      // isCapturingEndDataRef stays true to capture all content
     } else {
       // Reconnect to deliver wrap-up
       setPendingReconnect({ type: 'moment', data: { topic: 'Encerramento da aula' } as any });
@@ -854,26 +857,22 @@ INSTRUÇÕES:
     }
   }, [connect, lessonMissions]);
   
-  // Watch for professor to finish speaking during wrap-up, then show end screen
+  // Cleanup wrap-up state when agent finishes speaking
   const wrapUpSpeechEndedRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
-    // Only trigger when we're capturing end data (wrap-up in progress) and professor stops speaking
-    if (isCapturingEndDataRef.current && !isSpeaking && agentMode === 'teaching') {
-      // Clear any existing timeout
+    // When professor finishes speaking during end screen, cleanup capture state
+    if (isCapturingEndDataRef.current && !isSpeaking && agentMode === 'ended') {
       if (wrapUpSpeechEndedRef.current) {
         clearTimeout(wrapUpSpeechEndedRef.current);
       }
       
-      // Wait a moment to ensure professor is truly done (not just a brief pause)
       wrapUpSpeechEndedRef.current = setTimeout(() => {
-        // Double-check we're still in wrap-up mode and professor is not speaking
         if (isCapturingEndDataRef.current && !isSpeaking) {
-          console.log('[VoiceChat] Professor terminou de falar o encerramento, mostrando tela final');
-          setAgentMode('ended');
+          console.log('[VoiceChat] Professor terminou explicação da missão');
           isCapturingEndDataRef.current = false;
         }
-      }, 2000); // Wait 2 seconds of silence to confirm professor finished
+      }, 2000);
     }
     
     return () => {
@@ -1523,6 +1522,7 @@ INSTRUÇÕES:
       weeklyTask={lessonEndData.weeklyTask}
       summaryPoints={lessonEndData.summaryPoints}
       mission={lessonEndData.mission}
+      isProfessorSpeaking={isSpeaking}
       onGoHome={() => navigate('/aluno/dashboard')}
       onRestartLesson={() => {
         setAgentMode('idle');
