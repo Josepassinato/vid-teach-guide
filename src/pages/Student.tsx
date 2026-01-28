@@ -448,6 +448,10 @@ const Student = () => {
                   teacherIntro={selectedVideo.teacherIntro}
                   isStudentMode={true}
                   onContentPlanReady={(moments) => setGeneratedMoments(moments)}
+                  onOpenMissions={() => {
+                    setShowMissions(true);
+                    setMobileTab('missions');
+                  }}
                 />
               </div>
 

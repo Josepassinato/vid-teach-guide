@@ -11,15 +11,30 @@ import {
   RotateCcw,
   CheckCircle2,
   Calendar,
-  Check
+  Check,
+  Target,
+  Rocket,
+  ArrowRight
 } from 'lucide-react';
+
+interface Mission {
+  id: string;
+  title: string;
+  description: string;
+  instructions: string;
+  evidence_type: string;
+  difficulty_level: string;
+  points_reward: number;
+}
 
 interface LessonEndScreenProps {
   videoTitle?: string;
   weeklyTask?: string;
   summaryPoints?: string[];
+  mission?: Mission;
   onGoHome?: () => void;
   onRestartLesson?: () => void;
+  onStartMission?: () => void;
   isVisible: boolean;
 }
 
@@ -27,8 +42,10 @@ export function LessonEndScreen({
   videoTitle,
   weeklyTask,
   summaryPoints = [],
+  mission,
   onGoHome,
   onRestartLesson,
+  onStartMission,
   isVisible,
 }: LessonEndScreenProps) {
   const [showConfetti, setShowConfetti] = useState(false);
@@ -157,8 +174,68 @@ export function LessonEndScreen({
                   </motion.div>
                 )}
 
-                {/* Weekly Task - Main Highlight */}
-                {weeklyTask && (
+                {/* Mission Card - Primary CTA when mission exists */}
+                {mission && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ delay: 0.6, type: "spring" }}
+                    className="relative"
+                  >
+                    <div className="absolute -inset-1.5 bg-gradient-to-r from-google-green via-google-blue to-google-yellow rounded-2xl blur-md opacity-40 animate-pulse" />
+                    <div className="relative bg-gradient-to-br from-primary/5 to-accent/10 border-2 border-primary/40 rounded-xl p-5 space-y-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-google-green to-google-green/60 flex items-center justify-center shadow-lg flex-shrink-0">
+                          <Target className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-bold text-lg text-foreground">
+                              Missão Prática
+                            </h3>
+                            <Badge className="bg-google-green/20 text-google-green border-0">
+                              <Rocket className="w-3 h-3 mr-1" />
+                              +{mission.points_reward} pts
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            Aplique o que você aprendeu!
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-background/80 rounded-lg p-4 space-y-2">
+                        <h4 className="font-semibold text-foreground">
+                          {mission.title}
+                        </h4>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {mission.description}
+                        </p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <Badge variant="outline" className="text-xs">
+                            {mission.difficulty_level}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {mission.evidence_type}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={onStartMission}
+                        size="lg"
+                        className="w-full gap-2 bg-gradient-to-r from-google-green to-google-green/80 hover:from-google-green/90 hover:to-google-green/70 text-white shadow-lg"
+                      >
+                        <Target className="w-5 h-5" />
+                        Começar Missão
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Weekly Task - Fallback when no mission */}
+                {!mission && weeklyTask && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -194,8 +271,8 @@ export function LessonEndScreen({
                   </motion.div>
                 )}
 
-                {/* No task provided yet */}
-                {!weeklyTask && (
+                {/* No task or mission - Loading state */}
+                {!mission && !weeklyTask && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -206,7 +283,7 @@ export function LessonEndScreen({
                       <ClipboardList className="w-6 h-6 text-muted-foreground" />
                     </div>
                     <p className="text-muted-foreground text-sm">
-                      O professor está preparando sua tarefa da semana...
+                      Nenhuma missão configurada para esta aula
                     </p>
                   </motion.div>
                 )}
