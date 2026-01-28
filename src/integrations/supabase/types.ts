@@ -73,6 +73,39 @@ export type Database = {
           },
         ]
       }
+      modules: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_released: boolean | null
+          module_order: number
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_released?: boolean | null
+          module_order?: number
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_released?: boolean | null
+          module_order?: number
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       student_achievements: {
         Row: {
           average_score: number | null
@@ -454,6 +487,7 @@ export type Database = {
           is_configured: boolean | null
           is_released: boolean | null
           lesson_order: number | null
+          module_id: string | null
           teacher_intro: string | null
           teaching_moments: Json | null
           thumbnail_url: string | null
@@ -473,6 +507,7 @@ export type Database = {
           is_configured?: boolean | null
           is_released?: boolean | null
           lesson_order?: number | null
+          module_id?: string | null
           teacher_intro?: string | null
           teaching_moments?: Json | null
           thumbnail_url?: string | null
@@ -492,6 +527,7 @@ export type Database = {
           is_configured?: boolean | null
           is_released?: boolean | null
           lesson_order?: number | null
+          module_id?: string | null
           teacher_intro?: string | null
           teaching_moments?: Json | null
           thumbnail_url?: string | null
@@ -502,7 +538,15 @@ export type Database = {
           video_url?: string | null
           youtube_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "videos_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

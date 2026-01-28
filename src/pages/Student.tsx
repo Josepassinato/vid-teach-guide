@@ -5,13 +5,15 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play, LogOut, Lock, Target } from 'lucide-react';
+import { GraduationCap, Video, ChevronLeft, ChevronRight, Clock, CheckCircle, Trophy, Award, ClipboardCheck, BarChart3, Sparkles, Play, LogOut, Lock, Target, FolderOpen, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TeachingMoment } from '@/hooks/useContentManager';
 import { useStudentProgress } from '@/hooks/useStudentProgress';
+import { useModuleProgress } from '@/hooks/useModuleProgress';
 import { LessonQuiz } from '@/components/LessonQuiz';
 import { TeachingMomentsList } from '@/components/TeachingMomentsList';
 import { MissionsPanel } from '@/components/MissionsPanel';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -31,11 +33,7 @@ interface SavedVideo {
   is_configured: boolean;
   is_released: boolean;
   teacher_intro: string | null;
-}
-
-interface QuizResult {
-  video_id: string;
-  passed: boolean;
+  module_id: string | null;
 }
 
 interface VideoInfo {
@@ -65,7 +63,7 @@ const Student = () => {
   const [showQuiz, setShowQuiz] = useState(false);
   const [showMissions, setShowMissions] = useState(false);
   const [generatedMoments, setGeneratedMoments] = useState<TeachingMoment[] | null>(null);
-  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   
   const [studentId] = useState(() => {
     const stored = localStorage.getItem('studentId');
@@ -90,39 +88,34 @@ const Student = () => {
     onProgressUpdate: handleProgressUpdate
   });
 
+  // Module progress hook for module-based unlock logic
+  const {
+    modules,
+    lessonProgress,
+    moduleProgress,
+    isLessonUnlocked: checkModuleLessonUnlocked,
+    isModuleUnlocked,
+    getLessonsForModule,
+    getUnassignedLessons,
+    refreshProgress: refreshModuleProgress,
+  } = useModuleProgress(studentId);
+
   useEffect(() => {
     const loadSavedVideos = async () => {
       try {
-        // Load videos and quiz results in parallel
-        const [videosRes, quizRes] = await Promise.all([
-          supabase
-            .from('videos')
-            .select('*')
-            .order('lesson_order', { ascending: true }),
-          supabase
-            .from('student_quiz_results')
-            .select('video_id, passed')
-            .eq('student_id', studentId)
-            .eq('passed', true)
-        ]);
+        const videosRes = await supabase
+          .from('videos')
+          .select('*')
+          .order('lesson_order', { ascending: true });
 
         if (videosRes.error) throw videosRes.error;
         
         const allVideos = videosRes.data || [];
-        const passedQuizzes = quizRes.data || [];
-        
-        setQuizResults(passedQuizzes);
         setSavedVideos(allVideos);
         
         // Select first available video
         if (allVideos.length > 0) {
-          const firstUnlocked = allVideos.find((v, i) => isLessonUnlocked(v, i, allVideos, passedQuizzes));
-          if (firstUnlocked) {
-            const idx = allVideos.indexOf(firstUnlocked);
-            selectVideo(firstUnlocked, idx);
-          } else if (allVideos[0]) {
-            selectVideo(allVideos[0], 0);
-          }
+          selectVideo(allVideos[0], 0);
         }
       } catch (err) {
         console.error('[Student] Error loading saved videos:', err);
@@ -134,30 +127,28 @@ const Student = () => {
     loadSavedVideos();
   }, [studentId]);
 
-  // Check if a lesson is unlocked based on progression rules
-  // TODO: Para testes, todas as aulas estão liberadas. Remover isso depois.
-  const isLessonUnlocked = (_video: SavedVideo, _index: number, _videos: SavedVideo[], _passedQuizResults: QuizResult[]) => {
-    // MODO DE TESTE: Todas as aulas estão liberadas
-    return true;
-    
-    // Lógica original (descomentrar para produção):
-    // // First lesson is always unlocked if released
-    // if (index === 0) return video.is_released;
-    // 
-    // // Not released = not available
-    // if (!video.is_released) return false;
-    // 
-    // // Check if previous lesson was completed with passing quiz
-    // const previousVideo = videos[index - 1];
-    // if (!previousVideo) return false;
-    // 
-    // const previousQuizPassed = passedQuizResults.some(q => q.video_id === previousVideo.id && q.passed);
-    // return previousQuizPassed;
+  // Check if a lesson is unlocked using module-based logic
+  const checkLessonUnlocked = (video: SavedVideo) => {
+    // Use the module progress hook for unlock logic
+    // If modules exist, use module-based logic; otherwise, all released lessons are unlocked
+    if (modules.length > 0 && video.module_id) {
+      return checkModuleLessonUnlocked(video.id);
+    }
+    // Fallback for lessons without modules - just check if released
+    return video.is_released;
   };
 
-  // Helper to check unlock status with current state
-  const checkLessonUnlocked = (video: SavedVideo, index: number) => {
-    return isLessonUnlocked(video, index, savedVideos, quizResults);
+  // Toggle module expansion
+  const toggleModule = (moduleId: string) => {
+    setExpandedModules(prev => {
+      const next = new Set(prev);
+      if (next.has(moduleId)) {
+        next.delete(moduleId);
+      } else {
+        next.add(moduleId);
+      }
+      return next;
+    });
   };
 
   const selectVideo = (video: SavedVideo, index: number) => {
@@ -198,10 +189,10 @@ const Student = () => {
   const goToNextLesson = () => {
     if (currentLessonIndex < savedVideos.length - 1) {
       const nextVideo = savedVideos[currentLessonIndex + 1];
-      if (checkLessonUnlocked(nextVideo, currentLessonIndex + 1)) {
+      if (checkLessonUnlocked(nextVideo)) {
         selectVideo(nextVideo, currentLessonIndex + 1);
       } else {
-        toast.error('Complete o quiz desta aula para desbloquear a próxima!');
+        toast.error('Complete o quiz e a missão desta aula para desbloquear a próxima!');
       }
     }
   };
@@ -227,9 +218,9 @@ const Student = () => {
   const handleQuizComplete = async (passed: boolean) => {
     if (passed) {
       await handleMarkComplete();
-      // Update quiz results to unlock next lesson
-      setQuizResults(prev => [...prev, { video_id: savedVideos[currentLessonIndex].id, passed: true }]);
-      toast.success('🎉 Próxima aula desbloqueada!');
+      // Refresh module progress to update unlock status
+      refreshModuleProgress();
+      toast.success('🎉 Quiz concluído! Complete a missão para desbloquear a próxima aula.');
     }
   };
 
@@ -403,12 +394,183 @@ const Student = () => {
                     </div>
                     <p className="text-muted-foreground">Nenhuma aula disponível</p>
                   </div>
+                ) : modules.length > 0 ? (
+                  /* Module-based view */
+                  <div className="space-y-3">
+                    {modules.map((module, moduleIndex) => {
+                      const modProgress = moduleProgress.get(module.id);
+                      const isModUnlocked = isModuleUnlocked(module.id);
+                      const isExpanded = expandedModules.has(module.id);
+                      const moduleLessons = savedVideos.filter(v => v.module_id === module.id);
+                      
+                      return (
+                        <Collapsible 
+                          key={module.id} 
+                          open={isExpanded} 
+                          onOpenChange={() => toggleModule(module.id)}
+                        >
+                          <Card className={`overflow-hidden ${!isModUnlocked ? 'opacity-60' : ''}`}>
+                            <CollapsibleTrigger asChild>
+                              <div className={`p-3 flex items-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors ${!isModUnlocked ? 'cursor-not-allowed' : ''}`}>
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isModUnlocked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                                  {isModUnlocked ? (
+                                    <FolderOpen className="h-4 w-4" />
+                                  ) : (
+                                    <Lock className="h-4 w-4" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="secondary" className="text-xs">Módulo {moduleIndex + 1}</Badge>
+                                    {modProgress?.isComplete && (
+                                      <Badge className="bg-accent text-white text-xs">
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Completo
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm font-medium truncate">{module.title}</p>
+                                  {isModUnlocked && modProgress && (
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                        <div 
+                                          className="h-full bg-primary rounded-full transition-all"
+                                          style={{ width: `${modProgress.progressPercentage}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs text-muted-foreground">
+                                        {modProgress.completedLessons}/{modProgress.totalLessons}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="border-t px-2 py-2 space-y-1 bg-muted/30">
+                                {moduleLessons.map((video, lessonIndex) => {
+                                  const completed = isLessonCompleted(video.id);
+                                  const isActive = selectedVideo?.dbId === video.id;
+                                  const isUnlocked = checkLessonUnlocked(video);
+                                  const progress = lessonProgress.get(video.id);
+                                  
+                                  return (
+                                    <motion.div
+                                      key={video.id}
+                                      whileHover={isUnlocked ? { scale: 1.01 } : {}}
+                                      whileTap={isUnlocked ? { scale: 0.99 } : {}}
+                                    >
+                                      <div
+                                        className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                                          !isUnlocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-background'
+                                        } ${isActive ? 'bg-primary/10 ring-1 ring-primary' : ''}`}
+                                        onClick={() => {
+                                          if (isUnlocked) {
+                                            const globalIndex = savedVideos.findIndex(v => v.id === video.id);
+                                            selectVideo(video, globalIndex);
+                                          } else {
+                                            toast.error('Complete a aula anterior para desbloquear!');
+                                          }
+                                        }}
+                                      >
+                                        <div className="relative w-14 h-10 rounded overflow-hidden flex-shrink-0">
+                                          <img
+                                            src={video.thumbnail_url || (video.youtube_id ? `https://img.youtube.com/vi/${video.youtube_id}/default.jpg` : '/placeholder.svg')}
+                                            alt={video.title}
+                                            className={`w-full h-full object-cover ${!isUnlocked ? 'grayscale' : ''}`}
+                                          />
+                                          {!isUnlocked && (
+                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                              <Lock className="h-3 w-3 text-white" />
+                                            </div>
+                                          )}
+                                          {completed && (
+                                            <div className="absolute inset-0 bg-accent/80 flex items-center justify-center">
+                                              <CheckCircle className="h-4 w-4 text-white" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-medium truncate">{video.title}</p>
+                                          <div className="flex items-center gap-1 mt-0.5">
+                                            {progress?.quizPassed && (
+                                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-accent/10 text-accent border-accent/30">
+                                                Quiz ✓
+                                              </Badge>
+                                            )}
+                                            {progress?.missionCompleted && (
+                                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-primary/10 text-primary border-primary/30">
+                                                Missão ✓
+                                              </Badge>
+                                            )}
+                                            {video.duration_minutes && !progress?.isComplete && (
+                                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                                <Clock className="h-2.5 w-2.5" />
+                                                {video.duration_minutes}min
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  );
+                                })}
+                              </div>
+                            </CollapsibleContent>
+                          </Card>
+                        </Collapsible>
+                      );
+                    })}
+                    
+                    {/* Unassigned lessons */}
+                    {getUnassignedLessons().length > 0 && (
+                      <Card className="mt-4">
+                        <div className="p-3 border-b">
+                          <p className="text-sm font-medium text-muted-foreground">Aulas Avulsas</p>
+                        </div>
+                        <div className="p-2 space-y-1">
+                          {savedVideos.filter(v => !v.module_id).map((video, index) => {
+                            const completed = isLessonCompleted(video.id);
+                            const isActive = selectedVideo?.dbId === video.id;
+                            const isUnlocked = video.is_released;
+                            
+                            return (
+                              <div
+                                key={video.id}
+                                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted/50 ${isActive ? 'bg-primary/10' : ''}`}
+                                onClick={() => {
+                                  const globalIndex = savedVideos.findIndex(v => v.id === video.id);
+                                  selectVideo(video, globalIndex);
+                                }}
+                              >
+                                <div className="relative w-14 h-10 rounded overflow-hidden flex-shrink-0">
+                                  <img
+                                    src={video.thumbnail_url || (video.youtube_id ? `https://img.youtube.com/vi/${video.youtube_id}/default.jpg` : '/placeholder.svg')}
+                                    alt={video.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  {completed && (
+                                    <div className="absolute inset-0 bg-accent/80 flex items-center justify-center">
+                                      <CheckCircle className="h-4 w-4 text-white" />
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-xs font-medium truncate flex-1">{video.title}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </Card>
+                    )}
+                  </div>
                 ) : (
+                  /* Flat list view (no modules) */
                   <div className="space-y-2">
                     {savedVideos.map((video, index) => {
                       const completed = isLessonCompleted(video.id);
                       const isActive = selectedVideo?.dbId === video.id;
-                      const isUnlocked = checkLessonUnlocked(video, index);
+                      const isUnlocked = checkLessonUnlocked(video);
                       const colorIndex = index % 4;
                       
                       return (
@@ -437,7 +599,6 @@ const Student = () => {
                           >
                             <CardContent className="p-0">
                               <div className="flex gap-3 p-3">
-                                {/* Thumbnail with overlay */}
                                 <div className="relative w-20 h-14 rounded-xl overflow-hidden flex-shrink-0">
                                   <img
                                     src={video.thumbnail_url || (video.youtube_id ? `https://img.youtube.com/vi/${video.youtube_id}/default.jpg` : '/placeholder.svg')}
@@ -472,7 +633,7 @@ const Student = () => {
                                   </p>
                                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-1">
                                     {!isUnlocked && (
-                                      <Badge variant="outline" className="text-[10px] border-orange-500 text-orange-600">
+                                      <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive">
                                         <Lock className="h-2.5 w-2.5 mr-0.5" />
                                         Bloqueada
                                       </Badge>
@@ -624,7 +785,7 @@ const Student = () => {
                     )}
                     {currentLessonIndex < savedVideos.length - 1 && (
                       <>
-                        {checkLessonUnlocked(savedVideos[currentLessonIndex + 1], currentLessonIndex + 1) ? (
+                        {checkLessonUnlocked(savedVideos[currentLessonIndex + 1]) ? (
                           <Button 
                             size="sm" 
                             onClick={goToNextLesson}
