@@ -123,14 +123,25 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     }));
   }, []);
 
-  // Start silence timeout after agent finishes speaking
+  // Start silence timeout after agent finishes speaking (only if video is paused)
   const startSilenceTimeout = useCallback(() => {
+    // Only start silence timer if video is paused - student won't talk while watching
+    if (videoControlsRef.current && !videoControlsRef.current.isPaused()) {
+      console.log('[SILENCE] Video está rodando, não inicia timer de silêncio');
+      return;
+    }
+    
     clearSilenceTimeout();
     
-    console.log('[SILENCE] Iniciando timer de', SILENCE_TIMEOUT_MS / 1000, 'segundos');
+    console.log('[SILENCE] Video pausado - Iniciando timer de', SILENCE_TIMEOUT_MS / 1000, 'segundos');
     lastAgentSpeechEndRef.current = Date.now();
     
     silenceTimeoutRef.current = setTimeout(() => {
+      // Double-check video is still paused before prompting
+      if (videoControlsRef.current && !videoControlsRef.current.isPaused()) {
+        console.log('[SILENCE] Timer expirou mas video voltou a rodar, ignorando');
+        return;
+      }
       console.log('[SILENCE] ⏰ Timer expirou! Aluno não respondeu em', SILENCE_TIMEOUT_MS / 1000, 'segundos');
       sendProactivePrompt();
     }, SILENCE_TIMEOUT_MS);
