@@ -62,6 +62,10 @@ interface VideoInfo {
 const Student = () => {
   const { user, profile, signOut } = useAuth();
   
+  // DEV BYPASS: Check for dev mode authentication bypass
+  const isDevBypass = localStorage.getItem('dev_bypass_auth') === 'true';
+  const devStudentId = localStorage.getItem('dev_student_id') || 'dev-test-student-001';
+  
   const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
@@ -73,8 +77,8 @@ const Student = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('video');
 
-  // Use authenticated user ID as student ID
-  const studentId = user?.id || '';
+  // Use authenticated user ID or dev bypass ID
+  const studentId = user?.id || (isDevBypass ? devStudentId : '');
 
   const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
     if (newStats.progressPercentage === 100) {
