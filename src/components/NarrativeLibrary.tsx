@@ -438,13 +438,20 @@ export function NarrativeLibrary({ password }: NarrativeLibraryProps) {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={saveNarrative} disabled={isSaving}>
+            <Button 
+              onClick={saveNarrative} 
+              disabled={isSaving || editingNarrative.length < MIN_CHARS_5MIN}
+              title={editingNarrative.length < MIN_CHARS_5MIN ? `Mínimo de ${MIN_CHARS_5MIN.toLocaleString()} caracteres para 5 minutos de vídeo` : ''}
+            >
               {isSaving ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Save className="h-4 w-4 mr-2" />
               )}
-              Salvar Narrativa
+              {editingNarrative.length < MIN_CHARS_5MIN 
+                ? `Faltam ${(MIN_CHARS_5MIN - editingNarrative.length).toLocaleString()} chars`
+                : 'Salvar Narrativa'
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
