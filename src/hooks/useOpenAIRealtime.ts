@@ -17,7 +17,6 @@ interface UseOpenAIRealtimeOptions {
   onError?: (error: string) => void;
   onStatusChange?: (status: ConnectionStatus) => void;
   videoControls?: VideoControls | null;
-  enableVision?: boolean; // Enable sending camera frames to AI
 }
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
@@ -35,7 +34,6 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const isPlayingRef = useRef(false);
   const videoControlsRef = useRef<VideoControls | null>(null);
   const processedCallIdsRef = useRef<Set<string>>(new Set());
-  const lastVisionFrameRef = useRef<number>(0);
   
   // Store callbacks in refs to avoid dependency issues
   const optionsRef = useRef(options);
@@ -576,53 +574,6 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     optionsRef.current.onTranscript?.(text, 'user');
   }, []);
 
-  // Send a vision frame (base64 image) to OpenAI for analysis
-  const sendVisionFrame = useCallback((base64Image: string, prompt?: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    // Rate limit: max 1 frame every 2 seconds
-    const now = Date.now();
-    if (now - lastVisionFrameRef.current < 2000) {
-      return;
-    }
-    lastVisionFrameRef.current = now;
-
-    console.log('[OpenAI Vision] Sending frame to AI tutor');
-
-    // Send image as a conversation item with context
-    const contextMessage = prompt || 
-      'Analise brevemente esta imagem do aluno. Se notar algo relevante para o ensino (distração, confusão, afastamento), mencione gentilmente. Caso contrário, apenas continue a aula normalmente sem comentar a imagem.';
-
-    wsRef.current.send(JSON.stringify({
-      type: "conversation.item.create",
-      item: {
-        type: "message",
-        role: "user",
-        content: [
-          {
-            type: "input_image",
-            image: {
-              type: "base64",
-              media_type: "image/jpeg",
-              data: base64Image,
-            }
-          },
-          {
-            type: "input_text",
-            text: `[CONTEXTO VISUAL - NÃO LEIA EM VOZ ALTA] ${contextMessage}`
-          }
-        ]
-      }
-    }));
-
-    // Request response based on the image
-    wsRef.current.send(JSON.stringify({
-      type: "response.create"
-    }));
-  }, []);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -640,6 +591,5 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     startListening,
     stopListening,
     sendText,
-    sendVisionFrame, // New: send camera frames to AI
   };
 }
