@@ -14,6 +14,8 @@ import { MissionsPanel } from '@/components/MissionsPanel';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
+import { useOnboarding } from '@/hooks/useOnboarding';
+import { OnboardingCarousel } from '@/components/onboarding';
 
 // New student components
 import { StudentHeader } from '@/components/student/StudentHeader';
@@ -66,6 +68,14 @@ const Student = () => {
   const isDevBypass = localStorage.getItem('dev_bypass_auth') === 'true';
   const devStudentId = localStorage.getItem('dev_student_id') || 'dev-test-student-001';
   
+  // Use authenticated user ID or dev bypass ID
+  const studentId = user?.id || (isDevBypass ? devStudentId : '');
+  
+  // Onboarding hook
+  const { showOnboarding, isLoading: isOnboardingLoading, completeOnboarding } = useOnboarding({ 
+    userId: studentId 
+  });
+  
   const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([]);
   const [isLoadingVideos, setIsLoadingVideos] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
@@ -76,9 +86,6 @@ const Student = () => {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('video');
-
-  // Use authenticated user ID or dev bypass ID
-  const studentId = user?.id || (isDevBypass ? devStudentId : '');
 
   const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
     if (newStats.progressPercentage === 100) {
@@ -370,6 +377,16 @@ const Student = () => {
 
   const currentLesson = savedVideos[currentLessonIndex];
   const isCurrentLessonCompleted = currentLesson ? isLessonCompleted(currentLesson.id) : false;
+
+  // Show onboarding for new users
+  if (showOnboarding && !isOnboardingLoading) {
+    return (
+      <OnboardingCarousel 
+        onComplete={completeOnboarding}
+        userName={profile?.full_name || undefined}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
