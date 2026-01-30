@@ -517,7 +517,12 @@ const Student = () => {
                     }`}
                   >
                     <div className="p-4 max-w-3xl mx-auto">
-                      <MissionsPanel videoId={currentLesson.id} studentId={studentId} />
+                      <MissionsPanel 
+                        videoId={currentLesson.id} 
+                        studentId={studentId}
+                        moduleId={currentLesson.module_id || undefined}
+                        moduleTitle={modules.find(m => m.id === currentLesson.module_id)?.title}
+                      />
                     </div>
                   </motion.div>
                 )}

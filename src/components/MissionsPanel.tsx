@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,13 +6,20 @@ import { Target, CheckCircle2, Clock } from 'lucide-react';
 import { MissionCard } from './MissionCard';
 import { AchievementsPanel } from './AchievementsPanel';
 import { useMissions } from '@/hooks/useMissions';
+import { useCertificateGeneration } from '@/hooks/useCertificateGeneration';
+import { useAuth } from '@/hooks/useAuth';
 
 interface MissionsPanelProps {
   videoId?: string;
   studentId: string;
+  moduleId?: string;
+  moduleTitle?: string;
 }
 
-export function MissionsPanel({ videoId, studentId }: MissionsPanelProps) {
+export function MissionsPanel({ videoId, studentId, moduleId, moduleTitle }: MissionsPanelProps) {
+  const { profile } = useAuth();
+  const { checkAndGenerateCertificate, checkCourseCompletion } = useCertificateGeneration();
+  
   const {
     missions,
     submissions,
@@ -43,9 +50,27 @@ export function MissionsPanel({ videoId, studentId }: MissionsPanelProps) {
     return submissions.filter(s => s.mission_id === missionId);
   };
 
-  const handleSubmit = async (mission: typeof missions[0], evidenceText?: string, evidenceUrl?: string) => {
-    await submitEvidence(mission, evidenceText, evidenceUrl);
-  };
+  const handleSubmit = useCallback(async (mission: typeof missions[0], evidenceText?: string, evidenceUrl?: string) => {
+    const result = await submitEvidence(mission, evidenceText, evidenceUrl);
+    
+    // If mission was approved, check for module completion and certificate
+    if (result.success && moduleId && moduleTitle && profile?.full_name) {
+      // Small delay to ensure database is updated
+      setTimeout(async () => {
+        const certResult = await checkAndGenerateCertificate({
+          studentId,
+          studentName: profile.full_name || 'Aluno',
+          moduleId,
+          moduleTitle,
+        });
+
+        // If module certificate was generated, check for course completion
+        if (certResult.generated) {
+          await checkCourseCompletion(studentId, profile.full_name || 'Aluno');
+        }
+      }, 1000);
+    }
+  }, [submitEvidence, moduleId, moduleTitle, profile, studentId, checkAndGenerateCertificate, checkCourseCompletion]);
 
   if (isLoading) {
     return (

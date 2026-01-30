@@ -19,10 +19,13 @@ import {
   BookOpen,
   Award,
   ArrowLeft,
-  Loader2
+  Loader2,
+  ScrollText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
+import { CertificatesPanel } from '@/components/certificates';
+import { useAuth } from '@/hooks/useAuth';
 
 interface QuizResult {
   id: string;
@@ -61,6 +64,7 @@ interface DashboardStats {
 }
 
 const StudentDashboard = () => {
+  const { user } = useAuth();
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [lessonProgress, setLessonProgress] = useState<LessonProgress[]>([]);
   const [videos, setVideos] = useState<VideoInfo[]>([]);
@@ -76,8 +80,8 @@ const StudentDashboard = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Support both camelCase (VoiceChat) and auth user ID patterns
-  const studentId = localStorage.getItem('studentId') || localStorage.getItem('student_id') || '';
+  // Use authenticated user ID or fallback to localStorage
+  const studentId = user?.id || localStorage.getItem('studentId') || localStorage.getItem('student_id') || '';
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -605,6 +609,22 @@ const StudentDashboard = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Certificates Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ScrollText className="h-5 w-5 text-google-yellow" />
+              Meus Certificados
+            </CardTitle>
+            <CardDescription>
+              Certificados de conclusão de módulos e curso
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CertificatesPanel studentId={studentId} />
+          </CardContent>
+        </Card>
 
         {/* Back to Classroom */}
         <div className="text-center pt-4">
