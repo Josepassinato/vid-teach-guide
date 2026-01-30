@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      certificates: {
+        Row: {
+          certificate_code: string
+          certificate_type: string
+          created_at: string
+          id: string
+          issued_at: string
+          module_id: string | null
+          module_title: string | null
+          student_id: string
+          student_name: string
+        }
+        Insert: {
+          certificate_code: string
+          certificate_type?: string
+          created_at?: string
+          id?: string
+          issued_at?: string
+          module_id?: string | null
+          module_title?: string | null
+          student_id: string
+          student_name: string
+        }
+        Update: {
+          certificate_code?: string
+          certificate_type?: string
+          created_at?: string
+          id?: string
+          issued_at?: string
+          module_id?: string | null
+          module_title?: string | null
+          student_id?: string
+          student_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificates_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       missions: {
         Row: {
           created_at: string
