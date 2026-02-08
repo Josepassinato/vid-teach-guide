@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Users, Clock, BookOpen, CheckCircle, Settings, Play, Pause, Target, Lightbulb, Loader2, Sparkles, HelpCircle, GripVertical, ArrowUp, ArrowDown, Unlock, ListOrdered, FolderOpen, Library, Download } from 'lucide-react';
 import { ExportDataButton } from '@/components/ExportDataButton';
+import { ExportTranscriptsPdf } from '@/components/ExportTranscriptsPdf';
 import { QuizEditor } from '@/components/QuizEditor';
 import { MissionsAdmin } from '@/components/MissionsAdmin';
 import { ModulesAdmin } from '@/components/ModulesAdmin';
@@ -474,6 +475,7 @@ export default function Admin() {
               </>
             )}
             <ExportDataButton password={password} />
+            <ExportTranscriptsPdf password={password} />
             <Button variant="outline" onClick={() => navigate('/aluno')}>
               <Users className="h-4 w-4 mr-2" />
               Painel do Aluno
