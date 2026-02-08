@@ -1,0 +1,169 @@
+{
+  "exported_at": "2026-02-08",
+  "tables": {
+    "modules": [
+      {
+        "id": "0c292893-43d7-4308-af65-a77cf90b1947",
+        "title": "Fundamentos do Empreendedor Vibe",
+        "description": "Mindset empreendedor, oportunidades com IA e introdução ao ecossistema Google.",
+        "module_order": 1,
+        "is_released": true,
+        "created_at": "2026-01-28T20:43:07.028754+00"
+      },
+      {
+        "id": "0e29cd0b-304a-42a3-8e19-5ed2febab000",
+        "title": "Seu Ambiente Google",
+        "description": "Configuração do AI Studio, Firebase Studio e domínio do Gemini.",
+        "module_order": 2,
+        "is_released": false,
+        "created_at": "2026-01-28T20:43:07.028754+00"
+      },
+      {
+        "id": "917cc8f3-15fa-488c-ab4a-526180590003",
+        "title": "Construindo seu SaaS",
+        "description": "Desenvolvimento com Flutter, autenticação, Firestore e integrações.",
+        "module_order": 3,
+        "is_released": false,
+        "created_at": "2026-01-28T20:43:07.028754+00"
+      },
+      {
+        "id": "38a875eb-f1eb-4e80-85d1-b03d8fcda4de",
+        "title": "Lançamento",
+        "description": "Deploy, Vertex AI em produção e projeto final.",
+        "module_order": 4,
+        "is_released": false,
+        "created_at": "2026-01-28T20:43:07.028754+00"
+      }
+    ],
+    "videos": [
+      {
+        "id": "1dc10fa2-a5d0-4c7c-8ebc-413f282460da",
+        "title": "Introdução",
+        "youtube_id": "-8e3EH41qHQ",
+        "lesson_order": 1,
+        "module_id": null,
+        "is_configured": true,
+        "is_released": true,
+        "description": "Introdução",
+        "transcript_chars": 1391,
+        "video_type": "youtube"
+      },
+      {
+        "id": "760470fa-7670-4b56-8746-d5d44d1c4509",
+        "title": "Aula 1 descobrindo a Dor",
+        "youtube_id": "Pp-7DJZMSBA",
+        "lesson_order": 2,
+        "module_id": null,
+        "is_configured": true,
+        "is_released": true,
+        "description": "Aula 1 Descobrindo a Dor",
+        "transcript_chars": 5757,
+        "video_type": "youtube"
+      },
+      {
+        "id": "eaa3d3c2-5394-464d-9336-20f8053a249c",
+        "title": "Aula 2 : piscicologia real da dor",
+        "youtube_id": "kDSsKjM-kps",
+        "lesson_order": 3,
+        "module_id": null,
+        "is_configured": true,
+        "is_released": true,
+        "description": "Aula 2 sobre a psicologia real da dor",
+        "transcript_chars": 3854,
+        "video_type": "youtube"
+      },
+      {
+        "id": "44ceb0f3-9f49-4721-a205-87850e2c5c7b",
+        "title": "3 aula : quebrando paradigmas",
+        "youtube_id": "i1KkgV3eSdI",
+        "lesson_order": 4,
+        "module_id": null,
+        "is_configured": true,
+        "is_released": true,
+        "description": "Aula 3: quebrando paradigmas",
+        "transcript_chars": 4500,
+        "video_type": "youtube"
+      },
+      {
+        "id": "b653e1eb-a89a-4231-a656-8d6ec4f7f4b3",
+        "title": "Aula 4: O ciclo do hábito",
+        "youtube_id": "UbJpxSTORwA",
+        "lesson_order": 5,
+        "module_id": null,
+        "is_configured": true,
+        "is_released": true,
+        "description": "Aula 4 sobre o ciclo do hábito",
+        "transcript_chars": 3217,
+        "video_type": "youtube"
+      }
+    ],
+    "video_quizzes": [
+      {
+        "id": "95178a1e-8405-4687-be67-19264eafba9d",
+        "video_id": "760470fa-7670-4b56-8746-d5d44d1c4509",
+        "question": "Qual é o principal sinal de alerta do corpo?",
+        "options": ["Fome", "Dor", "Sono", "Sede"],
+        "correct_option_index": 1,
+        "explanation": "A dor é um mecanismo de proteção do corpo que nos alerta sobre possíveis problemas.",
+        "question_order": 1,
+        "timestamp_seconds": 60
+      },
+      {
+        "id": "ce25d883-8f1e-4cc4-9365-51499beade69",
+        "video_id": "760470fa-7670-4b56-8746-d5d44d1c4509",
+        "question": "O que mais afeta a postura no trabalho?",
+        "options": ["Luz do ambiente", "Ergonomia da cadeira", "Temperatura", "Ruído"],
+        "correct_option_index": 1,
+        "explanation": "A ergonomia adequada da cadeira e mesa é fundamental para uma boa postura.",
+        "question_order": 2,
+        "timestamp_seconds": 120
+      }
+    ],
+    "missions": [
+      {
+        "id": "d1b161e9-df55-4ce6-b667-449b90b2a30d",
+        "title": "Reflexão sobre a Introdução",
+        "description": "Após assistir à aula introdutória, reflita sobre os principais conceitos apresentados e como eles se aplicam ao seu contexto.",
+        "instructions": "Escreva um texto de 3-5 parágrafos explicando:\n1. Os principais conceitos que você aprendeu\n2. Como esses conceitos se relacionam com algo do seu dia-a-dia\n3. Uma dúvida ou ponto que gostaria de explorar mais",
+        "video_id": "1dc10fa2-a5d0-4c7c-8ebc-413f282460da",
+        "difficulty_level": "básico",
+        "evidence_type": "text",
+        "points_reward": 15,
+        "is_active": true,
+        "evaluation_criteria": [
+          "Demonstra compreensão dos conceitos principais da aula",
+          "Apresenta reflexão crítica e pessoal",
+          "Conecta o conteúdo com exemplos práticos",
+          "Texto bem estruturado e coerente"
+        ]
+      }
+    ],
+    "student_achievements": [
+      {
+        "id": "54bf3da4-2bf0-4825-bdc5-95f2a81938fa",
+        "student_id": "dev-test-student-001",
+        "total_points": 0,
+        "level": 1,
+        "current_streak": 0,
+        "longest_streak": 0,
+        "missions_completed": 0,
+        "missions_attempted": 0,
+        "average_score": 0,
+        "badges": []
+      }
+    ],
+    "student_lesson_progress": [],
+    "student_quiz_results": [],
+    "profiles": [],
+    "certificates": [],
+    "squads": []
+  },
+  "summary": {
+    "modules_count": 4,
+    "videos_count": 5,
+    "quizzes_count": 2,
+    "missions_count": 1,
+    "students_count": 1,
+    "empty_tables": ["student_lesson_progress", "student_quiz_results", "profiles", "certificates", "squads"]
+  }
+}
