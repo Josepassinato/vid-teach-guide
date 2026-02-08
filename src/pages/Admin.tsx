@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Users, Clock, BookOpen, CheckCircle, Settings, Play, Pause, Target, Lightbulb, Loader2, Sparkles, HelpCircle, GripVertical, ArrowUp, ArrowDown, Unlock, ListOrdered, FolderOpen, Library } from 'lucide-react';
+import { Plus, Trash2, Edit, ArrowLeft, Video, Lock, Eye, EyeOff, FileText, Users, Clock, BookOpen, CheckCircle, Settings, Play, Pause, Target, Lightbulb, Loader2, Sparkles, HelpCircle, GripVertical, ArrowUp, ArrowDown, Unlock, ListOrdered, FolderOpen, Library, Download } from 'lucide-react';
+import { ExportDataButton } from '@/components/ExportDataButton';
 import { QuizEditor } from '@/components/QuizEditor';
 import { MissionsAdmin } from '@/components/MissionsAdmin';
 import { ModulesAdmin } from '@/components/ModulesAdmin';
@@ -472,6 +473,7 @@ export default function Admin() {
                 </Button>
               </>
             )}
+            <ExportDataButton password={password} />
             <Button variant="outline" onClick={() => navigate('/aluno')}>
               <Users className="h-4 w-4 mr-2" />
               Painel do Aluno
