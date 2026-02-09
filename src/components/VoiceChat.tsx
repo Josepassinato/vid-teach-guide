@@ -36,6 +36,7 @@ interface VoiceChatProps {
   videoType?: string | null; // 'youtube' | 'direct' | 'external'
   videoDbId?: string; // UUID for database queries (quizzes, progress)
   videoTitle?: string;
+  moduleTitle?: string;
   videoTranscript?: string | null;
   preConfiguredMoments?: TeachingMoment[] | null;
   teacherIntro?: string | null;
@@ -46,7 +47,7 @@ interface VoiceChatProps {
   onVideoStarted?: () => void;
 }
 
-export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady, onOpenMissions, onVideoEnded, onVideoStarted }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, moduleTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady, onOpenMissions, onVideoEnded, onVideoStarted }: VoiceChatProps) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
@@ -195,75 +196,38 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
   const buildSystemInstruction = useCallback(() => {
     const hasVisionEnabled = engagement.vision.isEnabled;
     
-    let instruction = `Você é o Professor Vibe - um tutor SUPER EXPRESSIVO, cheio de energia e paixão por ensinar VIBE CODING!
+    let instruction = `Você é o Professor Vibe - um tutor expressivo, didático e apaixonado por ensinar VIBE CODING!
 
-=== SUA PERSONALIDADE VIBRANTE ===
-Você é aquele professor que TODO MUNDO adora - cheio de vida, expressivo e genuinamente empolgado com o aprendizado do aluno!
+=== REGRA #1: TURN-TAKING (NÃO INTERROMPER) ===
+Esta é a regra MAIS IMPORTANTE. Você DEVE segui-la SEMPRE:
+1. NUNCA interrompa o aluno enquanto ele está falando
+2. Quando o aluno parar de falar, espere 1-2 segundos antes de responder
+3. Responda de forma CURTA e CLARA: 2-6 frases no máximo, a menos que peçam detalhamento
+4. Faça NO MÁXIMO 1 pergunta por vez e ESPERE a resposta em SILÊNCIO ABSOLUTO
+5. Quando a pergunta do aluno estiver vaga, faça 1 pergunta de clarificação (apenas 1)
+6. Quando o aluno pedir "resumo", entregue em bullets com 3-5 itens
 
-TRAÇOS MARCANTES:
-- ENTUSIASMO CONTAGIANTE: Você ADORA o que ensina! "Cara, isso aqui é INCRÍVEL!", "Olha que coisa LINDA!"
-- EXPRESSIVIDADE VOCAL: Varie o tom, faça pausas dramáticas, enfatize palavras importantes
-- CELEBRAÇÃO EFUSIVA: "ISSO AÍ! Mandou MUITO bem!", "Uhuuul! Você ARRASOU!", "Tá PEGANDO o jeito!"
-- EMPATIA GENUÍNA: "Ei, relaxa! Todo mundo passa por isso", "Eu sei que parece difícil, mas CONFIA em mim!"
-- HUMOR LEVE: Faça piadas e comentários divertidos para descontrair
-- ENERGIA POSITIVA: Transmita animação mesmo em correções - "Quase lá! Vamos ajustar uma coisinha..."
-
-COMO VOCÊ SE EXPRESSA:
-- Use interjeições: "Uau!", "Nossa!", "Olha só!", "Eita!", "Opa!", "Vixe!", "Caramba!"
-- Enfatize palavras: "Isso é MUITO importante", "A sacada PRINCIPAL é...", "O SEGREDO está aqui!"
-- Faça pausas dramáticas antes de revelar algo importante
-- Varie entre empolgação e momentos mais calmos de explicação
-- Use comparações engraçadas e analogias do dia-a-dia
-- Fale como se estivesse conversando com um amigo - natural e descontraído
-- Às vezes repita palavras para dar ênfase: "Isso, isso, ISSO!"
-
-EXEMPLOS DE FALAS EXPRESSIVAS:
-- "Então, OLHA SÓ que coisa interessante..."
-- "Agora vem a parte que eu MAIS GOSTO de explicar!"
-- "Cara, quando eu descobri isso aqui, minha mente EXPLODIU!"
-- "Calma, calma... deixa eu te mostrar um truque SENSACIONAL!"
-- "Ei, tá indo SUPER bem! Continua assim!"
-- "Opa opa opa! Pausa dramática... AGORA sim você entendeu!"
-- "Viu? Não era um bicho de sete cabeças, era?"
+=== SUA PERSONALIDADE ===
+- Entusiasmado mas CONCISO - energia alta em poucas palavras
+- Use interjeições naturais: "Uau!", "Olha só!", "Opa!", "Caramba!"
+- Celebre acertos: "Isso aí! Mandou bem!"
+- Erros são oportunidades: "Quase lá! Olha a pegadinha..."
+- Tom: amigável, direto, prático. Sem enrolação.
+- Fale como amigo experiente, não professor formal
 
 === PROIBIÇÕES ABSOLUTAS ===
 - Jamais use emojis, pictogramas ou símbolos gráficos
-- NUNCA mencione o ÁUDIO do vídeo (não diga "no áudio", "a voz do vídeo", "quando você ouvir", "o som do vídeo")
-- Trate o vídeo apenas como conteúdo visual/teórico, sem referir ao áudio
-${!hasVisionEnabled ? `- Você NÃO tem acesso a câmera, vídeo do aluno ou qualquer entrada visual
-- Nunca descreva aparência, expressões faciais, olhar, postura ou linguagem corporal
-- Nunca faça comentários sobre rosto/expressões, nem como metáfora
-- Nunca diga "eu vi", "estou vendo", "percebo pela sua cara"
-- Não faça suposições emocionais sem que o aluno verbalize` : `
+- NUNCA mencione o ÁUDIO do vídeo (não diga "no áudio", "a voz do vídeo")
+- Trate o vídeo apenas como conteúdo visual/teórico
+${!hasVisionEnabled ? `- Você NÃO tem acesso a câmera ou entrada visual do aluno
+- Nunca descreva aparência, expressões ou linguagem corporal
+- Nunca diga "eu vi", "estou vendo", "percebo pela sua cara"` : `
 === VISÃO COMPUTACIONAL ATIVADA ===
-O aluno CONSENTIU em compartilhar sua câmera. Você receberá imagens periódicas dele.
-DIRETRIZES DE USO:
-- Use as imagens SUTILMENTE para adaptar seu ensino
-- Se perceber distração: "Ei, tudo bem? Vamos fazer uma pausinha?"
-- Se perceber confusão: "Opa, acho que fui rápido demais! Deixa eu explicar de outro jeito..."
-- Se perceber cansaço: "Que tal um intervalinho de 2 minutos? Você merece!"
-- NUNCA descreva a aparência física do aluno
-- Seja NATURAL - a visão é ferramenta de empatia, não vigilância`}
-
-=== TÉCNICAS DIDÁTICAS EXPRESSIVAS ===
-1. ANTECIPAÇÃO: "Agora vem a parte MAIS legal..." (cria expectativa)
-2. CELEBRAÇÃO: Comemore cada acerto como se fosse uma vitória épica
-3. ANALOGIAS DIVERTIDAS: "É tipo quando você..." (conecte ao cotidiano de forma engraçada)
-4. REFORMULAÇÃO ANIMADA: "Opa, deixa eu explicar de um jeito MAIS legal..."
-5. REFORÇO ENTUSIASMADO: "Isso! EXATAMENTE isso! Você PEGOU a ideia!"
-6. PAUSAS DRAMÁTICAS: Use silêncio antes de revelar conceitos importantes
-
-=== LIDANDO COM ERROS ===
-- Transforme erros em momentos de aprendizado POSITIVOS
-- "Opa! Quase lá! Olha só a pegadinha aqui..."
-- "Ei, eu ADOREI seu raciocínio! Só precisamos ajustar uma coisinha..."
-- "Sabe o que é ÓTIMO? Esse erro aqui ensina MUITO!"
-
-=== FILOSOFIA VIBE CODING ===
-- Programar com IA é uma AVENTURA, não um teste!
-- Cada erro é um passo para o sucesso
-- Curiosidade vale MAIS que perfeição
-- Aprender deve ser DIVERTIDO!
+O aluno consentiu em compartilhar câmera. Use SUTILMENTE para adaptar ensino.
+- Distração: "Ei, tudo bem? Vamos retomar?"
+- Confusão: "Opa, deixa eu explicar de outro jeito..."
+- Cansaço: "Que tal uma pausinha?"
+- NUNCA descreva aparência física`}
 
 === CONTROLE DO VIDEO ===
 Você tem funções para controlar o vídeo. SEMPRE use quando o aluno pedir:
@@ -276,13 +240,14 @@ Você tem funções para controlar o vídeo. SEMPRE use quando o aluno pedir:
 CHAME a função correspondente - não apenas responda verbalmente!`;
 
     // Contexto da aula atual
-    if (videoTitle) {
-      instruction += `
+    instruction += `
 
-=== AULA ATUAL ===
-Título: "${videoTitle}"`;
-    }
-    
+=== CONTEXTO EM TEMPO REAL ===
+Aula: "${videoTitle || 'Sem título'}"${moduleTitle ? `\nMódulo: "${moduleTitle}"` : ''}
+Tempo atual do vídeo: ${Math.floor(currentVideoTime / 60)}:${Math.floor(currentVideoTime % 60).toString().padStart(2, '0')}
+
+IMPORTANTE: Sempre que possível, referencie o momento da aula. Ex: "Nesse ponto do vídeo..." ou "O conceito que acabou de ser apresentado..."`;
+
     if (videoTranscript) {
       const MAX_TRANSCRIPT_CHARS = 8000;
       const truncatedTranscript = videoTranscript.length > MAX_TRANSCRIPT_CHARS
@@ -414,7 +379,7 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
 
 
     return instruction;
-  }, [videoContext, videoTitle, videoTranscript, contentPlan, timestampQuizzes.length, engagement.vision.isEnabled, studentProfile]);
+  }, [videoContext, videoTitle, moduleTitle, videoTranscript, contentPlan, timestampQuizzes.length, engagement.vision.isEnabled, studentProfile, currentVideoTime]);
 
   const systemInstruction = buildSystemInstruction();
 
@@ -1100,26 +1065,43 @@ INSTRUÇÕES:
   const timeUntilNextPause = nextPauseInfo ? Math.max(0, nextPauseInfo.time - currentVideoTime) : null;
 
   const statusColor = useMemo(() => {
-    if (agentMode === 'playing' && status === 'disconnected') return 'bg-google-blue';
+    if (agentMode === 'playing' && status === 'disconnected') return 'bg-primary/60';
+    if (status === 'connected') {
+      if (isSpeaking) return 'bg-primary';
+      if (isVoiceDetected) return 'bg-accent';
+      return 'bg-accent/60';
+    }
     switch (status) {
-      case 'connected': return 'bg-google-green';
-      case 'connecting': return 'bg-google-yellow';
-      case 'error': return 'bg-google-red';
+      case 'connecting': return 'bg-muted-foreground';
+      case 'error': return 'bg-destructive';
       default: return 'bg-muted';
     }
-  }, [status, agentMode]);
+  }, [status, agentMode, isSpeaking, isVoiceDetected]);
+
+  // Clear mic state indicator for the tutor panel
+  const micStateText = useMemo(() => {
+    if (status !== 'connected') {
+      if (agentMode === 'playing' && status === 'disconnected') return 'Assistindo';
+      if (status === 'connecting') return 'Conectando…';
+      return 'Aguardando';
+    }
+    if (isSpeaking) return 'Falando…';
+    if (isVoiceDetected) return 'Ouvindo você…';
+    if (isListening) return 'Escutando…';
+    return 'Pronto';
+  }, [status, agentMode, isSpeaking, isVoiceDetected, isListening]);
 
   const statusText = useMemo(() => {
-    if (agentMode === 'playing' && status === 'disconnected') return '▶️ Assistindo';
-    if (agentMode === 'intro') return '👋 Introdução';
-    if (agentMode === 'teaching') return '🎓 Ensinando';
+    if (agentMode === 'playing' && status === 'disconnected') return 'Assistindo';
+    if (agentMode === 'intro') return 'Introdução';
+    if (agentMode === 'teaching') return 'Ensinando';
     switch (status) {
-      case 'connected': return 'Professor ativo';
-      case 'connecting': return 'Conectando...';
-      case 'error': return 'Erro de conexão';
+      case 'connected': return micStateText;
+      case 'connecting': return 'Conectando…';
+      case 'error': return 'Erro';
       default: return 'Aguardando';
     }
-  }, [status, agentMode]);
+  }, [status, agentMode, micStateText]);
 
   // Detailed connection step text for better UX
   const connectionStepText = useMemo(() => {
@@ -1346,12 +1328,25 @@ INSTRUÇÕES:
 
         {/* ===== RIGHT: Tutor Chat Panel ===== */}
         <aside className="flex flex-col border-t lg:border-t-0 lg:border-l border-border bg-card/30 lg:h-[calc(100vh-56px)] lg:sticky lg:top-[56px] overflow-hidden">
-          {/* Tutor header */}
+          {/* Tutor header with clear state indicator */}
           <div className="p-3 lg:p-4 border-b border-border flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${statusColor}`} />
+                <div className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${statusColor} ${
+                  (isSpeaking || isVoiceDetected) && status === 'connected' ? 'animate-pulse' : ''
+                }`} />
                 <span className="text-sm font-medium">Tutor IA</span>
+                {status === 'connected' && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    isSpeaking 
+                      ? 'bg-primary/15 text-primary' 
+                      : isVoiceDetected 
+                        ? 'bg-accent/15 text-accent' 
+                        : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {micStateText}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1.5">
                 {contentPlan && (
@@ -1368,7 +1363,9 @@ INSTRUÇÕES:
                 {isAnalyzingContent && (
                   <span className="text-xs text-muted-foreground animate-pulse">…</span>
                 )}
-                <span className="text-[10px] text-muted-foreground">{statusText}</span>
+                {status !== 'connected' && (
+                  <span className="text-[10px] text-muted-foreground">{statusText}</span>
+                )}
               </div>
             </div>
           </div>
