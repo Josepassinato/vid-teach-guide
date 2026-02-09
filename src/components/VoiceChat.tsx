@@ -43,9 +43,10 @@ interface VoiceChatProps {
   onContentPlanReady?: (moments: TeachingMoment[]) => void;
   onOpenMissions?: () => void;
   onVideoEnded?: () => void;
+  onVideoStarted?: () => void;
 }
 
-export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady, onOpenMissions, onVideoEnded }: VoiceChatProps) {
+export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbId, videoTitle, videoTranscript, preConfiguredMoments, teacherIntro, onContentPlanReady, onOpenMissions, onVideoEnded, onVideoStarted }: VoiceChatProps) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
@@ -313,10 +314,12 @@ ${contentPlan.teaching_moments.map((m, i) =>
 
 Quando receber "MOMENTO DE APROFUNDAMENTO":
 1. Explique o insight principal em 2-3 frases
-2. Faça APENAS UMA pergunta e PARE DE FALAR
-3. ESPERE em silêncio a resposta do aluno
-4. Só depois que o aluno responder, continue a conversa
-5. NUNCA faça múltiplas perguntas consecutivas - isso confunde o aluno`;
+2. Faça APENAS UMA pergunta e PARE DE FALAR COMPLETAMENTE
+3. ESPERE em silêncio absoluto a resposta do aluno - NÃO FALE até ele responder
+4. Tenha PACIÊNCIA - o aluno pode levar até 10 segundos para formular uma resposta
+5. Só depois que o aluno responder, continue a conversa
+6. NUNCA faça múltiplas perguntas consecutivas - isso confunde o aluno
+7. NUNCA interrompa o aluno enquanto ele está falando`;
     }
 
     // Quizzes
@@ -1048,6 +1051,7 @@ INSTRUÇÕES:
         resumeVideo();
         setAgentMode('playing');
         setIsVideoExpanded(true); // Expand video when playing
+        onVideoStarted?.();
         // Disconnect after agent finishes speaking
         setTimeout(() => {
           if (statusRef.current === 'connected') {
@@ -1056,7 +1060,7 @@ INSTRUÇÕES:
         }, 3000);
       }, 2000);
     }
-  }, [status, sendText, disconnect, resumeVideo]);
+  }, [status, sendText, disconnect, resumeVideo, onVideoStarted]);
 
   // Handle dismissing teaching moment - resume video and disconnect
   const handleDismissMoment = useCallback(() => {
@@ -1068,16 +1072,18 @@ INSTRUÇÕES:
         console.log('[VoiceChat] Moment dismissed, resuming video');
         resumeVideo();
         setAgentMode('playing');
-        setIsVideoExpanded(true); // Re-expand video when resuming
+        setIsVideoExpanded(true);
+        onVideoStarted?.();
         setTimeout(() => disconnect(), 3000);
       }, 1500);
     } else {
       console.log('[VoiceChat] Moment dismissed (not connected), resuming video directly');
       resumeVideo();
       setAgentMode('playing');
-      setIsVideoExpanded(true); // Re-expand video when resuming
+      setIsVideoExpanded(true);
+      onVideoStarted?.();
     }
-  }, [disconnect, sendText, status, resumeVideo]);
+  }, [disconnect, sendText, status, resumeVideo, onVideoStarted]);
 
   const dismissActiveMoment = () => {
     handleDismissMoment();

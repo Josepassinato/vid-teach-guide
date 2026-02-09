@@ -417,6 +417,15 @@ const Student = () => {
         >
           <div className="flex items-center justify-between px-4 py-3 border-b">
             <h2 className="text-sm font-semibold text-sidebar-foreground">Aulas</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setSidebarCollapsed(true)}
+              aria-label="Minimizar lista de aulas"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
           </div>
           <div className="flex-1 overflow-y-auto">
             {renderLessonsList()}
@@ -476,6 +485,10 @@ const Student = () => {
                     setMobileTab('missions');
                   }}
                   onVideoEnded={handleVideoEnded}
+                  onVideoStarted={() => {
+                    setSidebarCollapsed(true);
+                    setSidebarOpen(false);
+                  }}
                 />
               </div>
 

@@ -28,7 +28,7 @@ interface UseOpenAIRealtimeOptions {
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 // Silence timeout configuration (ms)
-const SILENCE_TIMEOUT_MS = 3000;
+const SILENCE_TIMEOUT_MS = 5000;
 
 // Proactive prompts to encourage student engagement
 const PROACTIVE_PROMPTS = [
@@ -409,9 +409,9 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             },
             turn_detection: {
               type: "server_vad",
-              threshold: 0.7,
-              prefix_padding_ms: 400,
-              silence_duration_ms: 800
+              threshold: 0.5,
+              prefix_padding_ms: 500,
+              silence_duration_ms: 1400
             },
             tools: tools,
             tool_choice: "auto"
@@ -463,9 +463,9 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 console.log('[OPENAI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
                 
                 if (queueLength === 0 && !isPlaying) {
-                  console.log('[OPENAI] Fala terminou, aguardando 5 segundos...');
-                  // 5 second buffer after speech ends
-                  setTimeout(resolve, 5000);
+                  console.log('[OPENAI] Fala terminou, aguardando 2 segundos...');
+                  // 2 second buffer after speech ends
+                  setTimeout(resolve, 2000);
                 } else {
                   setTimeout(checkSpeech, 100);
                 }
