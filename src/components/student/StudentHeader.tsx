@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BarChart3, LogOut, Menu, User } from 'lucide-react';
+import { BarChart3, LogOut, Menu, User, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Progress } from '@/components/ui/progress';
@@ -19,6 +19,8 @@ interface StudentHeaderProps {
   totalLessons: number;
   progressPercentage: number;
   onMenuClick?: () => void;
+  onToggleSidebar?: () => void;
+  sidebarCollapsed?: boolean;
   showMenuButton?: boolean;
   userName?: string | null;
   userAvatar?: string | null;
@@ -32,6 +34,8 @@ export function StudentHeader({
   totalLessons,
   progressPercentage,
   onMenuClick,
+  onToggleSidebar,
+  sidebarCollapsed,
   showMenuButton,
   userName,
   userAvatar,
@@ -45,9 +49,9 @@ export function StudentHeader({
     .slice(0, 2) || 'AL';
 
   return (
-    <header className="border-b bg-card/80 backdrop-blur-xl sticky top-0 z-50">
-      <div className="px-4 py-2.5 flex items-center gap-3">
-        {/* Menu button - mobile only */}
+    <header className="border-b border-border bg-card/80 backdrop-blur-xl sticky top-0 z-50 h-14">
+      <div className="px-4 h-full flex items-center gap-3">
+        {/* Mobile menu button */}
         {showMenuButton && (
           <Button
             variant="ghost"
@@ -56,6 +60,19 @@ export function StudentHeader({
             onClick={onMenuClick}
           >
             <Menu className="h-4 w-4" />
+          </Button>
+        )}
+
+        {/* Desktop sidebar toggle */}
+        {onToggleSidebar && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 hidden lg:inline-flex flex-shrink-0"
+            onClick={onToggleSidebar}
+            aria-label={sidebarCollapsed ? 'Abrir lista de aulas' : 'Fechar lista de aulas'}
+          >
+            {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
         )}
 
