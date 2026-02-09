@@ -87,6 +87,7 @@ const Student = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('video');
+  const [hasAutoCollapsedForThisLesson, setHasAutoCollapsedForThisLesson] = useState(false);
 
   const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
     if (newStats.progressPercentage === 100) {
@@ -184,6 +185,7 @@ const Student = () => {
     setCurrentLessonIndex(index);
     setSidebarOpen(false);
     setMobileTab('video');
+    setHasAutoCollapsedForThisLesson(false); // Reset auto-collapse for new lesson
   };
 
   const goToNextLesson = () => {
@@ -475,6 +477,7 @@ const Student = () => {
                   videoType={selectedVideo.videoType}
                   videoDbId={selectedVideo.dbId}
                   videoTitle={selectedVideo.title}
+                  moduleTitle={currentLesson?.module_id ? modules.find(m => m.id === currentLesson.module_id)?.title : undefined}
                   videoTranscript={selectedVideo.transcript}
                   preConfiguredMoments={selectedVideo.teachingMoments}
                   teacherIntro={selectedVideo.teacherIntro}
@@ -486,8 +489,11 @@ const Student = () => {
                   }}
                   onVideoEnded={handleVideoEnded}
                   onVideoStarted={() => {
-                    setSidebarCollapsed(true);
-                    setSidebarOpen(false);
+                    if (!hasAutoCollapsedForThisLesson) {
+                      setSidebarCollapsed(true);
+                      setSidebarOpen(false);
+                      setHasAutoCollapsedForThisLesson(true);
+                    }
                   }}
                 />
               </div>
