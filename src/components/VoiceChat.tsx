@@ -1128,9 +1128,9 @@ INSTRUÇÕES:
 
   return (
     <>
-    <Card className={`flex flex-col transition-all duration-500 ${
+    <Card className={`flex flex-col border-0 shadow-none bg-transparent transition-all duration-500 ${
       isVideoExpanded 
-        ? 'h-[90vh] fixed inset-x-0 top-0 z-50 rounded-none border-x-0 border-t-0' 
+        ? 'h-[90vh] fixed inset-x-0 top-0 z-50 rounded-none bg-background' 
         : 'h-full min-h-[400px] sm:min-h-0'
     }`}>
       {/* Collapsed Header when video is expanded */}
@@ -1161,15 +1161,13 @@ INSTRUÇÕES:
           </div>
         </CardHeader>
       ) : (
-        <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
+        <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 pt-3 sm:pt-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full ${statusColor}`} />
               Professor IA
             </CardTitle>
             <div className="flex items-center gap-2">
-              {/* Debug badge */}
-              
               {contentPlan && (
                 <Button
                   size="sm"
@@ -1182,11 +1180,11 @@ INSTRUÇÕES:
                 </Button>
               )}
               {isAnalyzingContent && (
-                <Badge variant="outline" className="text-xs animate-pulse">
+                <span className="text-xs text-muted-foreground animate-pulse">
                   Analisando...
-                </Badge>
+                </span>
               )}
-              <span className="text-[10px] sm:text-xs text-muted-foreground">{statusText}</span>
+              <span className="text-[10px] text-muted-foreground">{statusText}</span>
             </div>
           </div>
         </CardHeader>
@@ -1414,24 +1412,22 @@ INSTRUÇÕES:
         )}
         
         {/* Collapsible Chat Section */}
-        <div className="border rounded-lg overflow-hidden flex-shrink-0">
+        <div className="border rounded-lg overflow-hidden flex-shrink-0 bg-card/50">
           <button
             onClick={() => setShowChat(!showChat)}
-            className="w-full flex items-center justify-between p-2 sm:p-3 bg-muted/30 hover:bg-muted/50 transition-colors"
+            className="w-full flex items-center justify-between p-2.5 hover:bg-muted/30 transition-colors"
           >
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <MessageSquare className="h-4 w-4" />
-              <span>Chat de Texto</span>
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span>Chat</span>
               {messages.length > 0 && (
-                <Badge variant="secondary" className="text-[10px] h-5">
-                  {messages.length}
-                </Badge>
+                <span className="text-[10px] tabular-nums">({messages.length})</span>
               )}
             </div>
             {showChat ? (
-              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
             ) : (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             )}
           </button>
           
@@ -1467,14 +1463,14 @@ INSTRUÇÕES:
               {status === 'connected' && (
                 <div className="flex gap-2 pt-2 border-t">
                   <Input
-                    placeholder="Digite sua pergunta..."
+                    placeholder="Pergunte algo sobre esta aula…"
                     value={textInput}
                     onChange={(e) => setTextInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendText()}
-                    className="h-9 text-sm"
+                    className="h-8 text-xs border-0 bg-muted/50 focus-visible:ring-1"
                   />
-                  <Button onClick={handleSendText} size="icon" variant="secondary" className="h-9 w-9">
-                    <Send className="h-4 w-4" />
+                  <Button onClick={handleSendText} size="icon" variant="ghost" className="h-8 w-8">
+                    <Send className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               )}
@@ -1558,7 +1554,7 @@ INSTRUÇÕES:
                 </div>
                 <Button 
                   onClick={handleStartVideo} 
-                  className="h-10 sm:h-11 px-4 bg-google-green hover:bg-google-green/90"
+                  className="h-10 sm:h-11 px-4 bg-accent hover:bg-accent/90 text-accent-foreground"
                 >
                   <Play className="h-4 w-4 mr-2" />
                   <span>Começar Vídeo</span>

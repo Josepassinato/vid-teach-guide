@@ -19,35 +19,15 @@ export function MobileNavigation({
   lessonCompleted = false,
 }: MobileNavigationProps) {
   const tabs = [
-    {
-      id: 'lessons' as const,
-      icon: Video,
-      label: 'Aulas',
-      show: true,
-    },
-    {
-      id: 'video' as const,
-      icon: Play,
-      label: 'Vídeo',
-      show: true,
-    },
-    {
-      id: 'missions' as const,
-      icon: Target,
-      label: 'Missões',
-      show: hasMissions,
-    },
-    {
-      id: 'quiz' as const,
-      icon: ClipboardCheck,
-      label: 'Quiz',
-      show: hasQuiz && !lessonCompleted,
-    },
+    { id: 'lessons' as const, icon: Video, label: 'Aulas', show: true },
+    { id: 'video' as const, icon: Play, label: 'Vídeo', show: true },
+    { id: 'missions' as const, icon: Target, label: 'Missões', show: hasMissions },
+    { id: 'quiz' as const, icon: ClipboardCheck, label: 'Quiz', show: hasQuiz && !lessonCompleted },
   ].filter((tab) => tab.show);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t lg:hidden safe-area-bottom">
-      <div className="flex items-center justify-around px-2 py-1">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-t lg:hidden safe-area-bottom">
+      <div className="flex items-center justify-around px-2 py-1.5">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -56,14 +36,14 @@ export function MobileNavigation({
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                'flex flex-col items-center justify-center py-2 px-4 min-w-[64px] rounded-xl transition-all',
+                'flex flex-col items-center justify-center py-1.5 px-4 min-w-[56px] rounded-lg transition-colors',
                 isActive
-                  ? 'text-primary bg-primary/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  ? 'text-primary'
+                  : 'text-muted-foreground'
               )}
             >
-              <Icon className={cn('h-5 w-5 mb-1', isActive && 'text-primary')} />
-              <span className="text-[10px] font-medium">{tab.label}</span>
+              <Icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+              <span className="text-[10px] font-medium mt-0.5">{tab.label}</span>
             </button>
           );
         })}

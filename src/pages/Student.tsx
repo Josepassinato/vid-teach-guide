@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VoiceChat } from '@/components/VoiceChat';
-import { X, ChevronLeft, ChevronRight, CheckCircle, Lock, Target, ClipboardCheck, Video, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, Lock, Target, ClipboardCheck, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -407,14 +407,9 @@ const Student = () => {
       {/* Main layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex w-80 xl:w-96 border-r bg-card/50 flex-col overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b">
-            <h2 className="font-semibold flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-primary/10">
-                <Video className="h-4 w-4 text-primary" />
-              </div>
-              Suas Aulas
-            </h2>
+        <aside className="hidden lg:flex w-72 xl:w-80 border-r bg-sidebar flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b">
+            <h2 className="text-sm font-semibold text-sidebar-foreground">Aulas</h2>
           </div>
           <div className="flex-1 overflow-y-auto">
             {renderLessonsList()}
@@ -430,16 +425,11 @@ const Student = () => {
 
         {/* Mobile Sheet for lessons */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="w-[85vw] sm:w-[400px] p-0">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="font-semibold flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-primary/10">
-                  <Video className="h-4 w-4 text-primary" />
-                </div>
-                Suas Aulas
-              </h2>
+          <SheetContent side="left" className="w-[80vw] sm:w-[350px] p-0 bg-sidebar">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <h2 className="text-sm font-semibold">Aulas</h2>
             </div>
-            <div className="overflow-y-auto h-[calc(100vh-60px)]">
+            <div className="overflow-y-auto h-[calc(100vh-50px)]">
               {renderLessonsList()}
 
               {/* Teaching Moments */}

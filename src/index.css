@@ -2,131 +2,87 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Google-Inspired Modern Design System */
+/* Premium SaaS Design System */
 
 @layer base {
   :root {
-    /* Google Colors - Light Mode */
-    --background: 210 20% 98%;
-    --foreground: 213 14% 20%;
+    --background: 0 0% 98%;
+    --foreground: 220 13% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 213 14% 20%;
+    --card-foreground: 220 13% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 213 14% 20%;
+    --popover-foreground: 220 13% 18%;
 
-    /* Google Blue */
-    --primary: 217 91% 60%;
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
 
-    /* Google Yellow */
-    --secondary: 43 96% 56%;
-    --secondary-foreground: 213 14% 20%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 18%;
 
-    /* Google Green */
     --accent: 142 69% 45%;
     --accent-foreground: 0 0% 100%;
 
-    /* Google Red */
-    --destructive: 4 90% 58%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --muted: 210 15% 94%;
-    --muted-foreground: 215 14% 45%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
 
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 217 91% 60%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 221 83% 53%;
 
-    --radius: 1rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 217 91% 60%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 217 91% 60%;
-    --sidebar-accent: 217 91% 55%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 217 91% 50%;
-    --sidebar-ring: 0 0% 100%;
-    
-    /* Google-style custom tokens */
-    --google-blue: 217 91% 60%;
-    --google-red: 4 90% 58%;
-    --google-yellow: 43 96% 56%;
-    --google-green: 142 69% 45%;
-    
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(142 69% 45%) 50%, hsl(43 96% 56%) 100%);
-    --gradient-warm: linear-gradient(135deg, hsl(43 96% 56%) 0%, hsl(4 90% 58%) 100%);
-    --gradient-cool: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(142 69% 45%) 100%);
-    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-medium: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
-    --shadow-glow: 0 0 30px -5px hsl(217 91% 60% / 0.25);
+    --sidebar-background: 220 14% 96%;
+    --sidebar-foreground: 220 13% 18%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 92%;
+    --sidebar-accent-foreground: 220 13% 18%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 221 83% 53%;
   }
 
   .dark {
-    /* Deep dark background with subtle blue tint */
-    --background: 225 20% 7%;
-    --foreground: 210 40% 98%;
+    --background: 224 20% 5%;
+    --foreground: 210 20% 93%;
 
-    --card: 225 20% 10%;
-    --card-foreground: 210 40% 98%;
+    --card: 224 18% 8%;
+    --card-foreground: 210 20% 93%;
 
-    --popover: 225 25% 12%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 224 18% 10%;
+    --popover-foreground: 210 20% 93%;
 
-    /* Google Blue - VIBRANT */
-    --primary: 217 100% 65%;
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
 
-    /* Google Yellow - VIBRANT */
-    --secondary: 43 100% 60%;
-    --secondary-foreground: 225 20% 7%;
+    --secondary: 224 14% 14%;
+    --secondary-foreground: 210 20% 93%;
 
-    /* Google Green - VIBRANT */
-    --accent: 142 80% 55%;
+    --accent: 142 70% 50%;
     --accent-foreground: 0 0% 100%;
 
-    /* Google Red - VIBRANT */
-    --destructive: 4 100% 65%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --muted: 225 20% 15%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 224 14% 12%;
+    --muted-foreground: 215 14% 55%;
 
-    --border: 225 20% 18%;
-    --input: 225 20% 18%;
-    --ring: 217 100% 65%;
-    
-    /* Sidebar with subtle gradient feel */
-    --sidebar-background: 225 25% 6%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 100% 65%;
+    --border: 224 14% 14%;
+    --input: 224 14% 14%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 224 20% 4%;
+    --sidebar-foreground: 210 20% 93%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 225 20% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 225 20% 15%;
-    --sidebar-ring: 217 100% 65%;
-    
-    /* VIBRANT Google colors for dark mode */
-    --google-blue: 217 100% 68%;
-    --google-red: 4 100% 68%;
-    --google-yellow: 43 100% 65%;
-    --google-green: 142 80% 58%;
-    
-    /* Neon-inspired gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 100% 68%) 0%, hsl(280 100% 70%) 50%, hsl(4 100% 68%) 100%);
-    --gradient-warm: linear-gradient(135deg, hsl(43 100% 65%) 0%, hsl(4 100% 68%) 100%);
-    --gradient-cool: linear-gradient(135deg, hsl(217 100% 68%) 0%, hsl(142 80% 58%) 100%);
-    --gradient-rainbow: linear-gradient(90deg, hsl(217 100% 68%) 0%, hsl(4 100% 68%) 33%, hsl(43 100% 65%) 66%, hsl(142 80% 58%) 100%);
-    
-    /* Glow shadows for dark mode */
-    --shadow-soft: 0 2px 8px 0 hsl(0 0% 0% / 0.4);
-    --shadow-medium: 0 4px 16px -2px hsl(0 0% 0% / 0.5);
-    --shadow-glow: 0 0 40px -8px hsl(217 100% 65% / 0.5);
-    --shadow-glow-red: 0 0 40px -8px hsl(4 100% 65% / 0.4);
-    --shadow-glow-green: 0 0 40px -8px hsl(142 80% 55% / 0.4);
-    --shadow-glow-yellow: 0 0 40px -8px hsl(43 100% 60% / 0.4);
+    --sidebar-accent: 224 14% 10%;
+    --sidebar-accent-foreground: 210 20% 93%;
+    --sidebar-border: 224 14% 12%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 
@@ -137,110 +93,13 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 @layer utilities {
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-  
-  .gradient-warm {
-    background: var(--gradient-warm);
-  }
-  
-  .gradient-cool {
-    background: var(--gradient-cool);
-  }
-  
-  .gradient-rainbow {
-    background: var(--gradient-rainbow);
-  }
-  
-  .shadow-soft {
-    box-shadow: var(--shadow-soft);
-  }
-  
-  .shadow-medium {
-    box-shadow: var(--shadow-medium);
-  }
-  
-  .shadow-glow {
-    box-shadow: var(--shadow-glow);
-  }
-  
-  .shadow-glow-red {
-    box-shadow: var(--shadow-glow-red);
-  }
-  
-  .shadow-glow-green {
-    box-shadow: var(--shadow-glow-green);
-  }
-  
-  .shadow-glow-yellow {
-    box-shadow: var(--shadow-glow-yellow);
-  }
-  
-  .google-blue {
-    color: hsl(var(--google-blue));
-  }
-  
-  .google-red {
-    color: hsl(var(--google-red));
-  }
-  
-  .google-yellow {
-    color: hsl(var(--google-yellow));
-  }
-  
-  .google-green {
-    color: hsl(var(--google-green));
-  }
-  
-  .bg-google-blue {
-    background-color: hsl(var(--google-blue));
-  }
-  
-  .bg-google-red {
-    background-color: hsl(var(--google-red));
-  }
-  
-  .bg-google-yellow {
-    background-color: hsl(var(--google-yellow));
-  }
-  
-  .bg-google-green {
-    background-color: hsl(var(--google-green));
-  }
-  
-  /* Glow effects for dark mode */
-  .dark .glow-blue {
-    box-shadow: 0 0 20px -4px hsl(var(--google-blue) / 0.6);
-  }
-  
-  .dark .glow-red {
-    box-shadow: 0 0 20px -4px hsl(var(--google-red) / 0.6);
-  }
-  
-  .dark .glow-yellow {
-    box-shadow: 0 0 20px -4px hsl(var(--google-yellow) / 0.6);
-  }
-  
-  .dark .glow-green {
-    box-shadow: 0 0 20px -4px hsl(var(--google-green) / 0.6);
-  }
-  
-  /* Neon text effect */
-  .dark .neon-text {
-    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 40px currentColor;
-  }
-  
-  /* Vibrant card hover in dark mode */
-  .dark .card-glow:hover {
-    box-shadow: 0 0 30px -10px hsl(var(--primary) / 0.4);
-  }
-  
   /* Safe area for mobile navigation */
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
