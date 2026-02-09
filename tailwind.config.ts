@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Google Sans', 'Roboto', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -61,10 +61,10 @@ export default {
           ring: "hsl(var(--sidebar-ring))",
         },
         google: {
-          blue: "hsl(var(--google-blue))",
-          red: "hsl(var(--google-red))",
-          yellow: "hsl(var(--google-yellow))",
-          green: "hsl(var(--google-green))",
+          blue: "hsl(var(--primary))",
+          red: "hsl(var(--destructive))",
+          yellow: "hsl(43 96% 56%)",
+          green: "hsl(var(--accent))",
         },
       },
       borderRadius: {
