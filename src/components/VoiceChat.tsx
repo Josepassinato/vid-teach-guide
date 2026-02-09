@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useOpenAIRealtime, VideoControls, ConnectionStep } from '@/hooks/useOpenAIRealtime';
 import { useContentManager, TeachingMoment } from '@/hooks/useContentManager';
 import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes';
-import { useEngagementDetection, InterventionReason } from '@/hooks/useEngagementDetection';
+
 import { useMissions, Mission } from '@/hooks/useMissions';
 import { useStudentMemory, StudentProfile } from '@/hooks/useStudentMemory';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
@@ -16,8 +16,6 @@ import { VoiceIndicator } from './VoiceIndicator';
 import { ProcessingIndicator } from './ProcessingIndicator';
 import { MiniQuiz } from './MiniQuiz';
 import { LessonEndScreen } from './LessonEndScreen';
-import { EngagementPanel } from './EngagementPanel';
-import { VisionConsentDialog } from './VisionConsentDialog';
 import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
@@ -63,7 +61,6 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
   const [lessonEndData, setLessonEndData] = useState<{ weeklyTask?: string; summaryPoints?: string[]; mission?: Mission }>({});
-  const [showVisionConsent, setShowVisionConsent] = useState(false);
   const [connectionStep, setConnectionStep] = useState<'idle' | 'fetching_key' | 'connecting_ws' | 'configuring' | 'ready'>('idle');
   const videoPlayerRef = useRef<VideoPlayerRef | DirectVideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
@@ -143,21 +140,6 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
     }
   }, [videoDbId, loadMissions]);
 
-  // Engagement detection system (Audio + Behavioral + Vision opt-in)
-  // Note: The intervention handler will be set up after useGeminiLive is initialized
-  const engagementInterventionHandlerRef = useRef<((reason: InterventionReason) => void) | null>(null);
-  
-  const engagement = useEngagementDetection({
-    enabled: true,
-    onInterventionTriggered: (reason) => {
-      // Use ref to avoid stale closure
-      engagementInterventionHandlerRef.current?.(reason);
-    },
-    config: {
-      attentionThreshold: 0.4,
-      attentionDurationMs: 4000,
-    },
-  });
 
   // Determine if we have a video to display
   const hasVideo = videoId || videoUrl;
@@ -194,7 +176,6 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
 
   // Build system instruction with video context, content plan, and student memory
   const buildSystemInstruction = useCallback(() => {
-    const hasVisionEnabled = engagement.vision.isEnabled;
     
     let instruction = `Você é o Professor Vibe - um tutor expressivo, didático e apaixonado por ensinar VIBE CODING!
 
@@ -219,16 +200,9 @@ Esta é a regra MAIS IMPORTANTE. Você DEVE segui-la SEMPRE:
 - Jamais use emojis, pictogramas ou símbolos gráficos
 - NUNCA mencione o ÁUDIO do vídeo (não diga "no áudio", "a voz do vídeo")
 - Trate o vídeo apenas como conteúdo visual/teórico
-${!hasVisionEnabled ? `- Você NÃO tem acesso a câmera ou entrada visual do aluno
+- Você NÃO tem acesso a câmera ou entrada visual do aluno
 - Nunca descreva aparência, expressões ou linguagem corporal
-- Nunca diga "eu vi", "estou vendo", "percebo pela sua cara"` : `
-=== VISÃO COMPUTACIONAL ATIVADA ===
-O aluno consentiu em compartilhar câmera. Use SUTILMENTE para adaptar ensino.
-- Distração: "Ei, tudo bem? Vamos retomar?"
-- Confusão: "Opa, deixa eu explicar de outro jeito..."
-- Cansaço: "Que tal uma pausinha?"
-- NUNCA descreva aparência física`}
-
+- Nunca diga "eu vi", "estou vendo", "percebo pela sua cara"
 === CONTROLE DO VIDEO ===
 Você tem funções para controlar o vídeo. SEMPRE use quando o aluno pedir:
 1. play_video: "da play", "continua", "roda", "pode ir"
@@ -379,7 +353,7 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
 
 
     return instruction;
-  }, [videoContext, videoTitle, moduleTitle, videoTranscript, contentPlan, timestampQuizzes.length, engagement.vision.isEnabled, studentProfile, currentVideoTime]);
+  }, [videoContext, videoTitle, moduleTitle, videoTranscript, contentPlan, timestampQuizzes.length, studentProfile, currentVideoTime]);
 
   const systemInstruction = buildSystemInstruction();
 
@@ -506,153 +480,8 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
     }
   });
 
-  // Send MediaPipe analysis (text) to OpenAI instead of raw frames (cheaper & more private)
-  const lastVisionUpdateRef = useRef<number>(0);
-  const lastVisionStateRef = useRef<string>('');
-  
-  // Periodically send MediaPipe vision analysis to OpenAI as text context
-  useEffect(() => {
-    if (!engagement.vision.isEnabled || status !== 'connected') return;
-    
-    const intervalId = setInterval(() => {
-      const now = Date.now();
-      // Rate limit: max 1 update every 8 seconds
-      if (now - lastVisionUpdateRef.current < 8000) return;
-      
-      const visionSignals = engagement.vision.signals;
-      if (!visionSignals.enabled || !visionSignals.faceDetected) return;
-      
-      // Build a text description of the student's state
-      let stateDescription = '';
-      
-      // Gaze analysis
-      if (!visionSignals.isLookingAtScreen) {
-        stateDescription = 'O aluno está olhando para fora da tela.';
-      } else if (visionSignals.gazeOnVideoRatio < 0.5) {
-        stateDescription = 'O aluno parece distraído, olhando pouco para a tela.';
-      }
-      
-      // Expression/fatigue analysis
-      if (visionSignals.expression === 'confused') {
-        stateDescription = 'O aluno parece confuso ou pensativo.';
-      } else if (visionSignals.expression === 'tired') {
-        stateDescription = 'O aluno parece cansado.';
-      }
-      
-      // Distance analysis
-      if (visionSignals.distanceFromScreen > 1.2) {
-        stateDescription = 'O aluno está se afastando da tela.';
-      }
-      
-      // Only send if there's something noteworthy AND it's different from last update
-      if (stateDescription && stateDescription !== lastVisionStateRef.current) {
-        lastVisionUpdateRef.current = now;
-        lastVisionStateRef.current = stateDescription;
-        
-        console.log('[VoiceChat] Sending MediaPipe analysis to tutor:', stateDescription);
-        
-        // Send as silent context (the AI won't read this aloud but will use it)
-        sendText(`[CONTEXTO VISUAL SILENCIOSO - NÃO LEIA EM VOZ ALTA, apenas adapte seu comportamento] ${stateDescription}`);
-      }
-    }, 3000); // Check every 3 seconds
-    
-    return () => clearInterval(intervalId);
-  }, [engagement.vision.isEnabled, engagement.vision.signals, status, sendText]);
 
-  // Update refs when values change
-  useEffect(() => {
-    sendTextRef.current = sendText;
-    statusRef.current = status;
-  }, [sendText, status]);
 
-  // Set up engagement intervention handler after status and connect are available
-  useEffect(() => {
-    engagementInterventionHandlerRef.current = (reason: InterventionReason) => {
-      console.log('[VoiceChat] Intervention triggered:', reason);
-      
-      // Only intervene when video is playing and agent is not connected
-      if (agentMode !== 'playing' || statusRef.current === 'connected') {
-        console.log('[VoiceChat] Intervention skipped - not in playing mode or agent connected');
-        return;
-      }
-
-      switch (reason.type) {
-        case 'low_attention':
-          // Pause video and ask check-in question
-          videoPlayerRef.current?.pause();
-          setAgentMode('teaching');
-          setIsVideoExpanded(false);
-          setPendingReconnect({ 
-            type: 'moment', 
-            data: { 
-              topic: 'Verificação de atenção',
-              key_insight: 'Parece que você se distraiu. Vamos retomar?',
-              questions_to_ask: ['Está conseguindo acompanhar?', 'Quer que eu repita algo?'],
-              discussion_points: [],
-              timestamp_seconds: currentVideoTime,
-            } as TeachingMoment 
-          });
-          connect();
-          toast.info('🎯 O professor notou que você se distraiu...', { duration: 3000 });
-          break;
-
-        case 'tab_switch':
-          // Just pause the video silently
-          videoPlayerRef.current?.pause();
-          toast.info('⏸️ Vídeo pausado - você saiu da aba', { duration: 2000 });
-          break;
-
-        case 'high_confusion':
-          // Pause and offer help
-          videoPlayerRef.current?.pause();
-          setAgentMode('teaching');
-          setIsVideoExpanded(false);
-          setPendingReconnect({ 
-            type: 'moment', 
-            data: { 
-              topic: 'Momento de dúvida',
-              key_insight: 'Percebi que você pode estar com dúvidas. Vamos esclarecer!',
-              questions_to_ask: ['O que não ficou claro?', 'Quer que eu explique de outra forma?'],
-              discussion_points: [],
-              timestamp_seconds: currentVideoTime,
-            } as TeachingMoment 
-          });
-          connect();
-          toast.info('💡 O professor quer te ajudar com uma dúvida...', { duration: 3000 });
-          break;
-
-        case 'fatigue':
-          toast.info('😴 Você parece cansado. Que tal uma pausa?', { duration: 5000 });
-          break;
-
-        default:
-          console.log('[VoiceChat] Unhandled intervention type:', reason.type);
-      }
-    };
-  }, [agentMode, currentVideoTime, connect]);
-
-  // Feed audio signals from transcripts
-  useEffect(() => {
-    // Analyze transcripts for engagement signals
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      engagement.audio.analyzeTranscript(lastMessage.text, lastMessage.role);
-    }
-  }, [messages, engagement.audio]);
-
-  // Track voice detection for engagement
-  useEffect(() => {
-    if (isVoiceDetected) {
-      engagement.audio.onUserSpeechStart();
-    }
-  }, [isVoiceDetected, engagement.audio]);
-
-  // Track agent speaking for engagement
-  useEffect(() => {
-    if (!isSpeaking) {
-      engagement.audio.onAgentSpeechEnd();
-    }
-  }, [isSpeaking, engagement.audio]);
 
   // Handle agent connection events - process pending actions
   useEffect(() => {
@@ -1509,23 +1338,8 @@ INSTRUÇÕES:
           </div>
         )}
         
-        {/* Engagement Panel - shows attention metrics */}
-        <EngagementPanel
-          stateVector={engagement.stateVector}
-          visionEnabled={engagement.vision.isEnabled}
-          visionConsent={engagement.vision.hasConsent}
-          onToggleVision={() => {
-            if (engagement.vision.isEnabled) {
-              engagement.vision.disableVision();
-            } else if (engagement.vision.hasConsent) {
-              engagement.vision.enableVision();
-            } else {
-              setShowVisionConsent(true);
-            }
-          }}
-          isInterventionTriggered={engagement.isInterventionTriggered}
-          className="flex-shrink-0"
-        />
+
+
         
         {/* Controls - mobile only (desktop has them in fixed bottom) */}
         <div className="space-y-2 pt-2 border-t flex-shrink-0 lg:hidden">
@@ -1709,16 +1523,8 @@ INSTRUÇÕES:
       }}
     />
     
-    {/* Vision Consent Dialog */}
-    <VisionConsentDialog
-      isOpen={showVisionConsent}
-      onGrantConsent={() => {
-        engagement.vision.grantConsent();
-        engagement.vision.enableVision();
-        setShowVisionConsent(false);
-      }}
-      onDeny={() => setShowVisionConsent(false)}
-    />
+
+
     </>
   );
 }
