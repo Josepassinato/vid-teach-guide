@@ -1142,11 +1142,10 @@ INSTRUÇÕES:
               <span className="text-sm font-medium truncate max-w-[200px]">{videoTitle}</span>
             </div>
             <div className="flex items-center gap-2">
-              {/* Next Pause Timer - Compact in header when expanded */}
               {agentMode === 'playing' && nextPauseInfo && timeUntilNextPause !== null && timeUntilNextPause > 0 && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  <Target className="h-3 w-3 text-google-yellow" />
-                  <span className="font-mono text-google-yellow">{formatTime(timeUntilNextPause)}</span>
+                  <Target className="h-3 w-3 text-accent" />
+                  <span className="font-mono text-accent">{formatTime(timeUntilNextPause)}</span>
                 </div>
               )}
               <Button
@@ -1160,40 +1159,15 @@ INSTRUÇÕES:
             </div>
           </div>
         </CardHeader>
-      ) : (
-        <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 pt-3 sm:pt-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${statusColor}`} />
-              Professor IA
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              {contentPlan && (
-                <Button
-                  size="sm"
-                  variant={showContentPlan ? "secondary" : "ghost"}
-                  onClick={() => setShowContentPlan(!showContentPlan)}
-                  className="h-6 px-2 text-xs"
-                >
-                  <BookOpen className="h-3 w-3 mr-1" />
-                  {contentPlan.teaching_moments.length} momentos
-                </Button>
-              )}
-              {isAnalyzingContent && (
-                <span className="text-xs text-muted-foreground animate-pulse">
-                  Analisando...
-                </span>
-              )}
-              <span className="text-[10px] text-muted-foreground">{statusText}</span>
-            </div>
-          </div>
-        </CardHeader>
-      )}
+      ) : null}
       
-      <CardContent className={`flex-1 flex flex-col gap-3 sm:gap-4 overflow-hidden px-3 sm:px-6 pb-3 sm:pb-6 ${
+      <CardContent className={`flex-1 flex flex-col overflow-hidden p-0 ${
         isVideoExpanded ? 'pt-0' : ''
       }`}>
-        {/* Video Player with Quiz Overlay */}
+        {/* Desktop: 2-column grid (video | chat). Mobile: single column */}
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_360px] overflow-hidden">
+        {/* ===== LEFT: Video Stage ===== */}
+        <div className="flex flex-col overflow-hidden p-3 sm:p-4 lg:p-6">
         {hasVideo && (
           <div className={`relative transition-all duration-500 ${
             isVideoExpanded 
@@ -1361,10 +1335,44 @@ INSTRUÇÕES:
             )}
           </div>
         )}
+        </div>
+        {/* ===== END LEFT: Video Stage ===== */}
+
+        {/* ===== RIGHT: Tutor Chat Panel ===== */}
+        <aside className="flex flex-col border-t lg:border-t-0 lg:border-l border-border bg-card/30 lg:h-[calc(100vh-56px)] lg:sticky lg:top-[56px] overflow-hidden">
+          {/* Tutor header */}
+          <div className="p-3 lg:p-4 border-b border-border flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${statusColor}`} />
+                <span className="text-sm font-medium">Tutor IA</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {contentPlan && (
+                  <Button
+                    size="sm"
+                    variant={showContentPlan ? "secondary" : "ghost"}
+                    onClick={() => setShowContentPlan(!showContentPlan)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <BookOpen className="h-3 w-3 mr-1" />
+                    {contentPlan.teaching_moments.length}
+                  </Button>
+                )}
+                {isAnalyzingContent && (
+                  <span className="text-xs text-muted-foreground animate-pulse">…</span>
+                )}
+                <span className="text-[10px] text-muted-foreground">{statusText}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
 
         {/* Content Plan Panel */}
         {showContentPlan && contentPlan && (
-          <div className="bg-muted/30 rounded-lg p-3 border space-y-2 flex-shrink-0 max-h-48 overflow-y-auto">
+          <div className="bg-muted/30 rounded-lg p-3 border space-y-2 max-h-48 overflow-y-auto">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Target className="h-4 w-4 text-primary" />
               Plano de Ensino
@@ -1411,11 +1419,11 @@ INSTRUÇÕES:
           </div>
         )}
         
-        {/* Collapsible Chat Section */}
-        <div className="border rounded-lg overflow-hidden flex-shrink-0 bg-card/50">
+        {/* Chat Section - always visible on desktop, collapsible on mobile */}
+        <div className="border rounded-lg overflow-hidden bg-card/50">
           <button
             onClick={() => setShowChat(!showChat)}
-            className="w-full flex items-center justify-between p-2.5 hover:bg-muted/30 transition-colors"
+            className="w-full flex items-center justify-between p-2.5 hover:bg-muted/30 transition-colors lg:hidden"
           >
             <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <MessageSquare className="h-3.5 w-3.5" />
@@ -1431,8 +1439,8 @@ INSTRUÇÕES:
             )}
           </button>
           
-          {showChat && (
-            <div className="p-2 sm:p-3 border-t space-y-2">
+          {(showChat || true) && ( /* Always show on desktop via CSS, toggle on mobile */
+            <div className={`p-2 sm:p-3 border-t space-y-2 ${!showChat ? 'hidden lg:block' : ''}`}>
               {/* Messages */}
               <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
                 {messages.length === 0 ? (
@@ -1478,9 +1486,9 @@ INSTRUÇÕES:
           )}
         </div>
         
-        {/* Voice indicators */}
+        {/* Voice indicators - mobile only (desktop has them in fixed bottom) */}
         {status === 'connected' && (
-          <div className="flex justify-center gap-6 sm:gap-8 py-1.5 sm:py-2">
+          <div className="flex justify-center gap-6 py-1.5 lg:hidden">
             {isListening && (
               <div className="text-center">
                 <VoiceIndicator isActive={isListening} type="listening" isVoiceDetected={isVoiceDetected} />
@@ -1516,8 +1524,8 @@ INSTRUÇÕES:
           className="flex-shrink-0"
         />
         
-        {/* Controls */}
-        <div className="space-y-2 sm:space-y-3 pt-2 border-t flex-shrink-0">
+        {/* Controls - mobile only (desktop has them in fixed bottom) */}
+        <div className="space-y-2 pt-2 border-t flex-shrink-0 lg:hidden">
           <div className="flex gap-2">
             {status === 'disconnected' && agentMode !== 'playing' ? (
               <Button onClick={handleStartClass} className="flex-1 h-12 sm:h-11 text-sm sm:text-base">
@@ -1618,6 +1626,61 @@ INSTRUÇÕES:
           </div>
           
         </div>
+
+          </div>
+          {/* End scrollable content */}
+
+          {/* Fixed bottom controls */}
+          <div className="p-3 border-t border-border flex-shrink-0">
+            {/* Voice indicators */}
+            {status === 'connected' && (
+              <div className="flex justify-center gap-6 py-1.5 mb-2">
+                {isListening && (
+                  <div className="text-center">
+                    <VoiceIndicator isActive={isListening} type="listening" isVoiceDetected={isVoiceDetected} />
+                    <p className={`text-[10px] mt-0.5 transition-colors ${isVoiceDetected ? 'text-accent font-medium' : 'text-muted-foreground'}`}>
+                      {isVoiceDetected ? 'Voz detectada' : 'Ouvindo...'}
+                    </p>
+                  </div>
+                )}
+                {isSpeaking && (
+                  <div className="text-center">
+                    <VoiceIndicator isActive={isSpeaking} type="speaking" />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Falando...</p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Start/Stop button */}
+            <div className="flex gap-2">
+              {status === 'disconnected' && agentMode !== 'playing' ? (
+                <Button onClick={handleStartClass} className="flex-1 h-10 text-sm">
+                  <Phone className="h-4 w-4 mr-2" />
+                  Iniciar Aula
+                </Button>
+              ) : status === 'connecting' ? (
+                <Button disabled className="flex-1 h-10 text-sm gap-2">
+                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                  <span>{connectionStepText}</span>
+                </Button>
+              ) : status === 'connected' ? (
+                <Button onClick={disconnect} variant="destructive" className="flex-1 h-10 text-sm">
+                  <PhoneOff className="h-4 w-4 mr-2" />
+                  Encerrar
+                </Button>
+              ) : (
+                <Button onClick={handleStartClass} className="flex-1 h-10 text-sm">
+                  <Phone className="h-4 w-4 mr-2" />
+                  Iniciar Aula
+                </Button>
+              )}
+            </div>
+          </div>
+        </aside>
+
+        </div>
+        {/* End grid wrapper */}
       </CardContent>
     </Card>
     

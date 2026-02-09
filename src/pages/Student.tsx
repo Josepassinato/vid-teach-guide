@@ -85,6 +85,7 @@ const Student = () => {
   const [generatedMoments, setGeneratedMoments] = useState<TeachingMoment[] | null>(null);
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('video');
 
   const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
@@ -398,6 +399,8 @@ const Student = () => {
         totalLessons={stats.totalLessons}
         progressPercentage={stats.progressPercentage}
         onMenuClick={() => setSidebarOpen(true)}
+        onToggleSidebar={() => setSidebarCollapsed(prev => !prev)}
+        sidebarCollapsed={sidebarCollapsed}
         showMenuButton={!!selectedVideo}
         userName={profile?.full_name}
         userAvatar={profile?.avatar_url}
@@ -406,8 +409,12 @@ const Student = () => {
 
       {/* Main layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex w-72 xl:w-80 border-r bg-sidebar flex-col overflow-hidden">
+        {/* Desktop Sidebar - Collapsible */}
+        <aside 
+          className={`hidden lg:flex border-r border-border bg-sidebar flex-col overflow-hidden transition-[width] duration-200 ease-out ${
+            sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 xl:w-80 opacity-100'
+          }`}
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b">
             <h2 className="text-sm font-semibold text-sidebar-foreground">Aulas</h2>
           </div>
