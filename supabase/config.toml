@@ -29,3 +29,24 @@ verify_jwt = true
 
 [functions.quiz-generator]
 verify_jwt = true
+
+[functions.agent-orchestrator]
+verify_jwt = true
+
+[functions.agent-cto]
+verify_jwt = true
+
+[functions.agent-cpo]
+verify_jwt = true
+
+[functions.agent-cmo]
+verify_jwt = true
+
+[functions.agent-cfo]
+verify_jwt = true
+
+[functions.agent-cso]
+verify_jwt = true
+
+[functions.agent-scheduler]
+verify_jwt = true

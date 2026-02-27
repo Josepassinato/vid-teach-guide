@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import Admin from "./pages/Admin";
 import Student from "./pages/Student";
 import StudentDashboard from "./pages/StudentDashboard";
+import DiretoriaIA from "./pages/DiretoriaIA";
 import NotFound from "./pages/NotFound";
 import DebugPanel from "./components/DebugPanel";
 import { AuthPage } from "./components/auth";
@@ -78,6 +79,7 @@ const AppRoutes = () => (
       }
     />
     <Route path="/admin" element={<Admin />} />
+    <Route path="/admin/diretoria" element={<DiretoriaIA />} />
     <Route
       path="/aluno"
       element={
