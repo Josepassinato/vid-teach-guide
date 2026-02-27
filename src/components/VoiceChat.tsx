@@ -1398,7 +1398,7 @@ INSTRUÇÕES:
                   <div className="flex items-center gap-1.5">
                     {(['fetching_key', 'connecting_ws', 'configuring', 'ready'] as const).map((step, i) => {
                       const steps = ['fetching_key', 'connecting_ws', 'configuring', 'ready'] as const;
-                      const currentIdx = steps.indexOf(connectionStep);
+                      const currentIdx = steps.indexOf(connectionStep as typeof steps[number]);
                       return (
                         <div key={step} className={`w-2 h-2 rounded-full transition-colors ${
                           connectionStep === step ? 'bg-primary-foreground animate-pulse' :
@@ -1536,7 +1536,7 @@ INSTRUÇÕES:
                     <div className="flex items-center gap-1">
                       {(['fetching_key', 'connecting_ws', 'configuring', 'ready'] as const).map((step, i) => {
                         const steps = ['fetching_key', 'connecting_ws', 'configuring', 'ready'] as const;
-                        const currentIdx = steps.indexOf(connectionStep);
+                        const currentIdx = steps.indexOf(connectionStep as typeof steps[number]);
                         return (
                           <div key={step} className={`w-1.5 h-1.5 rounded-full transition-colors ${
                             connectionStep === step ? 'bg-primary-foreground animate-pulse' :
