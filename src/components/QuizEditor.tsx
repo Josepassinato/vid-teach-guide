@@ -16,7 +16,7 @@ interface Quiz {
   correct_option_index: number;
   explanation: string | null;
   timestamp_seconds: number | null;
-  question_order: number;
+  question_order: number | null;
 }
 
 interface TeachingMoment {

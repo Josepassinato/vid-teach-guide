@@ -56,9 +56,19 @@ export const LessonQuiz = ({
   if (isLoading) {
     return (
       <Card className="border-primary/20">
-        <CardContent className="py-8 text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
-          <p className="text-muted-foreground">Carregando quiz...</p>
+        <CardContent className="py-6">
+          <div className="animate-pulse space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <div className="h-5 bg-muted rounded w-40" />
+            </div>
+            <div className="h-5 bg-muted rounded w-full" />
+            <div className="space-y-2 mt-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 bg-muted rounded-lg" />
+              ))}
+            </div>
+          </div>
         </CardContent>
       </Card>
     );

@@ -29,6 +29,12 @@ export type VideoPlayerProps = {
   expanded?: boolean;
   /** Callback when video playback ends */
   onEnded?: () => void;
+  /** Callback when video starts playing (including manual play by student) */
+  onPlay?: () => void;
+  /** Callback when video is paused (including manual pause by student) */
+  onPause?: () => void;
+  /** Callback when student seeks to a different position */
+  onSeek?: (seconds: number) => void;
   /** Teaching moments for timeline markers */
   teachingMoments?: Array<{ timestamp_seconds: number; topic?: string }>;
   /** Quiz timestamps for timeline markers */
@@ -36,7 +42,7 @@ export type VideoPlayerProps = {
 };
 
 export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
-  function VideoPlayer({ videoId, title, expanded = false, onEnded, teachingMoments = [], quizTimestamps = [] }, ref) {
+  function VideoPlayer({ videoId, title, expanded = false, onEnded, onPlay, onPause, onSeek, teachingMoments = [], quizTimestamps = [] }, ref) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [volume, setVolume] = useState(100);
@@ -147,7 +153,16 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             console.log('YouTube player ready');
           },
           onStateChange: (event: any) => {
-            setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
+            const wasPlaying = isPlaying;
+            const nowPlaying = event.data === window.YT.PlayerState.PLAYING;
+            setIsPlaying(nowPlaying);
+            // Notify on play/pause state changes
+            if (nowPlaying && !wasPlaying) {
+              onPlay?.();
+            }
+            if (!nowPlaying && wasPlaying && event.data === window.YT.PlayerState.PAUSED) {
+              onPause?.();
+            }
             // Detect video ended
             if (event.data === window.YT.PlayerState.ENDED) {
               onEnded?.();
@@ -400,7 +415,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
           <VideoTimeline
             currentTime={currentTime}
             duration={duration}
-            onSeek={(seconds) => playerRef.current?.seekTo(seconds, true)}
+            onSeek={(seconds) => {
+              playerRef.current?.seekTo(seconds, true);
+              onSeek?.(seconds);
+            }}
             teachingMoments={teachingMoments}
             quizTimestamps={quizTimestamps}
             className="mb-3"

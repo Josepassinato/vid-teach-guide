@@ -69,6 +69,7 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
   const introCompletedRef = useRef<boolean>(false);
   const isCapturingEndDataRef = useRef<boolean>(false);
   const endMessageBufferRef = useRef<string>('');
+  const lastContextUpdateTimeRef = useRef<number>(0);
   
   // Generate student ID
   const [studentId] = useState(() => {
@@ -584,7 +585,18 @@ INSTRUÇÕES:
       
       // Update current time for timer display
       setCurrentVideoTime(currentTime);
-      
+
+      // Send periodic context update to tutor (every 30s) so it knows the current video position
+      if (statusRef.current === 'connected' && !isPaused && sendTextRef.current) {
+        const timeSinceLastUpdate = currentTime - lastContextUpdateTimeRef.current;
+        if (timeSinceLastUpdate >= 30 || lastContextUpdateTimeRef.current === 0) {
+          lastContextUpdateTimeRef.current = currentTime;
+          const mins = Math.floor(currentTime / 60);
+          const secs = Math.floor(currentTime % 60).toString().padStart(2, '0');
+          sendTextRef.current(`[CONTEXTO] Tempo atual do vídeo: ${mins}:${secs}`);
+        }
+      }
+
       // Calculate next pause (quiz or teaching moment)
       const allPauses: {time: number; type: 'quiz' | 'moment'; topic?: string}[] = [];
       
@@ -607,7 +619,16 @@ INSTRUÇÕES:
       // Sort and get the next one
       allPauses.sort((a, b) => a.time - b.time);
       setNextPauseInfo(allPauses[0] || null);
-      
+
+      // Pre-warm WebSocket connection 15s before next pause if disconnected
+      if (allPauses[0] && status === 'disconnected' && !isPaused) {
+        const timeUntilPause = allPauses[0].time - currentTime;
+        if (timeUntilPause > 0 && timeUntilPause <= 15) {
+          console.log('[VoiceChat] Pre-warming connection, next pause in', Math.round(timeUntilPause), 's');
+          connect();
+        }
+      }
+
       // Only check when video is playing and no quiz is active
       // NOTE: Do not gate by agentMode: the student may start playback manually (e.g. during intro)
       // and pauses still must trigger reliably.
@@ -813,14 +834,9 @@ INSTRUÇÕES:
       console.log('[VoiceChat] Quiz complete, resuming video');
       resumeVideo();
       setAgentMode('playing');
-      // Disconnect to save tokens while video plays
-      setTimeout(() => {
-        if (statusRef.current === 'connected') {
-          disconnect();
-        }
-      }, 5000); // Give time for agent to finish speaking
+      // Keep connection alive for voice interaction during video
     }, 2000);
-  }, [activeQuiz, recordAttempt, sendText, status, disconnect, resumeVideo]);
+  }, [activeQuiz, recordAttempt, sendText, status, resumeVideo]);
 
   const handleSendText = () => {
     if (!textInput.trim()) return;
@@ -839,36 +855,32 @@ INSTRUÇÕES:
   // Called when student confirms they're ready to start the video
   const handleStartVideo = useCallback(() => {
     if (status === 'connected') {
-      sendText('[SISTEMA] O aluno confirmou que está pronto. Diga algo breve como "Vamos lá! Começando o vídeo..." e prepare-se para voltar nos momentos de pausa.');
+      sendText('[SISTEMA] O aluno confirmou que está pronto. Diga algo breve como "Vamos lá! Começando o vídeo..." e prepare-se para voltar nos momentos de pausa. Fique em silêncio durante o vídeo, mas responda imediatamente se o aluno falar com você.');
       setTimeout(() => {
         console.log('[VoiceChat] Starting video after intro');
         resumeVideo();
         setAgentMode('playing');
         setIsVideoExpanded(true); // Expand video when playing
         onVideoStarted?.();
-        // Disconnect after agent finishes speaking
-        setTimeout(() => {
-          if (statusRef.current === 'connected') {
-            disconnect();
-          }
-        }, 3000);
+        // Keep connection alive so student can interact by voice during video
+        // The tutor stays silent but listens for student commands like "pause", "volta", etc.
       }, 2000);
     }
-  }, [status, sendText, disconnect, resumeVideo, onVideoStarted]);
+  }, [status, sendText, resumeVideo, onVideoStarted]);
 
   // Handle dismissing teaching moment - resume video and disconnect
   const handleDismissMoment = useCallback(() => {
     console.log('[VoiceChat] handleDismissMoment called');
     setActiveMoment(null);
     if (status === 'connected') {
-      sendText('[SISTEMA] O aluno quer continuar o vídeo. Diga algo breve como "Vamos lá!" e prepare-se para a próxima parada.');
+      sendText('[SISTEMA] O aluno quer continuar o vídeo. Diga algo breve como "Vamos lá!" e fique em silêncio durante o vídeo. Responda imediatamente se o aluno falar com você.');
       setTimeout(() => {
         console.log('[VoiceChat] Moment dismissed, resuming video');
         resumeVideo();
         setAgentMode('playing');
         setIsVideoExpanded(true);
         onVideoStarted?.();
-        setTimeout(() => disconnect(), 3000);
+        // Keep connection alive for voice interaction during video
       }, 1500);
     } else {
       console.log('[VoiceChat] Moment dismissed (not connected), resuming video directly');
@@ -877,11 +889,36 @@ INSTRUÇÕES:
       setIsVideoExpanded(true);
       onVideoStarted?.();
     }
-  }, [disconnect, sendText, status, resumeVideo, onVideoStarted]);
+  }, [sendText, status, resumeVideo, onVideoStarted]);
 
   const dismissActiveMoment = () => {
     handleDismissMoment();
   };
+
+  // Notify tutor when student manually interacts with the video player
+  const handleManualPlay = useCallback(() => {
+    if (statusRef.current === 'connected' && sendTextRef.current && agentMode !== 'intro') {
+      const mins = Math.floor(currentVideoTime / 60);
+      const secs = Math.floor(currentVideoTime % 60).toString().padStart(2, '0');
+      sendTextRef.current(`[CONTEXTO] O aluno deu play no vídeo manualmente em ${mins}:${secs}. Fique em silêncio e acompanhe.`);
+    }
+  }, [agentMode, currentVideoTime]);
+
+  const handleManualPause = useCallback(() => {
+    if (statusRef.current === 'connected' && sendTextRef.current && agentMode === 'playing') {
+      const mins = Math.floor(currentVideoTime / 60);
+      const secs = Math.floor(currentVideoTime % 60).toString().padStart(2, '0');
+      sendTextRef.current(`[CONTEXTO] O aluno pausou o vídeo manualmente em ${mins}:${secs}. Pergunte brevemente se ele tem alguma dúvida sobre o que acabou de ver.`);
+    }
+  }, [agentMode, currentVideoTime]);
+
+  const handleManualSeek = useCallback((seconds: number) => {
+    if (statusRef.current === 'connected' && sendTextRef.current) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+      sendTextRef.current(`[CONTEXTO] O aluno pulou para ${mins}:${secs} no vídeo.`);
+    }
+  }, []);
 
   // Format seconds to MM:SS
   const formatTime = (seconds: number) => {
@@ -993,20 +1030,26 @@ INSTRUÇÕES:
           }`}>
             <div className={isVideoExpanded ? 'h-full' : ''}>
               {isDirectVideo && videoUrl ? (
-                <DirectVideoPlayer 
-                  ref={videoPlayerRef as React.RefObject<DirectVideoPlayerRef>} 
-                  videoUrl={videoUrl} 
+                <DirectVideoPlayer
+                  ref={videoPlayerRef as React.RefObject<DirectVideoPlayerRef>}
+                  videoUrl={videoUrl}
                   title={videoTitle}
                   expanded={isVideoExpanded}
                   onEnded={handleVideoEnded}
+                  onPlay={handleManualPlay}
+                  onPause={handleManualPause}
+                  onSeek={handleManualSeek}
                 />
               ) : videoId ? (
-                <VideoPlayer 
-                  ref={videoPlayerRef as React.RefObject<VideoPlayerRef>} 
-                  videoId={videoId} 
+                <VideoPlayer
+                  ref={videoPlayerRef as React.RefObject<VideoPlayerRef>}
+                  videoId={videoId}
                   title={videoTitle}
                   expanded={isVideoExpanded}
                   onEnded={handleVideoEnded}
+                  onPlay={handleManualPlay}
+                  onPause={handleManualPause}
+                  onSeek={handleManualSeek}
                 />
               ) : null}
             </div>
@@ -1048,7 +1091,7 @@ INSTRUÇÕES:
             </AnimatePresence>
             
             {/* Pause Times List */}
-            {(contentPlan?.teaching_moments?.length > 0 || timestampQuizzes.length > 0) && (
+            {((contentPlan?.teaching_moments?.length ?? 0) > 0 || timestampQuizzes.length > 0) && (
               <div className="flex flex-wrap items-center gap-1 mt-1.5 text-[9px] text-muted-foreground">
                 <span className="font-medium">Pausas:</span>
                 {[
@@ -1351,9 +1394,20 @@ INSTRUÇÕES:
               </Button>
             ) : status === 'connecting' ? (
               <Button disabled className="flex-1 h-12 sm:h-11 text-sm sm:text-base gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  <span>{connectionStepText}</span>
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    {(['fetching_key', 'connecting_ws', 'configuring', 'ready'] as const).map((step, i) => {
+                      const steps = ['fetching_key', 'connecting_ws', 'configuring', 'ready'] as const;
+                      const currentIdx = steps.indexOf(connectionStep);
+                      return (
+                        <div key={step} className={`w-2 h-2 rounded-full transition-colors ${
+                          connectionStep === step ? 'bg-primary-foreground animate-pulse' :
+                          currentIdx > i ? 'bg-primary-foreground' : 'bg-primary-foreground/30'
+                        }`} />
+                      );
+                    })}
+                  </div>
+                  <span className="text-xs">{connectionStepText}</span>
                 </div>
               </Button>
             ) : agentMode === 'intro' && status === 'connected' ? (
@@ -1478,8 +1532,21 @@ INSTRUÇÕES:
                 </Button>
               ) : status === 'connecting' ? (
                 <Button disabled className="flex-1 h-10 text-sm gap-2">
-                  <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  <span>{connectionStepText}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      {(['fetching_key', 'connecting_ws', 'configuring', 'ready'] as const).map((step, i) => {
+                        const steps = ['fetching_key', 'connecting_ws', 'configuring', 'ready'] as const;
+                        const currentIdx = steps.indexOf(connectionStep);
+                        return (
+                          <div key={step} className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                            connectionStep === step ? 'bg-primary-foreground animate-pulse' :
+                            currentIdx > i ? 'bg-primary-foreground' : 'bg-primary-foreground/30'
+                          }`} />
+                        );
+                      })}
+                    </div>
+                    <span>{connectionStepText}</span>
+                  </div>
                 </Button>
               ) : status === 'connected' ? (
                 <Button onClick={disconnect} variant="destructive" className="flex-1 h-10 text-sm">

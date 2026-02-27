@@ -58,6 +58,7 @@ export function StudentHeader({
             size="icon"
             className="h-9 w-9 lg:hidden flex-shrink-0"
             onClick={onMenuClick}
+            aria-label="Abrir menu de aulas"
           >
             <Menu className="h-4 w-4" />
           </Button>
@@ -108,6 +109,7 @@ export function StudentHeader({
             size="icon"
             className="h-8 w-8 rounded-full"
             asChild
+            aria-label="Ver dashboard"
           >
             <Link to="/aluno/dashboard">
               <BarChart3 className="h-4 w-4" />

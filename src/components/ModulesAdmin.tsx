@@ -19,7 +19,7 @@ interface Module {
   description: string | null;
   module_order: number;
   thumbnail_url: string | null;
-  is_released: boolean;
+  is_released: boolean | null;
   created_at: string;
 }
 
@@ -27,8 +27,8 @@ interface VideoLesson {
   id: string;
   title: string;
   module_id: string | null;
-  lesson_order: number;
-  is_released: boolean;
+  lesson_order: number | null;
+  is_released: boolean | null;
   thumbnail_url: string | null;
   youtube_id: string | null;
 }
@@ -374,8 +374,8 @@ export function ModulesAdmin({ password }: ModulesAdminProps) {
                     {/* Actions */}
                     <div className="flex items-center gap-2">
                       <Switch
-                        checked={module.is_released}
-                        onCheckedChange={() => toggleModuleRelease(module.id, module.is_released)}
+                        checked={module.is_released ?? false}
+                        onCheckedChange={() => toggleModuleRelease(module.id, module.is_released ?? false)}
                       />
                       <Button variant="outline" size="icon" onClick={() => openEditDialog(module)}>
                         <Edit className="h-4 w-4" />
