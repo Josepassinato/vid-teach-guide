@@ -23,6 +23,7 @@ import { LessonCard } from '@/components/student/LessonCard';
 import { ModuleAccordion } from '@/components/student/ModuleAccordion';
 import { MobileNavigation, MobileTab } from '@/components/student/MobileNavigation';
 import { EmptyState } from '@/components/student/EmptyState';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 interface SavedVideo {
   id: string;
@@ -33,12 +34,12 @@ interface SavedVideo {
   transcript: string | null;
   analysis: string | null;
   thumbnail_url: string | null;
-  lesson_order: number;
+  lesson_order: number | null;
   description: string | null;
   duration_minutes: number | null;
   teaching_moments: unknown;
-  is_configured: boolean;
-  is_released: boolean;
+  is_configured: boolean | null;
+  is_released: boolean | null;
   teacher_intro: string | null;
   module_id: string | null;
 }
@@ -63,9 +64,10 @@ interface VideoInfo {
 
 const Student = () => {
   const { user, profile, signOut } = useAuth();
-  
-  // DEV BYPASS: Check for dev mode authentication bypass
-  const isDevBypass = localStorage.getItem('dev_bypass_auth') === 'true';
+  useNetworkStatus();
+
+  // DEV BYPASS: Only works in development mode
+  const isDevBypass = import.meta.env.DEV && localStorage.getItem('dev_bypass_auth') === 'true';
   const devStudentId = localStorage.getItem('dev_student_id') || 'dev-test-student-001';
   
   // Use authenticated user ID or dev bypass ID
@@ -135,11 +137,11 @@ const Student = () => {
     loadSavedVideos();
   }, [studentId]);
 
-  const checkLessonUnlocked = (video: SavedVideo) => {
+  const checkLessonUnlocked = (video: SavedVideo): boolean => {
     if (modules.length > 0 && video.module_id) {
       return checkModuleLessonUnlocked(video.id);
     }
-    return video.is_released;
+    return video.is_released ?? false;
   };
 
   const toggleModule = (moduleId: string) => {
@@ -194,7 +196,8 @@ const Student = () => {
       if (checkLessonUnlocked(nextVideo)) {
         selectVideo(nextVideo, currentLessonIndex + 1);
       } else {
-        toast.error('Complete o quiz e a missão desta aula para desbloquear a próxima!');
+        const currentTitle = savedVideos[currentLessonIndex]?.title || 'atual';
+        toast.error(`Complete o quiz e a missão da aula "${currentTitle}" primeiro.`);
       }
     }
   };
@@ -219,8 +222,14 @@ const Student = () => {
     const currentVideo = savedVideos[currentLessonIndex];
     if (currentVideo) {
       console.log('[Student] Video ended, saving progress for:', currentVideo.id);
-      await markLessonComplete(currentVideo.id);
-      refreshProgress();
+      try {
+        await markLessonComplete(currentVideo.id);
+        refreshProgress();
+        toast.success('Progresso salvo!', { duration: 2000 });
+      } catch (error) {
+        console.error('[Student] Failed to save progress:', error);
+        toast.error('Não foi possível salvar o progresso. Verifique sua conexão.', { duration: 5000 });
+      }
     }
   }, [savedVideos, currentLessonIndex, markLessonComplete, refreshProgress]);
 
@@ -330,10 +339,10 @@ const Student = () => {
                         title={video.title}
                         thumbnail={getThumbnail(video)}
                         duration={video.duration_minutes}
-                        lessonNumber={video.lesson_order}
+                        lessonNumber={video.lesson_order ?? 0}
                         isActive={selectedVideo?.dbId === video.id}
                         isCompleted={isLessonCompleted(video.id)}
-                        isUnlocked={video.is_released}
+                        isUnlocked={video.is_released ?? false}
                         quizPassed={progress?.quizPassed}
                         missionCompleted={progress?.missionCompleted}
                         onClick={() => selectVideo(video, globalIndex)}
@@ -358,7 +367,7 @@ const Student = () => {
               title={video.title}
               thumbnail={getThumbnail(video)}
               duration={video.duration_minutes}
-              lessonNumber={video.lesson_order}
+              lessonNumber={video.lesson_order ?? 0}
               isActive={selectedVideo?.dbId === video.id}
               isCompleted={isLessonCompleted(video.id)}
               isUnlocked={checkLessonUnlocked(video)}
@@ -392,7 +401,7 @@ const Student = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
       <StudentHeader
         lessonNumber={selectedVideo?.lessonNumber}

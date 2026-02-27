@@ -35,6 +35,8 @@ export function MobileNavigation({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
+              aria-label={tab.label}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
                 'flex flex-col items-center justify-center py-1.5 px-4 min-w-[56px] rounded-lg transition-colors',
                 isActive

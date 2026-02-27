@@ -8,7 +8,7 @@ export interface QuizQuestion {
   options: string[];
   correct_option_index: number;
   explanation: string | null;
-  question_order: number;
+  question_order: number | null;
 }
 
 export interface QuizResult {

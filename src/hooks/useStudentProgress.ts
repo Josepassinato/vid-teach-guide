@@ -5,10 +5,10 @@ interface LessonProgress {
   id: string;
   student_id: string;
   video_id: string;
-  is_completed: boolean;
+  is_completed: boolean | null;
   completed_at: string | null;
-  watch_time_seconds: number;
-  last_position_seconds: number;
+  watch_time_seconds: number | null;
+  last_position_seconds: number | null;
 }
 
 interface ProgressStats {
@@ -79,16 +79,16 @@ export function useStudentProgress(options: UseStudentProgressOptions = {}) {
 
       // Build progress map
       const map = new Map<string, LessonProgress>();
-      (progress || []).forEach((p: LessonProgress) => {
-        map.set(p.video_id, p);
+      (progress || []).forEach((p) => {
+        map.set(p.video_id, p as LessonProgress);
       });
       setProgressMap(map);
 
       // Calculate stats
       const totalLessons = videos?.length || 0;
-      const completedLessons = (progress || []).filter((p: LessonProgress) => p.is_completed).length;
+      const completedLessons = (progress || []).filter((p) => p.is_completed).length;
       const totalWatchTimeSeconds = (progress || []).reduce(
-        (acc: number, p: LessonProgress) => acc + (p.watch_time_seconds || 0), 
+        (acc: number, p) => acc + (p.watch_time_seconds || 0),
         0
       );
 

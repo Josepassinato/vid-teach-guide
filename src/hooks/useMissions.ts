@@ -14,7 +14,7 @@ export interface Mission {
   time_limit_minutes: number | null;
   evaluation_criteria: string[];
   is_active: boolean;
-  mission_order: number;
+  mission_order: number | null;
 }
 
 export interface MissionSubmission {

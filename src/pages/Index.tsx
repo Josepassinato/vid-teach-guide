@@ -20,7 +20,7 @@ interface VideoInfo {
 
 interface SavedVideo {
   id: string;
-  youtube_id: string;
+  youtube_id: string | null;
   title: string;
   transcript: string | null;
   analysis: string | null;
@@ -55,7 +55,7 @@ const Index = () => {
 
   const selectSavedVideo = (video: SavedVideo) => {
     setVideoInfo({
-      videoId: video.youtube_id,
+      videoId: video.youtube_id || '',
       title: video.title,
       author: '',
       thumbnail: video.thumbnail_url || `https://img.youtube.com/vi/${video.youtube_id}/hqdefault.jpg`,

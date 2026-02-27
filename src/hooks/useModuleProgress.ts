@@ -6,15 +6,15 @@ interface Module {
   title: string;
   description: string | null;
   module_order: number;
-  is_released: boolean;
+  is_released: boolean | null;
 }
 
 interface Lesson {
   id: string;
   title: string;
   module_id: string | null;
-  lesson_order: number;
-  is_released: boolean;
+  lesson_order: number | null;
+  is_released: boolean | null;
 }
 
 interface LessonProgress {
@@ -111,7 +111,7 @@ export function useModuleProgress(studentId: string): UseModuleProgressReturn {
         }).length;
 
         // Check if previous module is complete (for unlock logic)
-        let isUnlocked = module.is_released;
+        let isUnlocked = module.is_released ?? false;
         if (moduleIndex > 0 && isUnlocked) {
           const prevModule = modulesData[moduleIndex - 1];
           const prevModuleProgress = moduleProgressMap.get(prevModule.id);
@@ -153,7 +153,7 @@ export function useModuleProgress(studentId: string): UseModuleProgressReturn {
 
     // Unassigned lessons follow legacy behavior (always unlocked if released)
     if (!lesson.module_id) {
-      return lesson.is_released;
+      return lesson.is_released ?? false;
     }
 
     // Check if the module is unlocked
@@ -161,12 +161,12 @@ export function useModuleProgress(studentId: string): UseModuleProgressReturn {
     if (!moduleUnlocked) return false;
 
     // Check lesson release status
-    if (!lesson.is_released) return false;
+    if (!(lesson.is_released ?? false)) return false;
 
     // Within a module, lessons are sequential
     const moduleLessons = lessons
       .filter(l => l.module_id === lesson.module_id)
-      .sort((a, b) => a.lesson_order - b.lesson_order);
+      .sort((a, b) => (a.lesson_order ?? 0) - (b.lesson_order ?? 0));
     
     const lessonIndex = moduleLessons.findIndex(l => l.id === lessonId);
     if (lessonIndex === 0) return true; // First lesson in module
@@ -180,7 +180,7 @@ export function useModuleProgress(studentId: string): UseModuleProgressReturn {
   const getLessonsForModule = useCallback((moduleId: string): Lesson[] => {
     return lessons
       .filter(l => l.module_id === moduleId)
-      .sort((a, b) => a.lesson_order - b.lesson_order);
+      .sort((a, b) => (a.lesson_order ?? 0) - (b.lesson_order ?? 0));
   }, [lessons]);
 
   const getUnassignedLessons = useCallback((): Lesson[] => {

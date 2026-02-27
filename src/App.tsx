@@ -11,11 +11,12 @@ import NotFound from "./pages/NotFound";
 import DebugPanel from "./components/DebugPanel";
 import { AuthPage } from "./components/auth";
 import { useAuth } from "./hooks/useAuth";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
-// DEV BYPASS CHECK
-const isDevBypass = () => localStorage.getItem('dev_bypass_auth') === 'true';
+// DEV BYPASS CHECK - Only works in development mode
+const isDevBypass = () => import.meta.env.DEV && localStorage.getItem('dev_bypass_auth') === 'true';
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -105,7 +106,9 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AppRoutes />
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
         </BrowserRouter>
         <DebugPanel />
       </TooltipProvider>

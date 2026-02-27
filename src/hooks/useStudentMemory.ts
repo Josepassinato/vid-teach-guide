@@ -10,9 +10,9 @@ export interface StudentProfile {
   areas_to_improve: string[];
   preferences: Record<string, any>;
   personality_notes: string | null;
-  interaction_count: number;
-  total_study_time_minutes: number;
-  last_seen_at: string;
+  interaction_count: number | null;
+  total_study_time_minutes: number | null;
+  last_seen_at: string | null;
 }
 
 export interface StudentObservation {
@@ -212,6 +212,7 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
 
   // Get recent observations for context
   const getRecentObservations = useCallback(async (limit = 20): Promise<StudentObservation[]> => {
+    if (!studentId) return [];
     try {
       const { data, error } = await supabase
         .from('student_observations')

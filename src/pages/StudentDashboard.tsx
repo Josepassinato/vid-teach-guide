@@ -40,15 +40,15 @@ interface QuizResult {
 interface LessonProgress {
   id: string;
   video_id: string;
-  is_completed: boolean;
-  watch_time_seconds: number;
+  is_completed: boolean | null;
+  watch_time_seconds: number | null;
   completed_at: string | null;
 }
 
 interface VideoInfo {
   id: string;
   title: string;
-  lesson_order: number;
+  lesson_order: number | null;
   duration_minutes: number | null;
 }
 

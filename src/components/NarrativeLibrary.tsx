@@ -26,9 +26,9 @@ interface Lesson {
   title: string;
   description: string | null;
   transcript: string | null;
-  lesson_order: number;
+  lesson_order: number | null;
   module_id: string | null;
-  is_configured: boolean;
+  is_configured: boolean | null;
 }
 
 interface Module {
@@ -127,7 +127,7 @@ export function NarrativeLibrary({ password }: NarrativeLibraryProps) {
   const getLessonsForModule = (moduleId: string) => {
     return lessons
       .filter(l => l.module_id === moduleId)
-      .sort((a, b) => a.lesson_order - b.lesson_order);
+      .sort((a, b) => (a.lesson_order ?? 0) - (b.lesson_order ?? 0));
   };
 
   const getUnassignedLessons = () => {

@@ -1,15 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { VideoControls } from '@/types/video';
 
-export interface VideoControls {
-  play: () => void;
-  pause: () => void;
-  restart: () => void;
-  seekTo: (seconds: number) => void;
-  getCurrentTime: () => number;
-  isPaused: () => boolean;
-}
+export type { VideoControls };
 
 export type ConnectionStep = 'idle' | 'fetching_key' | 'connecting_ws' | 'configuring' | 'ready';
 
@@ -297,8 +291,20 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       ]);
       wsRef.current = ws;
       console.log('🔌 [OPENAI CONNECT] WebSocket criado');
-      
+
+      // Connection timeout - 15 seconds
+      const connectionTimeout = setTimeout(() => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) {
+          console.error('🔌 [OPENAI CONNECT] ❌ Connection timeout after 15s');
+          wsRef.current?.close();
+          updateStatus('error');
+          optionsRef.current.onConnectionStepChange?.('idle');
+          toast.error('Não foi possível conectar ao tutor. Tente novamente.', { duration: 5000 });
+        }
+      }, 15000);
+
       ws.onopen = () => {
+        clearTimeout(connectionTimeout);
         console.log('WebSocket connected to OpenAI');
         processedCallIdsRef.current.clear();
         optionsRef.current.onConnectionStepChange?.('configuring');
@@ -529,10 +535,20 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                   console.log('[OPENAI TOOL CALL] Agente terminou de falar, dando play agora!');
                   toast.success('Dando play no video...', { duration: 2000 });
                   videoControlsRef.current.play();
-                  setTimeout(() => {
-                    console.log('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
-                  }, 100);
-                  result = { ok: true, message: "Video iniciado" };
+                  // Verify play actually worked with retry
+                  await new Promise(r => setTimeout(r, 500));
+                  if (videoControlsRef.current?.isPaused()) {
+                    console.log('[OPENAI TOOL CALL] Play falhou, tentando novamente...');
+                    videoControlsRef.current.play();
+                    await new Promise(r => setTimeout(r, 800));
+                    const stillPaused = videoControlsRef.current?.isPaused();
+                    result = stillPaused
+                      ? { ok: false, message: "Play falhou. O aluno precisa clicar no player para habilitar a reprodução." }
+                      : { ok: true, message: "Video iniciado após retry" };
+                  } else {
+                    result = { ok: true, message: "Video iniciado" };
+                  }
+                  console.log('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
                   break;
                 case "pause_video":
                   console.log('[OPENAI TOOL CALL] EXECUTANDO: pause_video');
@@ -553,10 +569,19 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                   console.log('[OPENAI TOOL CALL] Agente terminou de falar, reiniciando agora!');
                   toast.success('Reiniciando video...', { duration: 2000 });
                   videoControlsRef.current.restart();
-                  setTimeout(() => {
-                    console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
-                  }, 100);
-                  result = { ok: true, message: "Video reiniciado" };
+                  // Verify restart worked
+                  await new Promise(r => setTimeout(r, 500));
+                  if (videoControlsRef.current?.isPaused()) {
+                    videoControlsRef.current.play();
+                    await new Promise(r => setTimeout(r, 800));
+                    const stillPaused = videoControlsRef.current?.isPaused();
+                    result = stillPaused
+                      ? { ok: false, message: "Restart falhou. O aluno precisa clicar no player." }
+                      : { ok: true, message: "Video reiniciado após retry" };
+                  } else {
+                    result = { ok: true, message: "Video reiniciado" };
+                  }
+                  console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
                   break;
                 case "seek_video":
                   const targetSeconds = Number(args.seconds) || 0;
@@ -744,13 +769,15 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
       
       ws.onerror = (error) => {
+        clearTimeout(connectionTimeout);
         console.error('🚨 [WEBSOCKET ERROR] Erro no WebSocket:', error);
         console.error('🚨 [WEBSOCKET ERROR] Detalhes:', JSON.stringify(error, null, 2));
         updateStatus('error');
         optionsRef.current.onError?.('Connection error');
       };
-      
+
       ws.onclose = (event) => {
+        clearTimeout(connectionTimeout);
         console.log('🔌 [WEBSOCKET CLOSE] WebSocket fechado');
         console.log('🔌 [WEBSOCKET CLOSE] Código:', event.code);
         console.log('🔌 [WEBSOCKET CLOSE] Motivo:', event.reason || '(sem motivo)');
@@ -858,7 +885,13 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       
     } catch (error) {
       console.error('Microphone error:', error);
-      optionsRef.current.onError?.('Could not access microphone');
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        toast.error('Permissão de microfone negada. O tutor precisa do microfone para conversar com você. Habilite nas configurações do navegador.', { duration: 8000 });
+        optionsRef.current.onError?.('Microphone permission denied');
+      } else {
+        toast.error('Erro ao acessar microfone. Verifique se outro aplicativo está usando.', { duration: 5000 });
+        optionsRef.current.onError?.('Could not access microphone');
+      }
     }
   }, []);
 

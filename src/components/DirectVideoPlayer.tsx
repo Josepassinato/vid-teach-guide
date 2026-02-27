@@ -20,12 +20,15 @@ export type DirectVideoPlayerProps = {
   title?: string;
   expanded?: boolean;
   onEnded?: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
+  onSeek?: (seconds: number) => void;
   teachingMoments?: Array<{ timestamp_seconds: number; topic?: string }>;
   quizTimestamps?: number[];
 };
 
 export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPlayerProps>(
-  function DirectVideoPlayer({ videoUrl, title, expanded = false, onEnded, teachingMoments = [], quizTimestamps = [] }, ref) {
+  function DirectVideoPlayer({ videoUrl, title, expanded = false, onEnded, onPlay, onPause, onSeek, teachingMoments = [], quizTimestamps = [] }, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -49,11 +52,20 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
         setCurrentTime(video.currentTime);
       };
 
-      const handlePlay = () => setIsPlaying(true);
-      const handlePause = () => setIsPlaying(false);
+      const handlePlay = () => {
+        setIsPlaying(true);
+        onPlay?.();
+      };
+      const handlePause = () => {
+        setIsPlaying(false);
+        onPause?.();
+      };
       const handleEnded = () => {
         setIsPlaying(false);
         onEnded?.();
+      };
+      const handleSeeked = () => {
+        onSeek?.(video.currentTime);
       };
 
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -61,6 +73,7 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
       video.addEventListener('play', handlePlay);
       video.addEventListener('pause', handlePause);
       video.addEventListener('ended', handleEnded);
+      video.addEventListener('seeked', handleSeeked);
 
       return () => {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
@@ -68,8 +81,9 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
         video.removeEventListener('play', handlePlay);
         video.removeEventListener('pause', handlePause);
         video.removeEventListener('ended', handleEnded);
+        video.removeEventListener('seeked', handleSeeked);
       };
-    }, [onEnded]);
+    }, [onEnded, onPlay, onPause, onSeek]);
 
     useImperativeHandle(ref, () => ({
       play: () => {
