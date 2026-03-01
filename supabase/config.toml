@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.quiz-generator]
 verify_jwt = true
+
+[functions.export-sql]
+verify_jwt = false
