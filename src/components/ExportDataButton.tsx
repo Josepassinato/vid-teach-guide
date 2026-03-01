@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, Database } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -10,23 +10,15 @@ interface ExportDataButtonProps {
 
 export function ExportDataButton({ password }: ExportDataButtonProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingSQL, setIsExportingSQL] = useState(false);
 
   const exportData = async () => {
     setIsExporting(true);
     try {
-      // Fetch all main tables in parallel
       const [
-        videosRes,
-        modulesRes,
-        quizzesRes,
-        missionsRes,
-        progressRes,
-        quizResultsRes,
-        achievementsRes,
-        certificatesRes,
-        squadsRes,
-        squadMembersRes,
-        submissionsRes,
+        videosRes, modulesRes, quizzesRes, missionsRes,
+        progressRes, quizResultsRes, achievementsRes,
+        certificatesRes, squadsRes, squadMembersRes, submissionsRes,
       ] = await Promise.all([
         supabase.from('videos').select('*').order('lesson_order', { ascending: true }),
         supabase.from('modules').select('*').order('module_order', { ascending: true }),
@@ -71,10 +63,7 @@ export function ExportDataButton({ password }: ExportDataButtonProps) {
         },
       };
 
-      // Create and download JSON file
-      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
-        type: 'application/json',
-      });
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -94,14 +83,41 @@ export function ExportDataButton({ password }: ExportDataButtonProps) {
     }
   };
 
+  const exportSQL = async () => {
+    setIsExportingSQL(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/export-sql?password=${encodeURIComponent(password)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const sql = await res.text();
+      const blob = new Blob([sql], { type: 'application/sql' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `vibe-class-complete-${new Date().toISOString().slice(0, 10)}.sql`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Script SQL unificado exportado com sucesso!');
+    } catch (err) {
+      console.error('SQL Export error:', err);
+      toast.error('Erro ao exportar SQL');
+    } finally {
+      setIsExportingSQL(false);
+    }
+  };
+
   return (
-    <Button variant="outline" onClick={exportData} disabled={isExporting}>
-      {isExporting ? (
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-      ) : (
-        <Download className="h-4 w-4 mr-2" />
-      )}
-      {isExporting ? 'Exportando...' : 'Exportar Dados'}
-    </Button>
+    <div className="flex gap-2">
+      <Button variant="outline" onClick={exportData} disabled={isExporting}>
+        {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+        {isExporting ? 'Exportando...' : 'Exportar JSON'}
+      </Button>
+      <Button variant="outline" onClick={exportSQL} disabled={isExportingSQL}>
+        {isExportingSQL ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Database className="h-4 w-4 mr-2" />}
+        {isExportingSQL ? 'Gerando SQL...' : 'Exportar SQL Completo'}
+      </Button>
+    </div>
   );
 }
