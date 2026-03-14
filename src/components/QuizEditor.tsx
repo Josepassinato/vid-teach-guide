@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, Clock, HelpCircle, Check, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 interface Quiz {
   id: string;
@@ -67,7 +68,7 @@ export function QuizEditor({ videoId, password, transcript, title, videoDuration
       }));
       setQuizzes(mapped);
     } catch (err) {
-      console.error('Error loading quizzes:', err);
+      logger.error('Error loading quizzes:', err);
       toast.error('Erro ao carregar quizzes');
     } finally {
       setIsLoading(false);
@@ -125,7 +126,7 @@ export function QuizEditor({ videoId, password, transcript, title, videoDuration
       setNewTimestamp('');
       loadQuizzes();
     } catch (err) {
-      console.error('Error adding quiz:', err);
+      logger.error('Error adding quiz:', err);
       toast.error('Erro ao adicionar quiz');
     } finally {
       setIsSaving(false);
@@ -144,7 +145,7 @@ export function QuizEditor({ videoId, password, transcript, title, videoDuration
       toast.success('Quiz removido!');
       loadQuizzes();
     } catch (err) {
-      console.error('Error deleting quiz:', err);
+      logger.error('Error deleting quiz:', err);
       toast.error('Erro ao remover quiz');
     }
   };
@@ -205,7 +206,7 @@ export function QuizEditor({ videoId, password, transcript, title, videoDuration
         toast.error('Não foi possível gerar quizzes');
       }
     } catch (err: any) {
-      console.error('Error generating quizzes:', err);
+      logger.error('Error generating quizzes:', err);
       toast.error(err.message || 'Erro ao gerar quizzes');
     } finally {
       setIsGenerating(false);

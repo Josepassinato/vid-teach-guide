@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit, FolderOpen, ChevronDown, ChevronRight, GripVertical, ArrowUp, ArrowDown, Unlock, Lock, Video, BookOpen, Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface Module {
   id: string;
@@ -72,7 +73,7 @@ export function ModulesAdmin({ password }: ModulesAdminProps) {
       setLessons(lessonsRes.data || []);
     } catch (err) {
       toast.error('Erro ao carregar dados');
-      console.error(err);
+      logger.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +102,7 @@ export function ModulesAdmin({ password }: ModulesAdminProps) {
       loadData();
     } catch (err) {
       toast.error('Erro ao criar módulo');
-      console.error(err);
+      logger.error(err);
     }
   };
 
@@ -127,7 +128,7 @@ export function ModulesAdmin({ password }: ModulesAdminProps) {
       loadData();
     } catch (err) {
       toast.error('Erro ao atualizar módulo');
-      console.error(err);
+      logger.error(err);
     }
   };
 
@@ -152,7 +153,7 @@ export function ModulesAdmin({ password }: ModulesAdminProps) {
       loadData();
     } catch (err) {
       toast.error('Erro ao remover módulo');
-      console.error(err);
+      logger.error(err);
     }
   };
 

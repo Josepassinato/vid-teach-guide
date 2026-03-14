@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { VisionSignals } from './types';
 import { useMediaPipeFace, FaceDetectionResult } from './useMediaPipeFace';
+import { logger } from '@/lib/logger';
 
 interface UseVisionSignalsOptions {
   onSignalsUpdate?: (signals: VisionSignals) => void;
@@ -143,13 +144,13 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
 
       setIsEnabled(true);
       setSignals(prev => ({ ...prev, enabled: true }));
-      console.log('[VisionSignals] Enabled with MediaPipe');
+      logger.debug('[VisionSignals] Enabled with MediaPipe');
 
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to access camera';
       setError(message);
-      console.error('[VisionSignals] Camera error:', err);
+      logger.error('[VisionSignals] Camera error:', err);
       return false;
     } finally {
       setIsLoading(false);
@@ -167,7 +168,7 @@ export function useVisionSignals(options: UseVisionSignalsOptions = {}) {
 
     setIsEnabled(false);
     setSignals(DEFAULT_VISION_SIGNALS);
-    console.log('[VisionSignals] Disabled');
+    logger.debug('[VisionSignals] Disabled');
   }, [mediaPipe]);
 
   // Grant consent for vision

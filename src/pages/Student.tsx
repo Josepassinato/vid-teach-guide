@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VoiceChat } from '@/components/VoiceChat';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ChevronLeft, ChevronRight, CheckCircle, Lock, Target, ClipboardCheck, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -479,32 +480,34 @@ const Student = () => {
                   mobileTab !== 'video' && mobileTab !== 'lessons' ? 'hidden lg:flex' : ''
                 }`}
               >
-                <VoiceChat
-                  videoContext={selectedVideo.transcript || selectedVideo.analysis}
-                  videoId={selectedVideo.videoId}
-                  videoUrl={selectedVideo.videoUrl}
-                  videoType={selectedVideo.videoType}
-                  videoDbId={selectedVideo.dbId}
-                  videoTitle={selectedVideo.title}
-                  moduleTitle={currentLesson?.module_id ? modules.find(m => m.id === currentLesson.module_id)?.title : undefined}
-                  videoTranscript={selectedVideo.transcript}
-                  preConfiguredMoments={selectedVideo.teachingMoments}
-                  teacherIntro={selectedVideo.teacherIntro}
-                  isStudentMode={true}
-                  onContentPlanReady={(moments) => setGeneratedMoments(moments)}
-                  onOpenMissions={() => {
-                    setShowMissions(true);
-                    setMobileTab('missions');
-                  }}
-                  onVideoEnded={handleVideoEnded}
-                  onVideoStarted={() => {
-                    if (!hasAutoCollapsedForThisLesson) {
-                      setSidebarCollapsed(true);
-                      setSidebarOpen(false);
-                      setHasAutoCollapsedForThisLesson(true);
-                    }
-                  }}
-                />
+                <ErrorBoundary>
+                  <VoiceChat
+                    videoContext={selectedVideo.transcript || selectedVideo.analysis}
+                    videoId={selectedVideo.videoId}
+                    videoUrl={selectedVideo.videoUrl}
+                    videoType={selectedVideo.videoType}
+                    videoDbId={selectedVideo.dbId}
+                    videoTitle={selectedVideo.title}
+                    moduleTitle={currentLesson?.module_id ? modules.find(m => m.id === currentLesson.module_id)?.title : undefined}
+                    videoTranscript={selectedVideo.transcript}
+                    preConfiguredMoments={selectedVideo.teachingMoments}
+                    teacherIntro={selectedVideo.teacherIntro}
+                    isStudentMode={true}
+                    onContentPlanReady={(moments) => setGeneratedMoments(moments)}
+                    onOpenMissions={() => {
+                      setShowMissions(true);
+                      setMobileTab('missions');
+                    }}
+                    onVideoEnded={handleVideoEnded}
+                    onVideoStarted={() => {
+                      if (!hasAutoCollapsedForThisLesson) {
+                        setSidebarCollapsed(true);
+                        setSidebarOpen(false);
+                        setHasAutoCollapsedForThisLesson(true);
+                      }
+                    }}
+                  />
+                </ErrorBoundary>
               </div>
 
               {/* Quiz Section */}

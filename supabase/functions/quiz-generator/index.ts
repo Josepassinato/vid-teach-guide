@@ -1,16 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 
 /**
  * QUIZ GENERATOR AGENT
- * 
+ *
  * Gera automaticamente quizzes de múltipla escolha a partir da transcrição do vídeo.
  * Cria perguntas contextuais que verificam compreensão real do conteúdo.
  */
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 interface QuizQuestion {
   question: string;
@@ -30,9 +26,8 @@ interface GeneratorRequest {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResp = handleCors(req);
+  if (corsResp) return corsResp;
 
   try {
     const request: GeneratorRequest = await req.json();

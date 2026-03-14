@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 interface CheckModuleCompletionParams {
   studentId: string;
@@ -39,7 +40,7 @@ export function useCertificateGeneration() {
         .in('video_id', lessonIds);
 
       if (quizError) {
-        console.error('[CertGen] Error checking quizzes:', quizError);
+        logger.error('[CertGen] Error checking quizzes:', quizError);
         return { generated: false };
       }
 
@@ -53,7 +54,7 @@ export function useCertificateGeneration() {
         .eq('status', 'completed');
 
       if (missionError) {
-        console.error('[CertGen] Error checking missions:', missionError);
+        logger.error('[CertGen] Error checking missions:', missionError);
         return { generated: false };
       }
 
@@ -100,7 +101,7 @@ export function useCertificateGeneration() {
       });
 
       if (error) {
-        console.error('[CertGen] Error generating certificate:', error);
+        logger.error('[CertGen] Error generating certificate:', error);
         return { generated: false, error };
       }
 
@@ -124,7 +125,7 @@ export function useCertificateGeneration() {
         svg: data.svg,
       };
     } catch (error) {
-      console.error('[CertGen] Unexpected error:', error);
+      logger.error('[CertGen] Unexpected error:', error);
       return { generated: false, error };
     }
   }, []);
@@ -153,7 +154,7 @@ export function useCertificateGeneration() {
         .eq('certificate_type', 'module');
 
       if (certsError) {
-        console.error('[CertGen] Error checking module certs:', certsError);
+        logger.error('[CertGen] Error checking module certs:', certsError);
         return { generated: false };
       }
 
@@ -186,7 +187,7 @@ export function useCertificateGeneration() {
       });
 
       if (error) {
-        console.error('[CertGen] Error generating course certificate:', error);
+        logger.error('[CertGen] Error generating course certificate:', error);
         return { generated: false, error };
       }
 
@@ -210,7 +211,7 @@ export function useCertificateGeneration() {
         svg: data.svg,
       };
     } catch (error) {
-      console.error('[CertGen] Unexpected error:', error);
+      logger.error('[CertGen] Unexpected error:', error);
       return { generated: false, error };
     }
   }, []);

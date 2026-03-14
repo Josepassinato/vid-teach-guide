@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoControls } from '@/types/video';
+import { logger } from '@/lib/logger';
 
 interface UseGeminiLiveOptions {
   systemInstruction?: string;
@@ -46,7 +47,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
   // Keep videoControls ref updated
   useEffect(() => {
-    console.log('[GeminiLive] videoControls updated:', options.videoControls ? 'EXISTS' : 'NULL');
+    logger.debug('[GeminiLive] videoControls updated:', options.videoControls ? 'EXISTS' : 'NULL');
     videoControlsRef.current = options.videoControls || null;
   }, [options.videoControls]);
 
@@ -130,13 +131,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       const checkSpeech = () => {
         const queueLength = audioQueueRef.current.length;
         const isPlaying = isPlayingRef.current;
-        console.log('[GEMINI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
+        logger.debug('[GEMINI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
         
         if (queueLength === 0 && !isPlaying) {
-          console.log('[GEMINI] Fala terminou, aguardando 5 segundos...');
+          logger.debug('[GEMINI] Fala terminou, aguardando 5 segundos...');
           // 5 second buffer after speech ends for natural pause
           setTimeout(() => {
-            console.log('[GEMINI] Buffer de 5s concluído, prosseguindo...');
+            logger.debug('[GEMINI] Buffer de 5s concluído, prosseguindo...');
             resolve();
           }, 5000);
         } else {
@@ -147,37 +148,37 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     });
   }, []);
 
-  const handleToolCall = useCallback((functionCall: any) => {
+  const handleToolCall = useCallback((functionCall: { name: string; id?: string; args?: Record<string, unknown> }) => {
     const name = functionCall.name;
     const callId = functionCall.id || `call_${Date.now()}`;
     const args = functionCall.args || {};
 
     // Detailed debug logging
-    console.log('='.repeat(60));
-    console.log('[GEMINI TOOL CALL] Recebido');
-    console.log('[GEMINI TOOL CALL] Funcao:', name);
-    console.log('[GEMINI TOOL CALL] Call ID:', callId);
-    console.log('[GEMINI TOOL CALL] Argumentos:', JSON.stringify(args, null, 2));
-    console.log('[GEMINI TOOL CALL] Raw functionCall:', JSON.stringify(functionCall, null, 2));
-    console.log('[GEMINI TOOL CALL] Video Controls:', videoControlsRef.current ? 'DISPONIVEL' : 'INDISPONIVEL');
-    console.log('[GEMINI TOOL CALL] Audio Queue:', audioQueueRef.current.length, 'isPlaying:', isPlayingRef.current);
+    logger.debug('='.repeat(60));
+    logger.debug('[GEMINI TOOL CALL] Recebido');
+    logger.debug('[GEMINI TOOL CALL] Funcao:', name);
+    logger.debug('[GEMINI TOOL CALL] Call ID:', callId);
+    logger.debug('[GEMINI TOOL CALL] Argumentos:', JSON.stringify(args, null, 2));
+    logger.debug('[GEMINI TOOL CALL] Raw functionCall:', JSON.stringify(functionCall, null, 2));
+    logger.debug('[GEMINI TOOL CALL] Video Controls:', videoControlsRef.current ? 'DISPONIVEL' : 'INDISPONIVEL');
+    logger.debug('[GEMINI TOOL CALL] Audio Queue:', audioQueueRef.current.length, 'isPlaying:', isPlayingRef.current);
     
     if (videoControlsRef.current) {
-      console.log('[GEMINI TOOL CALL] Video Status - isPaused:', videoControlsRef.current.isPaused());
-      console.log('[GEMINI TOOL CALL] Video Status - currentTime:', videoControlsRef.current.getCurrentTime());
+      logger.debug('[GEMINI TOOL CALL] Video Status - isPaused:', videoControlsRef.current.isPaused());
+      logger.debug('[GEMINI TOOL CALL] Video Status - currentTime:', videoControlsRef.current.getCurrentTime());
     }
 
     if (processedCallIdsRef.current.has(callId)) {
-      console.log('[GEMINI TOOL CALL] IGNORADO - Call ID ja processado:', callId);
-      console.log('='.repeat(60));
+      logger.debug('[GEMINI TOOL CALL] IGNORADO - Call ID ja processado:', callId);
+      logger.debug('='.repeat(60));
       return;
     }
     processedCallIdsRef.current.add(callId);
-    console.log('[GEMINI TOOL CALL] Call ID adicionado ao set de processados');
+    logger.debug('[GEMINI TOOL CALL] Call ID adicionado ao set de processados');
 
     // For play and restart, we need to wait for speech to end
     const executeWithDelay = async () => {
-      let result: any = { ok: true };
+      let result: { ok: boolean; message?: string } = { ok: true };
 
       if (videoControlsRef.current) {
         const beforePaused = videoControlsRef.current.isPaused();
@@ -185,66 +186,66 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         
         switch (name) {
           case "play_video":
-            console.log('[GEMINI TOOL CALL] EXECUTANDO: play_video');
-            console.log('[GEMINI TOOL CALL] Estado antes: isPaused =', beforePaused);
-            console.log('[GEMINI TOOL CALL] Aguardando agente terminar de falar antes de dar play...');
+            logger.debug('[GEMINI TOOL CALL] EXECUTANDO: play_video');
+            logger.debug('[GEMINI TOOL CALL] Estado antes: isPaused =', beforePaused);
+            logger.debug('[GEMINI TOOL CALL] Aguardando agente terminar de falar antes de dar play...');
             toast.info('Aguardando professor terminar de falar...', { duration: 2000 });
             await waitForSpeechToEnd();
-            console.log('[GEMINI TOOL CALL] Agente terminou de falar, dando play agora!');
+            logger.debug('[GEMINI TOOL CALL] Agente terminou de falar, dando play agora!');
             toast.success('Dando play no video...', { duration: 2000 });
             videoControlsRef.current.play();
             setTimeout(() => {
-              console.log('[GEMINI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
+              logger.debug('[GEMINI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
             }, 100);
             result = { ok: true, message: "Video iniciado" };
             break;
           case "pause_video":
-            console.log('[GEMINI TOOL CALL] EXECUTANDO: pause_video');
-            console.log('[GEMINI TOOL CALL] Estado antes: isPaused =', beforePaused);
+            logger.debug('[GEMINI TOOL CALL] EXECUTANDO: pause_video');
+            logger.debug('[GEMINI TOOL CALL] Estado antes: isPaused =', beforePaused);
             toast.success('Pausando video...', { duration: 2000 });
             videoControlsRef.current.pause();
             setTimeout(() => {
-              console.log('[GEMINI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
+              logger.debug('[GEMINI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
             }, 100);
             result = { ok: true, message: "Video pausado" };
             break;
           case "restart_video":
-            console.log('[GEMINI TOOL CALL] EXECUTANDO: restart_video');
-            console.log('[GEMINI TOOL CALL] Tempo antes:', beforeTime);
-            console.log('[GEMINI TOOL CALL] Aguardando agente terminar de falar antes de reiniciar...');
+            logger.debug('[GEMINI TOOL CALL] EXECUTANDO: restart_video');
+            logger.debug('[GEMINI TOOL CALL] Tempo antes:', beforeTime);
+            logger.debug('[GEMINI TOOL CALL] Aguardando agente terminar de falar antes de reiniciar...');
             toast.info('Aguardando professor terminar de falar...', { duration: 2000 });
             await waitForSpeechToEnd();
-            console.log('[GEMINI TOOL CALL] Agente terminou de falar, reiniciando agora!');
+            logger.debug('[GEMINI TOOL CALL] Agente terminou de falar, reiniciando agora!');
             toast.success('Reiniciando video...', { duration: 2000 });
             videoControlsRef.current.restart();
             setTimeout(() => {
-              console.log('[GEMINI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+              logger.debug('[GEMINI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
             }, 100);
             result = { ok: true, message: "Video reiniciado" };
             break;
           case "seek_video":
             const targetSeconds = Number(args.seconds) || 0;
-            console.log('[GEMINI TOOL CALL] EXECUTANDO: seek_video');
-            console.log('[GEMINI TOOL CALL] Tempo antes:', beforeTime, '-> Destino:', targetSeconds);
+            logger.debug('[GEMINI TOOL CALL] EXECUTANDO: seek_video');
+            logger.debug('[GEMINI TOOL CALL] Tempo antes:', beforeTime, '-> Destino:', targetSeconds);
             toast.success(`Pulando para ${targetSeconds}s...`, { duration: 2000 });
             videoControlsRef.current.seekTo(targetSeconds);
             setTimeout(() => {
-              console.log('[GEMINI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+              logger.debug('[GEMINI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
             }, 100);
             result = { ok: true, message: `Video pulou para ${targetSeconds} segundos` };
             break;
           default:
-            console.warn('[GEMINI TOOL CALL] ERRO: Funcao desconhecida:', name);
+            logger.warn('[GEMINI TOOL CALL] ERRO: Funcao desconhecida:', name);
             result = { ok: false, message: `Funcao desconhecida: ${name}` };
         }
       } else {
-        console.error('[GEMINI TOOL CALL] ERRO: videoControlsRef.current e NULL');
-        console.error('[GEMINI TOOL CALL] Nao foi possivel executar:', name);
+        logger.error('[GEMINI TOOL CALL] ERRO: videoControlsRef.current e NULL');
+        logger.error('[GEMINI TOOL CALL] Nao foi possivel executar:', name);
         toast.error('Nenhum video carregado');
         result = { ok: false, message: "Nenhum video carregado" };
       }
 
-      console.log('[GEMINI TOOL CALL] Resultado:', JSON.stringify(result));
+      logger.debug('[GEMINI TOOL CALL] Resultado:', JSON.stringify(result));
 
       // Send tool response back to Gemini using the correct format
       // The Gemini Live API expects the response in a specific structure
@@ -259,14 +260,14 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
             }]
           }
         };
-        console.log('[GEMINI TOOL CALL] Enviando resposta:', JSON.stringify(response, null, 2));
+        logger.debug('[GEMINI TOOL CALL] Enviando resposta:', JSON.stringify(response, null, 2));
         wsRef.current.send(JSON.stringify(response));
-        console.log('[GEMINI TOOL CALL] Resposta enviada com sucesso');
+        logger.debug('[GEMINI TOOL CALL] Resposta enviada com sucesso');
       } else {
-        console.error('[GEMINI TOOL CALL] ERRO: WebSocket nao esta aberto, estado:', wsRef.current?.readyState);
+        logger.error('[GEMINI TOOL CALL] ERRO: WebSocket nao esta aberto, estado:', wsRef.current?.readyState);
       }
       
-      console.log('='.repeat(60));
+      logger.debug('='.repeat(60));
     };
 
     // Execute async
@@ -275,23 +276,23 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
   const connect = useCallback(async () => {
     try {
-      console.log('[GeminiLive] Starting connection...');
+      logger.debug('[GeminiLive] Starting connection...');
       updateStatus('connecting');
       
       const currentOptions = optionsRef.current;
       
        // Get API key (and preferred Live model) from backend function
-      console.log('[GeminiLive] Requesting token from edge function...');
+      logger.debug('[GeminiLive] Requesting token from edge function...');
       const { data, error } = await supabase.functions.invoke('gemini-token', {
         body: { systemInstruction: currentOptions.systemInstruction }
       });
       
       if (error || !data?.token) {
-        console.error('[GeminiLive] Token error:', error);
+        logger.error('[GeminiLive] Token error:', error);
         throw new Error(error?.message || 'Failed to get token');
       }
       
-      console.log('[GeminiLive] Token received, connecting to WebSocket...');
+      logger.debug('[GeminiLive] Token received, connecting to WebSocket...');
       
       // Connect to Gemini Live API
       // IMPORTANT: Live API uses v1alpha for BidiGenerateContent
@@ -308,14 +309,14 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
         const supportsToolCalling = (data as any)?.supportsToolCalling !== false;
 
-        console.log('[GeminiLive] Using model:', preferredModel, 'supportsToolCalling:', supportsToolCalling);
+        logger.debug('[GeminiLive] Using model:', preferredModel, 'supportsToolCalling:', supportsToolCalling);
 
         if (!supportsToolCalling) {
           toast.warning('Modelo atual não suporta controle de vídeo por voz. Use os botões na tela.', { duration: 5000 });
         }
 
        ws.onopen = () => {
-        console.log('WebSocket connected to Gemini');
+        logger.debug('WebSocket connected to Gemini');
         processedCallIdsRef.current.clear();
         
         // Define tools for video control - only if model supports it
@@ -359,7 +360,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         // Send setup message
         // Using Kore voice - warm female voice
         // Note: For Gemini Live API with audio, only AUDIO modality is supported
-        const setupMessage: any = {
+        const setupMessage: Record<string, unknown> = {
           setup: {
             model: preferredModel,
             generationConfig: {
@@ -387,7 +388,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           setupMessage.setup.tools = tools;
         }
         
-        console.log('[GeminiLive] Enviando setup:', JSON.stringify(setupMessage, null, 2).substring(0, 500));
+        logger.debug('[GeminiLive] Enviando setup:', JSON.stringify(setupMessage, null, 2).substring(0, 500));
         ws.send(JSON.stringify(setupMessage));
         
         updateStatus('connected');
@@ -404,14 +405,14 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           
           // Skip if not a string
           if (typeof messageData !== 'string') {
-            console.log('[gemini:event] Received non-string data, skipping');
+            logger.debug('[gemini:event] Received non-string data, skipping');
             return;
           }
           
           const data = JSON.parse(messageData);
           
           // Log ALL messages for complete debugging
-          console.log('[GEMINI RAW]', JSON.stringify(data).substring(0, 500));
+          logger.debug('[GEMINI RAW]', JSON.stringify(data).substring(0, 500));
           
           // Check for tool calls in ALL possible locations
           const hasToolCallInParts = data.serverContent?.modelTurn?.parts?.some((p: any) => p.functionCall);
@@ -428,40 +429,40 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
                             hasSnakeCaseToolCall || hasServerContentToolCall;
           
           if (hasToolCall) {
-            console.log('*'.repeat(60));
-            console.log('[GEMINI EVENT] TOOL CALL DETECTADO!');
-            console.log('[GEMINI EVENT] hasToolCallInParts:', hasToolCallInParts);
-            console.log('[GEMINI EVENT] hasToolCallInCandidates:', hasToolCallInCandidates);
-            console.log('[GEMINI EVENT] hasToolCallInToolCallField:', hasToolCallInToolCallField);
-            console.log('[GEMINI EVENT] hasDirectFunctionCall:', hasDirectFunctionCall);
-            console.log('[GEMINI EVENT] hasSnakeCaseToolCall:', hasSnakeCaseToolCall);
-            console.log('[GEMINI EVENT] hasServerContentToolCall:', hasServerContentToolCall);
-            console.log('[GEMINI EVENT] Dados completos:', JSON.stringify(data, null, 2));
-            console.log('*'.repeat(60));
+            logger.debug('*'.repeat(60));
+            logger.debug('[GEMINI EVENT] TOOL CALL DETECTADO!');
+            logger.debug('[GEMINI EVENT] hasToolCallInParts:', hasToolCallInParts);
+            logger.debug('[GEMINI EVENT] hasToolCallInCandidates:', hasToolCallInCandidates);
+            logger.debug('[GEMINI EVENT] hasToolCallInToolCallField:', hasToolCallInToolCallField);
+            logger.debug('[GEMINI EVENT] hasDirectFunctionCall:', hasDirectFunctionCall);
+            logger.debug('[GEMINI EVENT] hasSnakeCaseToolCall:', hasSnakeCaseToolCall);
+            logger.debug('[GEMINI EVENT] hasServerContentToolCall:', hasServerContentToolCall);
+            logger.debug('[GEMINI EVENT] Dados completos:', JSON.stringify(data, null, 2));
+            logger.debug('*'.repeat(60));
           } else {
             // Log resumido para outros eventos
             const eventType = data.setupComplete ? 'SETUP' : 
                             data.serverContent?.modelTurn ? 'MODEL_TURN' : 
                             data.serverContent?.interrupted ? 'INTERRUPTED' : 
                             data.serverContent?.turnComplete ? 'TURN_COMPLETE' : 'OTHER';
-            console.log('[GEMINI EVENT]', eventType);
+            logger.debug('[GEMINI EVENT]', eventType);
           }
           
           // Handle audio response
           if (data.serverContent?.modelTurn?.parts) {
-            console.log('[GEMINI EVENT] Processando modelTurn com', data.serverContent.modelTurn.parts.length, 'parts');
+            logger.debug('[GEMINI EVENT] Processando modelTurn com', data.serverContent.modelTurn.parts.length, 'parts');
             for (const part of data.serverContent.modelTurn.parts) {
               if (part.inlineData?.data) {
                 await playAudioChunk(part.inlineData.data);
               }
               if (part.text) {
-                console.log('[GEMINI EVENT] Texto recebido:', part.text.substring(0, 100));
+                logger.debug('[GEMINI EVENT] Texto recebido:', part.text.substring(0, 100));
                 optionsRef.current.onTranscript?.(part.text, 'assistant');
               }
               // Handle function calls in parts
               if (part.functionCall) {
-                console.log('[GEMINI EVENT] functionCall encontrado em part!');
-                console.log('[GEMINI EVENT] functionCall:', JSON.stringify(part.functionCall, null, 2));
+                logger.debug('[GEMINI EVENT] functionCall encontrado em part!');
+                logger.debug('[GEMINI EVENT] functionCall:', JSON.stringify(part.functionCall, null, 2));
                 handleToolCall(part.functionCall);
               }
             }
@@ -469,7 +470,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           
           // Handle tool calls in toolCall field (camelCase)
           if (data.toolCall?.functionCalls) {
-            console.log('[GEMINI EVENT] functionCalls encontrado em toolCall!');
+            logger.debug('[GEMINI EVENT] functionCalls encontrado em toolCall!');
             for (const fc of data.toolCall.functionCalls) {
               handleToolCall(fc);
             }
@@ -477,7 +478,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           
           // Handle tool calls in tool_call field (snake_case variant)
           if (data.tool_call?.function_calls) {
-            console.log('[GEMINI EVENT] function_calls encontrado em tool_call!');
+            logger.debug('[GEMINI EVENT] function_calls encontrado em tool_call!');
             for (const fc of data.tool_call.function_calls) {
               handleToolCall(fc);
             }
@@ -485,7 +486,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           
           // Handle serverContent.toolCall
           if (data.serverContent?.toolCall?.functionCalls) {
-            console.log('[GEMINI EVENT] functionCalls encontrado em serverContent.toolCall!');
+            logger.debug('[GEMINI EVENT] functionCalls encontrado em serverContent.toolCall!');
             for (const fc of data.serverContent.toolCall.functionCalls) {
               handleToolCall(fc);
             }
@@ -493,13 +494,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           
           // Handle tool calls directly on data
           if (data.functionCall) {
-            console.log('[GEMINI EVENT] functionCall encontrado diretamente em data!');
+            logger.debug('[GEMINI EVENT] functionCall encontrado diretamente em data!');
             handleToolCall(data.functionCall);
           }
           
           // Handle function_call (snake_case variant)
           if (data.function_call) {
-            console.log('[GEMINI EVENT] function_call (snake_case) encontrado!');
+            logger.debug('[GEMINI EVENT] function_call (snake_case) encontrado!');
             handleToolCall(data.function_call);
           }
           
@@ -507,7 +508,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           if (data.candidates?.[0]?.content?.parts) {
             for (const part of data.candidates[0].content.parts) {
               if (part.functionCall) {
-                console.log('[GEMINI EVENT] functionCall encontrado em candidates!');
+                logger.debug('[GEMINI EVENT] functionCall encontrado em candidates!');
                 handleToolCall(part.functionCall);
               }
             }
@@ -515,7 +516,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           
           // Handle interruption
           if (data.serverContent?.interrupted) {
-            console.log('[GEMINI EVENT] Interrupcao detectada');
+            logger.debug('[GEMINI EVENT] Interrupcao detectada');
             audioQueueRef.current = [];
             isPlayingRef.current = false;
             setIsSpeaking(false);
@@ -523,30 +524,30 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
 
           // Handle setup complete
           if (data.setupComplete) {
-            console.log('[GEMINI EVENT] Setup completo - tools configuradas');
+            logger.debug('[GEMINI EVENT] Setup completo - tools configuradas');
           }
         } catch (e) {
           // Only log if it's not a parse error from binary data
           if (e instanceof SyntaxError) {
-            console.log('[gemini:event] Non-JSON message received, likely binary audio');
+            logger.debug('[gemini:event] Non-JSON message received, likely binary audio');
           } else {
-            console.error('Error processing message:', e);
+            logger.error('Error processing message:', e);
           }
         }
       };
       
       ws.onerror = (error) => {
-        console.error('[GeminiLive] WebSocket error:', error);
-        console.error('[GeminiLive] WebSocket error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        logger.error('[GeminiLive] WebSocket error:', error);
+        logger.error('[GeminiLive] WebSocket error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
         updateStatus('error');
         optionsRef.current.onError?.('Erro de conexao com Gemini');
       };
       
        ws.onclose = (event) => {
-        console.log('[GeminiLive] WebSocket closed');
-        console.log('[GeminiLive] Close code:', event.code);
-        console.log('[GeminiLive] Close reason:', event.reason || 'Nenhuma razao fornecida');
-        console.log('[GeminiLive] Was clean:', event.wasClean);
+        logger.debug('[GeminiLive] WebSocket closed');
+        logger.debug('[GeminiLive] Close code:', event.code);
+        logger.debug('[GeminiLive] Close reason:', event.reason || 'Nenhuma razao fornecida');
+        logger.debug('[GeminiLive] Was clean:', event.wasClean);
         
         // Common close codes:
         // 1000 = Normal closure
@@ -554,7 +555,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         // 1011 = Server error
         // 1015 = TLS handshake failure
          if (event.code !== 1000) {
-           console.error('[GeminiLive] Conexao fechada com erro. Codigo:', event.code);
+           logger.error('[GeminiLive] Conexao fechada com erro. Codigo:', event.code);
            const reason = event.reason ? ` (${event.reason})` : '';
            optionsRef.current.onError?.(`Conexao fechada: codigo ${event.code}${reason}`);
          }
@@ -564,7 +565,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       };
       
     } catch (error) {
-      console.error('[GeminiLive] Connection error:', error);
+      logger.error('[GeminiLive] Connection error:', error);
       updateStatus('error');
       optionsRef.current.onError?.(error instanceof Error ? error.message : 'Connection failed');
     }
@@ -726,10 +727,10 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       processor.connect(audioContext.destination);
       
       setIsListening(true);
-      console.log('[GeminiLive] Audio pipeline com VAD e filtros de ruido ativado');
+      logger.debug('[GeminiLive] Audio pipeline com VAD e filtros de ruido ativado');
       
     } catch (error) {
-      console.error('Microphone error:', error);
+      logger.error('Microphone error:', error);
       optionsRef.current.onError?.('Could not access microphone');
     }
   }, []);

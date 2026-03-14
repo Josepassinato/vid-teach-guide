@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export interface StudentProfile {
   id: string;
@@ -82,7 +83,7 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
     initializedRef.current = true;
     
     getOrCreateStudentId().then(id => {
-      console.log('[StudentMemory] Student ID initialized:', id);
+      logger.debug('[StudentMemory] Student ID initialized:', id);
       setStudentId(id);
     });
   }, []);
@@ -90,13 +91,13 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
   // Load or create student profile
   const loadProfile = useCallback(async () => {
     if (!studentId) {
-      console.log('[StudentMemory] Waiting for studentId...');
+      logger.debug('[StudentMemory] Waiting for studentId...');
       return;
     }
     
     try {
       setIsLoading(true);
-      console.log('[StudentMemory] Loading profile for:', studentId);
+      logger.debug('[StudentMemory] Loading profile for:', studentId);
       
       // Try to get existing profile
       const { data: existing, error: fetchError } = await supabase
@@ -110,7 +111,7 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
       }
       
       if (existing) {
-        console.log('[StudentMemory] Found existing profile:', existing.id, 'name:', existing.name);
+        logger.debug('[StudentMemory] Found existing profile:', existing.id, 'name:', existing.name);
         const profileData: StudentProfile = {
           ...existing,
           strengths: existing.strengths || [],
@@ -129,7 +130,7 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
           })
           .eq('id', existing.id);
       } else {
-        console.log('[StudentMemory] Creating new profile for:', studentId);
+        logger.debug('[StudentMemory] Creating new profile for:', studentId);
         // Create new profile
         const { data: newProfile, error: insertError } = await supabase
           .from('student_profiles')
@@ -142,7 +143,7 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
         
         if (insertError) throw insertError;
         
-        console.log('[StudentMemory] Created new profile:', newProfile.id);
+        logger.debug('[StudentMemory] Created new profile:', newProfile.id);
         const profileData: StudentProfile = {
           ...newProfile,
           strengths: [],
@@ -153,7 +154,7 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
         optionsRef.current.onProfileLoaded?.(profileData);
       }
     } catch (error) {
-      console.error('[StudentMemory] Error loading profile:', error);
+      logger.error('[StudentMemory] Error loading profile:', error);
     } finally {
       setIsLoading(false);
     }
@@ -162,12 +163,12 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
   // Record an observation
   const recordObservation = useCallback(async (observation: StudentObservation) => {
     if (!profile || !studentId) {
-      console.warn('[StudentMemory] Cannot record observation - profile or studentId missing');
+      logger.warn('[StudentMemory] Cannot record observation - profile or studentId missing');
       return;
     }
     
     try {
-      console.log('[StudentMemory] Recording observation:', observation.observation_type, observation.context);
+      logger.debug('[StudentMemory] Recording observation:', observation.observation_type, observation.context);
       const { error } = await supabase
         .from('student_observations')
         .insert({
@@ -180,22 +181,22 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
       
       if (error) throw error;
       
-      console.log('[StudentMemory] ✅ Observation recorded successfully');
+      logger.debug('[StudentMemory] ✅ Observation recorded successfully');
       optionsRef.current.onObservationRecorded?.(observation);
     } catch (error) {
-      console.error('[StudentMemory] Error recording observation:', error);
+      logger.error('[StudentMemory] Error recording observation:', error);
     }
   }, [profile, studentId]);
 
   // Update student profile with new learnings
   const updateProfile = useCallback(async (updates: Partial<Pick<StudentProfile, 'name' | 'learning_style' | 'strengths' | 'areas_to_improve' | 'preferences' | 'personality_notes'>>) => {
     if (!profile) {
-      console.warn('[StudentMemory] Cannot update profile - profile not loaded');
+      logger.warn('[StudentMemory] Cannot update profile - profile not loaded');
       return;
     }
     
     try {
-      console.log('[StudentMemory] Updating profile with:', updates);
+      logger.debug('[StudentMemory] Updating profile with:', updates);
       const { error } = await supabase
         .from('student_profiles')
         .update(updates)
@@ -203,10 +204,10 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
       
       if (error) throw error;
       
-      console.log('[StudentMemory] ✅ Profile updated successfully');
+      logger.debug('[StudentMemory] ✅ Profile updated successfully');
       setProfile(prev => prev ? { ...prev, ...updates } : null);
     } catch (error) {
-      console.error('[StudentMemory] Error updating profile:', error);
+      logger.error('[StudentMemory] Error updating profile:', error);
     }
   }, [profile]);
 
@@ -230,7 +231,7 @@ export function useStudentMemory(options: UseStudentMemoryOptions = {}) {
         video_id: obs.video_id || undefined,
       }));
     } catch (error) {
-      console.error('[StudentMemory] Error getting observations:', error);
+      logger.error('[StudentMemory] Error getting observations:', error);
       return [];
     }
   }, [studentId]);
@@ -275,7 +276,7 @@ MEMÓRIA DO ALUNO:
               total_study_time_minutes: (profile.total_study_time_minutes || 0) + sessionMinutes 
             })
             .eq('id', profile.id)
-            .then(() => console.log('[StudentMemory] Updated study time'));
+            .then(() => logger.debug('[StudentMemory] Updated study time'));
         }
       }
     };

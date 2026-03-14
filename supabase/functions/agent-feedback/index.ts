@@ -1,16 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 
 /**
  * AGENTE DE FEEDBACK PERSONALIZADO
- * 
+ *
  * Especialista em gerar feedback pedagógico construtivo e motivador.
  * Adapta tom e conteúdo baseado no perfil do estudante.
  */
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 interface FeedbackRequest {
   studentName?: string;
@@ -37,9 +33,8 @@ interface FeedbackResult {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResp = handleCors(req);
+  if (corsResp) return corsResp;
 
   try {
     const request: FeedbackRequest = await req.json();

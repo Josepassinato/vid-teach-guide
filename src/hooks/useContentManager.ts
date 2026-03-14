@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export interface TeachingMoment {
   timestamp_seconds: number;
@@ -54,7 +55,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
     moments: TeachingMoment[]
   ): Promise<boolean> => {
     try {
-      console.log('[ContentManager] Saving teaching moments to database for video:', videoId);
+      logger.debug('[ContentManager] Saving teaching moments to database for video:', videoId);
       
       // Convert TeachingMoment[] to JSON-compatible format
       const momentsAsJson = moments.map(m => ({
@@ -78,14 +79,14 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
         .eq('id', videoId);
 
       if (updateError) {
-        console.error('[ContentManager] Failed to save teaching moments:', updateError);
+        logger.error('[ContentManager] Failed to save teaching moments:', updateError);
         return false;
       }
 
-      console.log('[ContentManager] Teaching moments saved successfully');
+      logger.debug('[ContentManager] Teaching moments saved successfully');
       return true;
     } catch (error) {
-      console.error('[ContentManager] Error saving teaching moments:', error);
+      logger.error('[ContentManager] Error saving teaching moments:', error);
       return false;
     }
   }, []);
@@ -100,7 +101,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
     videoId?: string,
     autoSave: boolean = true
   ) => {
-    console.log('[ContentManager] analyzeContent called:', {
+    logger.debug('[ContentManager] analyzeContent called:', {
       hasTranscript: !!transcript,
       transcriptLength: transcript?.length || 0,
       title,
@@ -113,7 +114,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
 
     // If we have pre-configured moments (not empty array), use them
     if (preConfiguredMoments && preConfiguredMoments.length > 0) {
-      console.log('[ContentManager] Using pre-configured moments:', preConfiguredMoments.length);
+      logger.debug('[ContentManager] Using pre-configured moments:', preConfiguredMoments.length);
       const plan = loadPreConfiguredMoments(preConfiguredMoments);
       if (plan) {
         toast.success(`📚 ${plan.teaching_moments.length} momentos de ensino carregados`);
@@ -123,11 +124,11 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
 
     // No pre-configured moments, need transcript or analysis to generate via AI
     if (!transcript && !analysis) {
-      console.log('[ContentManager] No content to analyze, skipping');
+      logger.debug('[ContentManager] No content to analyze, skipping');
       return null;
     }
 
-    console.log('[ContentManager] Calling AI Content Agent to analyze lesson...');
+    logger.debug('[ContentManager] Calling AI Content Agent to analyze lesson...');
     setIsLoading(true);
     toast.info('🤖 Agente de conteúdo analisando a aula...', { duration: 3000 });
     
@@ -142,17 +143,17 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       });
 
       if (error) {
-        console.error('[ContentManager] Edge function error:', error);
+        logger.error('[ContentManager] Edge function error:', error);
         // Check if it's a rate limit error - fail silently
         if (error.message?.includes('429') || error.message?.includes('rate limit')) {
-          console.warn('[ContentManager] Rate limited, skipping AI analysis');
+          logger.warn('[ContentManager] Rate limited, skipping AI analysis');
           toast.warning('Taxa de uso excedida. Tente novamente em alguns segundos.');
           return null;
         }
         throw error;
       }
 
-      console.log('[ContentManager] AI Content Agent response:', data);
+      logger.debug('[ContentManager] AI Content Agent response:', data);
       const plan: ContentPlan = data;
       setContentPlan(plan);
       setCurrentMomentIndex(-1);
@@ -179,7 +180,7 @@ export function useContentManager(options: UseContentManagerOptions = {}) {
       
       return plan;
     } catch (error) {
-      console.error('[ContentManager] AI analysis failed:', error);
+      logger.error('[ContentManager] AI analysis failed:', error);
       toast.error('Erro ao analisar conteúdo da aula');
       return null;
     } finally {

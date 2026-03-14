@@ -19,6 +19,7 @@ import { LessonEndScreen } from './LessonEndScreen';
 import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
+import { logger } from '@/lib/logger';
 
 interface Message {
   id: string;
@@ -94,14 +95,14 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
     generateTeacherInstructions,
   } = useContentManager({
     onPlanReady: (plan) => {
-      console.log('[ContentManager] Plan ready:', plan);
+      logger.debug('[ContentManager] Plan ready:', plan);
       // Notify parent component when teaching moments are ready
       if (plan.teaching_moments.length > 0 && onContentPlanReady) {
         onContentPlanReady(plan.teaching_moments);
       }
     },
     onError: (error) => {
-      console.error('[ContentManager] Error:', error);
+      logger.error('[ContentManager] Error:', error);
     },
   });
 
@@ -377,22 +378,22 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
 
     return {
       play: () => {
-        console.log('[VoiceChat] play called, ref:', videoPlayerRef.current ? 'EXISTS' : 'NULL');
+        logger.debug('[VoiceChat] play called, ref:', videoPlayerRef.current ? 'EXISTS' : 'NULL');
         setDebugInfo(prev => ({ ...prev, lastAction: 'play @ ' + new Date().toLocaleTimeString() }));
         videoPlayerRef.current?.play();
       },
       pause: () => {
-        console.log('[VoiceChat] pause called, ref:', videoPlayerRef.current ? 'EXISTS' : 'NULL');
+        logger.debug('[VoiceChat] pause called, ref:', videoPlayerRef.current ? 'EXISTS' : 'NULL');
         setDebugInfo(prev => ({ ...prev, lastAction: 'pause @ ' + new Date().toLocaleTimeString() }));
         videoPlayerRef.current?.pause();
       },
       restart: () => {
-        console.log('[VoiceChat] restart called, ref:', videoPlayerRef.current ? 'EXISTS' : 'NULL');
+        logger.debug('[VoiceChat] restart called, ref:', videoPlayerRef.current ? 'EXISTS' : 'NULL');
         setDebugInfo(prev => ({ ...prev, lastAction: 'restart @ ' + new Date().toLocaleTimeString() }));
         videoPlayerRef.current?.restart();
       },
       seekTo: (seconds: number) => {
-        console.log('[VoiceChat] seekTo called:', seconds, 'ref:', videoPlayerRef.current ? 'EXISTS' : 'NULL');
+        logger.debug('[VoiceChat] seekTo called:', seconds, 'ref:', videoPlayerRef.current ? 'EXISTS' : 'NULL');
         setDebugInfo(prev => ({ ...prev, lastAction: `seekTo(${seconds}) @ ` + new Date().toLocaleTimeString() }));
         videoPlayerRef.current?.seekTo(seconds);
       },
@@ -403,12 +404,12 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
 
   // Memory callbacks for agent tool calls
   const handleSaveStudentName = useCallback((name: string) => {
-    console.log('[VoiceChat] Salvando nome do aluno:', name);
+    logger.debug('[VoiceChat] Salvando nome do aluno:', name);
     updateStudentProfile({ name });
   }, [updateStudentProfile]);
 
   const handleSaveEmotionalObservation = useCallback((emotion: string, context: string) => {
-    console.log('[VoiceChat] Registrando observação emocional:', emotion, context);
+    logger.debug('[VoiceChat] Registrando observação emocional:', emotion, context);
     recordObservation({
       observation_type: 'engagement',
       observation_data: { 
@@ -438,7 +439,7 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
     onSaveStudentName: handleSaveStudentName,
     onSaveEmotionalObservation: handleSaveEmotionalObservation,
     onTranscript: (text, role) => {
-      console.log(`📝 [VOICECHAT TRANSCRIPT] ${role}: ${text.substring(0, 100)}...`);
+      logger.debug(`📝 [VOICECHAT TRANSCRIPT] ${role}: ${text.substring(0, 100)}...`);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         text,
@@ -465,18 +466,18 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
       }
     },
     onError: (error) => {
-      console.error('🚨 [VOICECHAT ERROR] Erro recebido:', error);
+      logger.error('🚨 [VOICECHAT ERROR] Erro recebido:', error);
       toast.error(error);
     },
     onStatusChange: (newStatus) => {
-      console.log(`🔄 [VOICECHAT STATUS] Status mudou para: ${newStatus}`);
-      console.log(`🔄 [VOICECHAT STATUS] agentMode atual: ${agentMode}`);
+      logger.debug(`🔄 [VOICECHAT STATUS] Status mudou para: ${newStatus}`);
+      logger.debug(`🔄 [VOICECHAT STATUS] agentMode atual: ${agentMode}`);
       if (newStatus === 'disconnected') {
         setConnectionStep('idle');
       }
     },
     onConnectionStepChange: (step) => {
-      console.log(`🔄 [VOICECHAT STEP] Etapa de conexão: ${step}`);
+      logger.debug(`🔄 [VOICECHAT STEP] Etapa de conexão: ${step}`);
       setConnectionStep(step);
     }
   });
@@ -488,25 +489,25 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
   useEffect(() => {
     let introTimeout: ReturnType<typeof setTimeout> | null = null;
     
-    console.log(`🎬 [VOICECHAT EFFECT] Status changed effect - status: ${status}, agentMode: ${agentMode}`);
+    logger.debug(`🎬 [VOICECHAT EFFECT] Status changed effect - status: ${status}, agentMode: ${agentMode}`);
     
     if (status === 'connected') {
-      console.log('🎬 [VOICECHAT EFFECT] ✅ Conectado! isListening:', isListening);
+      logger.debug('🎬 [VOICECHAT EFFECT] ✅ Conectado! isListening:', isListening);
       
       // Start microphone when connected
       if (!isListening) {
-        console.log('🎤 [VOICECHAT EFFECT] Iniciando microfone...');
+        logger.debug('🎤 [VOICECHAT EFFECT] Iniciando microfone...');
         startListening();
       }
       
       // Process any pending reconnect actions
       if (pendingReconnect) {
-        console.log('🎬 [VOICECHAT EFFECT] Processando pendingReconnect:', pendingReconnect.type);
+        logger.debug('🎬 [VOICECHAT EFFECT] Processando pendingReconnect:', pendingReconnect.type);
         const { type, data } = pendingReconnect;
         setPendingReconnect(null);
         
         if (type === 'moment') {
-          console.log('🎬 [VOICECHAT EFFECT] Configurando teaching moment:', data.topic);
+          logger.debug('🎬 [VOICECHAT EFFECT] Configurando teaching moment:', data.topic);
           setActiveMoment(data);
           const instruction = generateTeacherInstructions(data);
           setTimeout(() => sendText(instruction), 500);
@@ -532,12 +533,12 @@ INSTRUÇÕES:
       
       // Handle intro mode - agent starts class only if custom intro is configured
       if (agentMode === 'intro' && !introCompletedRef.current) {
-        console.log('🎬 [VOICECHAT EFFECT] Modo intro detectado, configurando...');
+        logger.debug('🎬 [VOICECHAT EFFECT] Modo intro detectado, configurando...');
         introCompletedRef.current = true;
         
         // Only send intro if admin configured a custom teacher intro
         const customIntro = teacherIntro?.trim();
-        console.log('🎬 [VOICECHAT EFFECT] Custom intro:', customIntro ? 'SIM' : 'NÃO');
+        logger.debug('🎬 [VOICECHAT EFFECT] Custom intro:', customIntro ? 'SIM' : 'NÃO');
         
         if (customIntro) {
           const introInstruction = `[SISTEMA] Você acabou de se conectar com o aluno para começar uma nova aula.
@@ -624,7 +625,7 @@ INSTRUÇÕES:
       if (allPauses[0] && status === 'disconnected' && !isPaused) {
         const timeUntilPause = allPauses[0].time - currentTime;
         if (timeUntilPause > 0 && timeUntilPause <= 15) {
-          console.log('[VoiceChat] Pre-warming connection, next pause in', Math.round(timeUntilPause), 's');
+          logger.debug('[VoiceChat] Pre-warming connection, next pause in', Math.round(timeUntilPause), 's');
           connect();
         }
       }
@@ -702,15 +703,15 @@ INSTRUÇÕES:
 
   // Resume video helper with retry logic
   const resumeVideo = useCallback(() => {
-    console.log('[VoiceChat] resumeVideo called');
+    logger.debug('[VoiceChat] resumeVideo called');
     
     if (!videoPlayerRef.current) {
-      console.error('[VoiceChat] videoPlayerRef.current is null');
+      logger.error('[VoiceChat] videoPlayerRef.current is null');
       return;
     }
     
     // Call play directly - the VideoPlayer queues the action if not ready
-    console.log('[VoiceChat] Calling videoPlayerRef.current.play()');
+    logger.debug('[VoiceChat] Calling videoPlayerRef.current.play()');
     videoPlayerRef.current.play();
     
     // Check after a delay if video started, retry if needed
@@ -719,17 +720,17 @@ INSTRUÇÕES:
         if (!videoPlayerRef.current) return;
         
         const isPaused = videoPlayerRef.current.isPaused();
-        console.log(`[VoiceChat] Check attempt ${attempt}: isPaused=${isPaused}`);
+        logger.debug(`[VoiceChat] Check attempt ${attempt}: isPaused=${isPaused}`);
         
         if (isPaused && attempt < 3) {
-          console.log('[VoiceChat] Video still paused, retrying play()...');
+          logger.debug('[VoiceChat] Video still paused, retrying play()...');
           videoPlayerRef.current.play();
           checkAndRetry(attempt + 1);
         } else if (isPaused) {
-          console.error('[VoiceChat] Failed to start video after 3 attempts');
+          logger.error('[VoiceChat] Failed to start video after 3 attempts');
           toast.error('Não foi possível iniciar o vídeo. Clique no play manualmente.');
         } else {
-          console.log('[VoiceChat] Video is playing!');
+          logger.debug('[VoiceChat] Video is playing!');
         }
       }, 800); // Give more time for YouTube player to respond
     };
@@ -739,7 +740,7 @@ INSTRUÇÕES:
 
   // Handle video ended - trigger class wrap-up
   const handleVideoEnded = useCallback(() => {
-    console.log('[VoiceChat] Video ended, triggering class wrap-up');
+    logger.debug('[VoiceChat] Video ended, triggering class wrap-up');
     
     // Notify parent that video ended (for progress tracking)
     onVideoEnded?.();
@@ -797,7 +798,7 @@ INSTRUÇÕES:
       
       wrapUpSpeechEndedRef.current = setTimeout(() => {
         if (isCapturingEndDataRef.current && !isSpeaking) {
-          console.log('[VoiceChat] Professor terminou explicação da missão');
+          logger.debug('[VoiceChat] Professor terminou explicação da missão');
           isCapturingEndDataRef.current = false;
         }
       }, 2000);
@@ -831,7 +832,7 @@ INSTRUÇÕES:
     
     // Resume video after brief delay for agent to respond
     setTimeout(() => {
-      console.log('[VoiceChat] Quiz complete, resuming video');
+      logger.debug('[VoiceChat] Quiz complete, resuming video');
       resumeVideo();
       setAgentMode('playing');
       // Keep connection alive for voice interaction during video
@@ -857,7 +858,7 @@ INSTRUÇÕES:
     if (status === 'connected') {
       sendText('[SISTEMA] O aluno confirmou que está pronto. Diga algo breve como "Vamos lá! Começando o vídeo..." e prepare-se para voltar nos momentos de pausa. Fique em silêncio durante o vídeo, mas responda imediatamente se o aluno falar com você.');
       setTimeout(() => {
-        console.log('[VoiceChat] Starting video after intro');
+        logger.debug('[VoiceChat] Starting video after intro');
         resumeVideo();
         setAgentMode('playing');
         setIsVideoExpanded(true); // Expand video when playing
@@ -870,12 +871,12 @@ INSTRUÇÕES:
 
   // Handle dismissing teaching moment - resume video and disconnect
   const handleDismissMoment = useCallback(() => {
-    console.log('[VoiceChat] handleDismissMoment called');
+    logger.debug('[VoiceChat] handleDismissMoment called');
     setActiveMoment(null);
     if (status === 'connected') {
       sendText('[SISTEMA] O aluno quer continuar o vídeo. Diga algo breve como "Vamos lá!" e fique em silêncio durante o vídeo. Responda imediatamente se o aluno falar com você.');
       setTimeout(() => {
-        console.log('[VoiceChat] Moment dismissed, resuming video');
+        logger.debug('[VoiceChat] Moment dismissed, resuming video');
         resumeVideo();
         setAgentMode('playing');
         setIsVideoExpanded(true);
@@ -883,7 +884,7 @@ INSTRUÇÕES:
         // Keep connection alive for voice interaction during video
       }, 1500);
     } else {
-      console.log('[VoiceChat] Moment dismissed (not connected), resuming video directly');
+      logger.debug('[VoiceChat] Moment dismissed (not connected), resuming video directly');
       resumeVideo();
       setAgentMode('playing');
       setIsVideoExpanded(true);
@@ -1156,7 +1157,7 @@ INSTRUÇÕES:
                     variant="outline"
                     className="h-6 px-2 text-xs"
                     onClick={() => {
-                      console.log('[Debug] Manual play test');
+                      logger.debug('[Debug] Manual play test');
                       toast.info('Testando Play...');
                       videoPlayerRef.current?.play();
                       setDebugInfo(prev => ({ ...prev, lastAction: 'MANUAL play @ ' + new Date().toLocaleTimeString() }));
@@ -1169,7 +1170,7 @@ INSTRUÇÕES:
                     variant="outline"
                     className="h-6 px-2 text-xs"
                     onClick={() => {
-                      console.log('[Debug] Manual pause test');
+                      logger.debug('[Debug] Manual pause test');
                       toast.info('Testando Pause...');
                       videoPlayerRef.current?.pause();
                       setDebugInfo(prev => ({ ...prev, lastAction: 'MANUAL pause @ ' + new Date().toLocaleTimeString() }));
@@ -1182,7 +1183,7 @@ INSTRUÇÕES:
                     variant="outline"
                     className="h-6 px-2 text-xs"
                     onClick={() => {
-                      console.log('[Debug] Manual restart test');
+                      logger.debug('[Debug] Manual restart test');
                       toast.info('Testando Restart...');
                       videoPlayerRef.current?.restart();
                       setDebugInfo(prev => ({ ...prev, lastAction: 'MANUAL restart @ ' + new Date().toLocaleTimeString() }));

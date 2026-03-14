@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 
 function escapeSQL(val: unknown): string {
   if (val === null || val === undefined) return "NULL";
@@ -22,7 +18,8 @@ function toInsert(table: string, rows: Record<string, unknown>[]): string {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsResp = handleCors(req);
+  if (corsResp) return corsResp;
 
   try {
     const adminPassword = Deno.env.get("ADMIN_PASSWORD");

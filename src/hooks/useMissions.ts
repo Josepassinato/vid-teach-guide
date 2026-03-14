@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export interface Mission {
   id: string;
@@ -113,7 +114,7 @@ export function useMissions(studentId: string) {
       setMissions(parsedMissions);
       return parsedMissions;
     } catch (error) {
-      console.error('[useMissions] Failed to load missions:', error);
+      logger.error('[useMissions] Failed to load missions:', error);
       toast.error('Erro ao carregar missões');
       return [];
     } finally {
@@ -155,7 +156,7 @@ export function useMissions(studentId: string) {
       setSubmissions(parsedSubmissions);
       return parsedSubmissions;
     } catch (error) {
-      console.error('[useMissions] Failed to load submissions:', error);
+      logger.error('[useMissions] Failed to load submissions:', error);
       return [];
     }
   }, [studentId]);
@@ -184,7 +185,7 @@ export function useMissions(studentId: string) {
 
       return data;
     } catch (error) {
-      console.error('[useMissions] Failed to load achievements:', error);
+      logger.error('[useMissions] Failed to load achievements:', error);
       return null;
     }
   }, [studentId]);
@@ -311,7 +312,7 @@ export function useMissions(studentId: string) {
       return { success: true, feedback: feedbackResult };
 
     } catch (error) {
-      console.error('[useMissions] Submission failed:', error);
+      logger.error('[useMissions] Submission failed:', error);
       toast.error('Erro ao processar submissão');
       return { success: false };
     } finally {

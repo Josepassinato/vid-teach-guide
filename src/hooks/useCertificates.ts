@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 interface Certificate {
   id: string;
@@ -41,7 +42,7 @@ export function useCertificates(studentId: string) {
       if (error) throw error;
       setCertificates((data || []) as Certificate[]);
     } catch (error) {
-      console.error('[Certificates] Error fetching:', error);
+      logger.error('[Certificates] Error fetching:', error);
     } finally {
       setIsLoading(false);
     }
@@ -66,7 +67,7 @@ export function useCertificates(studentId: string) {
         isNew: data.message === 'Certificate created successfully',
       };
     } catch (error) {
-      console.error('[Certificates] Error generating:', error);
+      logger.error('[Certificates] Error generating:', error);
       throw error;
     } finally {
       setIsGenerating(false);
@@ -133,7 +134,7 @@ export function useCertificates(studentId: string) {
         img.src = url;
       }
     } catch (error) {
-      console.error('[Certificates] Error downloading:', error);
+      logger.error('[Certificates] Error downloading:', error);
       throw error;
     }
   }, []);

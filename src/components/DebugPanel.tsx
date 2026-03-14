@@ -59,7 +59,7 @@ export const DebugPanel: React.FC = () => {
       info: console.info,
     };
 
-    // Override console methods
+    // Override console methods to capture logs in the debug panel
     console.log = (...args: unknown[]) => {
       originalConsole.current?.log.apply(console, args);
       addLog('log', args);
@@ -190,7 +190,7 @@ export const DebugPanel: React.FC = () => {
           </Button>
         </div>
       </CardHeader>
-      
+
       {!isMinimized && (
         <CardContent className="p-0">
           <ScrollArea className="h-[300px]" ref={scrollRef}>

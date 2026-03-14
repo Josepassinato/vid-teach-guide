@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit, Target, Star, Clock, FileText, Code, Link as LinkIcon, Image, Save, X, Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface Mission {
   id: string;
@@ -99,7 +100,7 @@ export function MissionsAdmin() {
 
       setMissions(parsed);
     } catch (error) {
-      console.error('Failed to load missions:', error);
+      logger.error('Failed to load missions:', error);
       toast.error('Erro ao carregar missões');
     } finally {
       setIsLoading(false);
@@ -116,7 +117,7 @@ export function MissionsAdmin() {
       if (error) throw error;
       setVideos(data || []);
     } catch (error) {
-      console.error('Failed to load videos:', error);
+      logger.error('Failed to load videos:', error);
     }
   }, []);
 
@@ -212,7 +213,7 @@ export function MissionsAdmin() {
       resetForm();
       loadMissions();
     } catch (error) {
-      console.error('Failed to save mission:', error);
+      logger.error('Failed to save mission:', error);
       toast.error('Erro ao salvar missão');
     } finally {
       setIsSaving(false);
@@ -230,7 +231,7 @@ export function MissionsAdmin() {
       toast.success('Missão excluída');
       loadMissions();
     } catch (error) {
-      console.error('Failed to delete mission:', error);
+      logger.error('Failed to delete mission:', error);
       toast.error('Erro ao excluir missão');
     }
   };
@@ -249,7 +250,7 @@ export function MissionsAdmin() {
       ));
       toast.success(mission.is_active ? 'Missão desativada' : 'Missão ativada');
     } catch (error) {
-      console.error('Failed to toggle mission:', error);
+      logger.error('Failed to toggle mission:', error);
       toast.error('Erro ao alterar status');
     }
   };

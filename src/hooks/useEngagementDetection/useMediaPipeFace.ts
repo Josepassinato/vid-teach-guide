@@ -2,6 +2,7 @@
 // Uses CDN-loaded MediaPipe for browser-based computer vision
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { logger } from '@/lib/logger';
 
 // Landmark indices for eye tracking (from MediaPipe Face Mesh)
 // https://github.com/google/mediapipe/blob/master/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
@@ -104,12 +105,12 @@ export function useMediaPipeFace(options: UseMediaPipeFaceOptions = {}) {
       }
 
       setIsLoaded(true);
-      console.log('[MediaPipeFace] Loaded successfully');
+      logger.debug('[MediaPipeFace] Loaded successfully');
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load MediaPipe';
       setError(message);
-      console.error('[MediaPipeFace] Load error:', err);
+      logger.error('[MediaPipeFace] Load error:', err);
       return false;
     }
   }, [isLoaded]);
@@ -177,7 +178,7 @@ export function useMediaPipeFace(options: UseMediaPipeFaceOptions = {}) {
 
       return { direction, isOnScreen };
     } catch (err) {
-      console.warn('[MediaPipeFace] Gaze analysis error:', err);
+      logger.warn('[MediaPipeFace] Gaze analysis error:', err);
       return { direction: 'unknown' as const, isOnScreen: false };
     }
   }, []);
@@ -326,7 +327,7 @@ export function useMediaPipeFace(options: UseMediaPipeFaceOptions = {}) {
         try {
           await faceMeshRef.current.send({ image: videoRef.current });
         } catch (err) {
-          console.warn('[MediaPipeFace] Detection error:', err);
+          logger.warn('[MediaPipeFace] Detection error:', err);
         }
         
         frameIdRef.current = window.setTimeout(detectFrame, detectionIntervalMs);
@@ -334,12 +335,12 @@ export function useMediaPipeFace(options: UseMediaPipeFaceOptions = {}) {
 
       detectFrame();
       setIsRunning(true);
-      console.log('[MediaPipeFace] Started');
+      logger.debug('[MediaPipeFace] Started');
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start face detection';
       setError(message);
-      console.error('[MediaPipeFace] Start error:', err);
+      logger.error('[MediaPipeFace] Start error:', err);
       return false;
     }
   }, [isRunning, loadMediaPipe, processResults, detectionIntervalMs]);
@@ -364,7 +365,7 @@ export function useMediaPipeFace(options: UseMediaPipeFaceOptions = {}) {
     blinkCounterRef.current = 0;
     blinkTotalRef.current = 0;
     
-    console.log('[MediaPipeFace] Stopped');
+    logger.debug('[MediaPipeFace] Stopped');
   }, []);
 
   // Get blink rate (blinks per minute)

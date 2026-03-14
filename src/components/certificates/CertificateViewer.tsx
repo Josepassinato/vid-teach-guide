@@ -1,9 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { X, Download, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+/**
+ * Sanitize SVG string to prevent XSS.
+ * Only allows known safe SVG elements and attributes.
+ */
+function sanitizeSvg(raw: string): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(raw, 'image/svg+xml');
+
+  // If parsing failed, return empty
+  const parseError = doc.querySelector('parsererror');
+  if (parseError) return '';
+
+  const ALLOWED_TAGS = new Set([
+    'svg', 'g', 'defs', 'linearGradient', 'radialGradient', 'stop',
+    'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path',
+    'text', 'tspan', 'textPath', 'clipPath', 'mask', 'use', 'symbol',
+    'marker', 'pattern', 'image', 'title', 'desc',
+  ]);
+
+  const DANGEROUS_ATTRS = /^on|^xlink:href$|^href$/i;
+  const SAFE_HREF_PATTERN = /^#/; // only allow internal fragment references
+
+  function walk(node: Element) {
+    const children = Array.from(node.children);
+    for (const child of children) {
+      const tag = child.tagName.toLowerCase();
+      if (tag === 'script' || tag === 'foreignobject' || !ALLOWED_TAGS.has(tag)) {
+        child.remove();
+        continue;
+      }
+      // Remove dangerous attributes
+      for (const attr of Array.from(child.attributes)) {
+        if (DANGEROUS_ATTRS.test(attr.name)) {
+          // Allow href only if it points to an internal fragment
+          if ((attr.name === 'href' || attr.name === 'xlink:href') && SAFE_HREF_PATTERN.test(attr.value)) {
+            continue;
+          }
+          child.removeAttribute(attr.name);
+        }
+      }
+      walk(child);
+    }
+  }
+
+  const svg = doc.documentElement;
+  walk(svg);
+  return new XMLSerializer().serializeToString(svg);
+}
 
 interface Certificate {
   id: string;
@@ -50,6 +99,9 @@ export function CertificateViewer({ certificate, onClose, onDownload }: Certific
 
     fetchSvg();
   }, [certificate]);
+
+  // Sanitize SVG before rendering to prevent XSS
+  const safeSvg = useMemo(() => (svg ? sanitizeSvg(svg) : null), [svg]);
 
   const handleShare = async () => {
     const shareText = `🎓 Certificado Vibe Class\n\nCódigo: ${certificate.certificate_code}\nAluno: ${certificate.student_name}`;
@@ -106,10 +158,10 @@ export function CertificateViewer({ certificate, onClose, onDownload }: Certific
         <div className="p-4 bg-muted/50 flex items-center justify-center min-h-[400px]">
           {isLoading ? (
             <div className="animate-pulse bg-muted rounded-lg w-full max-w-2xl aspect-[4/3]" />
-          ) : svg ? (
-            <div 
+          ) : safeSvg ? (
+            <div
               className="w-full max-w-2xl rounded-lg overflow-hidden shadow-lg"
-              dangerouslySetInnerHTML={{ __html: svg }}
+              dangerouslySetInnerHTML={{ __html: safeSvg }}
             />
           ) : (
             <p className="text-muted-foreground">Erro ao carregar certificado</p>

@@ -1,17 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 
 /**
  * AGENTE DE CONQUISTAS E GAMIFICAÇÃO
- * 
+ *
  * Especialista em calcular pontos, níveis, streaks e badges.
  * Gerencia todo o sistema de gamificação do estudante.
  */
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 interface AchievementRequest {
   studentId: string;
@@ -132,9 +128,8 @@ function calculateLevel(totalPoints: number): number {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResp = handleCors(req);
+  if (corsResp) return corsResp;
 
   try {
     const request: AchievementRequest = await req.json();

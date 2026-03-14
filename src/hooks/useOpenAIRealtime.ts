@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoControls } from '@/types/video';
+import { logger } from '@/lib/logger';
 
 export type { VideoControls };
 
@@ -76,20 +77,20 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
       silenceTimeoutRef.current = null;
-      console.log('[SILENCE] Timer cancelado');
+      logger.debug('[SILENCE] Timer cancelado');
     }
   }, []);
 
   // Send proactive message to encourage student
   const sendProactivePrompt = useCallback(() => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.log('[SILENCE] WebSocket não conectado, ignorando prompt proativo');
+      logger.debug('[SILENCE] WebSocket não conectado, ignorando prompt proativo');
       return;
     }
     
     // Don't interrupt if agent is speaking
     if (isPlayingRef.current || audioQueueRef.current.length > 0) {
-      console.log('[SILENCE] Agente ainda falando, adiando prompt proativo');
+      logger.debug('[SILENCE] Agente ainda falando, adiando prompt proativo');
       // Retry in 1 second
       silenceTimeoutRef.current = setTimeout(sendProactivePrompt, 1000);
       return;
@@ -98,8 +99,8 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     const prompt = PROACTIVE_PROMPTS[proactivePromptIndexRef.current % PROACTIVE_PROMPTS.length];
     proactivePromptIndexRef.current++;
     
-    console.log('[SILENCE] ⏰ 3 segundos sem resposta - Professor tomando iniciativa!');
-    console.log('[SILENCE] Enviando prompt proativo:', prompt);
+    logger.debug('[SILENCE] ⏰ 3 segundos sem resposta - Professor tomando iniciativa!');
+    logger.debug('[SILENCE] Enviando prompt proativo:', prompt);
     
     // Send a system-like message to prompt the agent to speak
     wsRef.current.send(JSON.stringify({
@@ -124,22 +125,22 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const startSilenceTimeout = useCallback(() => {
     // Only start silence timer if video is paused - student won't talk while watching
     if (videoControlsRef.current && !videoControlsRef.current.isPaused()) {
-      console.log('[SILENCE] Video está rodando, não inicia timer de silêncio');
+      logger.debug('[SILENCE] Video está rodando, não inicia timer de silêncio');
       return;
     }
     
     clearSilenceTimeout();
     
-    console.log('[SILENCE] Video pausado - Iniciando timer de', SILENCE_TIMEOUT_MS / 1000, 'segundos');
+    logger.debug('[SILENCE] Video pausado - Iniciando timer de', SILENCE_TIMEOUT_MS / 1000, 'segundos');
     lastAgentSpeechEndRef.current = Date.now();
     
     silenceTimeoutRef.current = setTimeout(() => {
       // Double-check video is still paused before prompting
       if (videoControlsRef.current && !videoControlsRef.current.isPaused()) {
-        console.log('[SILENCE] Timer expirou mas video voltou a rodar, ignorando');
+        logger.debug('[SILENCE] Timer expirou mas video voltou a rodar, ignorando');
         return;
       }
-      console.log('[SILENCE] ⏰ Timer expirou! Aluno não respondeu em', SILENCE_TIMEOUT_MS / 1000, 'segundos');
+      logger.debug('[SILENCE] ⏰ Timer expirou! Aluno não respondeu em', SILENCE_TIMEOUT_MS / 1000, 'segundos');
       sendProactivePrompt();
     }, SILENCE_TIMEOUT_MS);
   }, [clearSilenceTimeout, sendProactivePrompt]);
@@ -255,34 +256,34 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   }, []);
 
   const connect = useCallback(async () => {
-    console.log('🔌 [OPENAI CONNECT] Iniciando conexão...');
-    console.log('🔌 [OPENAI CONNECT] Status atual antes de conectar:', status);
+    logger.debug('🔌 [OPENAI CONNECT] Iniciando conexão...');
+    logger.debug('🔌 [OPENAI CONNECT] Status atual antes de conectar:', status);
     
     try {
       updateStatus('connecting');
       optionsRef.current.onConnectionStepChange?.('fetching_key');
-      console.log('🔌 [OPENAI CONNECT] Status atualizado para: connecting');
+      logger.debug('🔌 [OPENAI CONNECT] Status atualizado para: connecting');
       
       const currentOptions = optionsRef.current;
       
       // Get API key from edge function
-      console.log('🔌 [OPENAI CONNECT] Buscando API key...');
+      logger.debug('🔌 [OPENAI CONNECT] Buscando API key...');
       const { data, error } = await supabase.functions.invoke('openai-realtime-token', {
         body: { systemInstruction: currentOptions.systemInstruction }
       });
       
       if (error || !data?.apiKey) {
-        console.error('🔌 [OPENAI CONNECT] ❌ Erro ao buscar API key:', error);
+        logger.error('🔌 [OPENAI CONNECT] ❌ Erro ao buscar API key:', error);
         optionsRef.current.onConnectionStepChange?.('idle');
         throw new Error(error?.message || 'Failed to get API key');
       }
       
-      console.log('🔌 [OPENAI CONNECT] ✅ API key obtida, conectando WebSocket...');
+      logger.debug('🔌 [OPENAI CONNECT] ✅ API key obtida, conectando WebSocket...');
       optionsRef.current.onConnectionStepChange?.('connecting_ws');
       
       // Connect to OpenAI Realtime API
       const wsUrl = `wss://api.openai.com/v1/realtime?model=${data.model}`;
-      console.log('🔌 [OPENAI CONNECT] URL:', wsUrl);
+      logger.debug('🔌 [OPENAI CONNECT] URL:', wsUrl);
       
       const ws = new WebSocket(wsUrl, [
         "realtime",
@@ -290,12 +291,12 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         "openai-beta.realtime-v1"
       ]);
       wsRef.current = ws;
-      console.log('🔌 [OPENAI CONNECT] WebSocket criado');
+      logger.debug('🔌 [OPENAI CONNECT] WebSocket criado');
 
       // Connection timeout - 15 seconds
       const connectionTimeout = setTimeout(() => {
         if (wsRef.current?.readyState !== WebSocket.OPEN) {
-          console.error('🔌 [OPENAI CONNECT] ❌ Connection timeout after 15s');
+          logger.error('🔌 [OPENAI CONNECT] ❌ Connection timeout after 15s');
           wsRef.current?.close();
           updateStatus('error');
           optionsRef.current.onConnectionStepChange?.('idle');
@@ -305,7 +306,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
       ws.onopen = () => {
         clearTimeout(connectionTimeout);
-        console.log('WebSocket connected to OpenAI');
+        logger.debug('WebSocket connected to OpenAI');
         processedCallIdsRef.current.clear();
         optionsRef.current.onConnectionStepChange?.('configuring');
         
@@ -434,7 +435,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
           // Lightweight debug to confirm which event types we are receiving
           if (typeof data?.type === 'string') {
-            console.log('[realtime:event]', data.type);
+            logger.debug('[realtime:event]', data.type);
           }
 
           // Handle audio response
@@ -449,14 +450,14 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
           // Handle user transcript
           if (data.type === "conversation.item.input_audio_transcription.completed" && data.transcript) {
-            console.log('[SILENCE] Aluno falou! Cancelando timer de silêncio');
+            logger.debug('[SILENCE] Aluno falou! Cancelando timer de silêncio');
             clearSilenceTimeout();
             optionsRef.current.onTranscript?.(data.transcript, 'user');
           }
           
           // Also cancel silence timeout when user starts speaking (speech detected)
           if (data.type === "input_audio_buffer.speech_started") {
-            console.log('[SILENCE] Aluno começou a falar! Cancelando timer de silêncio');
+            logger.debug('[SILENCE] Aluno começou a falar! Cancelando timer de silêncio');
             clearSilenceTimeout();
           }
 
@@ -466,10 +467,10 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
               const checkSpeech = () => {
                 const queueLength = audioQueueRef.current.length;
                 const isPlaying = isPlayingRef.current;
-                console.log('[OPENAI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
+                logger.debug('[OPENAI] Aguardando fala terminar - queue:', queueLength, 'isPlaying:', isPlaying);
                 
                 if (queueLength === 0 && !isPlaying) {
-                  console.log('[OPENAI] Fala terminou, aguardando 2 segundos...');
+                  logger.debug('[OPENAI] Fala terminou, aguardando 2 segundos...');
                   // 2 second buffer after speech ends
                   setTimeout(resolve, 2000);
                 } else {
@@ -482,44 +483,44 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
           const runFunctionCall = async (name: string, callId: string, argsJson?: string) => {
             // Detailed debug logging
-            console.log('='.repeat(60));
-            console.log('[OPENAI TOOL CALL] Recebido');
-            console.log('[OPENAI TOOL CALL] Funcao:', name);
-            console.log('[OPENAI TOOL CALL] Call ID:', callId);
-            console.log('[OPENAI TOOL CALL] Args JSON:', argsJson);
-            console.log('[OPENAI TOOL CALL] Audio Queue:', audioQueueRef.current.length, 'isPlaying:', isPlayingRef.current);
+            logger.debug('='.repeat(60));
+            logger.debug('[OPENAI TOOL CALL] Recebido');
+            logger.debug('[OPENAI TOOL CALL] Funcao:', name);
+            logger.debug('[OPENAI TOOL CALL] Call ID:', callId);
+            logger.debug('[OPENAI TOOL CALL] Args JSON:', argsJson);
+            logger.debug('[OPENAI TOOL CALL] Audio Queue:', audioQueueRef.current.length, 'isPlaying:', isPlayingRef.current);
             
             if (!callId) {
-              console.error('[OPENAI TOOL CALL] ERRO: callId esta vazio/undefined');
-              console.log('='.repeat(60));
+              logger.error('[OPENAI TOOL CALL] ERRO: callId esta vazio/undefined');
+              logger.debug('='.repeat(60));
               return;
             }
             
             if (processedCallIdsRef.current.has(callId)) {
-              console.log('[OPENAI TOOL CALL] IGNORADO - Call ID ja processado:', callId);
-              console.log('='.repeat(60));
+              logger.debug('[OPENAI TOOL CALL] IGNORADO - Call ID ja processado:', callId);
+              logger.debug('='.repeat(60));
               return;
             }
             processedCallIdsRef.current.add(callId);
-            console.log('[OPENAI TOOL CALL] Call ID adicionado ao set de processados');
+            logger.debug('[OPENAI TOOL CALL] Call ID adicionado ao set de processados');
 
-            let args: any = {};
+            let args: Record<string, unknown> = {};
             try {
               args = argsJson ? JSON.parse(argsJson) : {};
-              console.log('[OPENAI TOOL CALL] Args parseados:', JSON.stringify(args, null, 2));
+              logger.debug('[OPENAI TOOL CALL] Args parseados:', JSON.stringify(args, null, 2));
             } catch (e) {
-              console.warn('[OPENAI TOOL CALL] Erro ao parsear args, usando {}:', e);
+              logger.warn('[OPENAI TOOL CALL] Erro ao parsear args, usando {}:', e);
               args = {};
             }
 
-            console.log('[OPENAI TOOL CALL] Video Controls:', videoControlsRef.current ? 'DISPONIVEL' : 'INDISPONIVEL');
+            logger.debug('[OPENAI TOOL CALL] Video Controls:', videoControlsRef.current ? 'DISPONIVEL' : 'INDISPONIVEL');
             
             if (videoControlsRef.current) {
-              console.log('[OPENAI TOOL CALL] Video Status - isPaused:', videoControlsRef.current.isPaused());
-              console.log('[OPENAI TOOL CALL] Video Status - currentTime:', videoControlsRef.current.getCurrentTime());
+              logger.debug('[OPENAI TOOL CALL] Video Status - isPaused:', videoControlsRef.current.isPaused());
+              logger.debug('[OPENAI TOOL CALL] Video Status - currentTime:', videoControlsRef.current.getCurrentTime());
             }
 
-            let result: any = { ok: true };
+            let result: { ok: boolean; message?: string } = { ok: true };
 
             if (videoControlsRef.current) {
               const beforePaused = videoControlsRef.current.isPaused();
@@ -527,18 +528,18 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
               
               switch (name) {
                 case "play_video":
-                  console.log('[OPENAI TOOL CALL] EXECUTANDO: play_video');
-                  console.log('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
-                  console.log('[OPENAI TOOL CALL] Aguardando agente terminar de falar antes de dar play...');
+                  logger.debug('[OPENAI TOOL CALL] EXECUTANDO: play_video');
+                  logger.debug('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
+                  logger.debug('[OPENAI TOOL CALL] Aguardando agente terminar de falar antes de dar play...');
                   toast.info('Aguardando professor terminar de falar...', { duration: 2000 });
                   await waitForSpeechToEnd();
-                  console.log('[OPENAI TOOL CALL] Agente terminou de falar, dando play agora!');
+                  logger.debug('[OPENAI TOOL CALL] Agente terminou de falar, dando play agora!');
                   toast.success('Dando play no video...', { duration: 2000 });
                   videoControlsRef.current.play();
                   // Verify play actually worked with retry
                   await new Promise(r => setTimeout(r, 500));
                   if (videoControlsRef.current?.isPaused()) {
-                    console.log('[OPENAI TOOL CALL] Play falhou, tentando novamente...');
+                    logger.debug('[OPENAI TOOL CALL] Play falhou, tentando novamente...');
                     videoControlsRef.current.play();
                     await new Promise(r => setTimeout(r, 800));
                     const stillPaused = videoControlsRef.current?.isPaused();
@@ -548,25 +549,25 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                   } else {
                     result = { ok: true, message: "Video iniciado" };
                   }
-                  console.log('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
+                  logger.debug('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
                   break;
                 case "pause_video":
-                  console.log('[OPENAI TOOL CALL] EXECUTANDO: pause_video');
-                  console.log('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
+                  logger.debug('[OPENAI TOOL CALL] EXECUTANDO: pause_video');
+                  logger.debug('[OPENAI TOOL CALL] Estado antes: isPaused =', beforePaused);
                   toast.success('Pausando video...', { duration: 2000 });
                   videoControlsRef.current.pause();
                   setTimeout(() => {
-                    console.log('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
+                    logger.debug('[OPENAI TOOL CALL] Estado depois: isPaused =', videoControlsRef.current?.isPaused());
                   }, 100);
                   result = { ok: true, message: "Video pausado" };
                   break;
                 case "restart_video":
-                  console.log('[OPENAI TOOL CALL] EXECUTANDO: restart_video');
-                  console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime);
-                  console.log('[OPENAI TOOL CALL] Aguardando agente terminar de falar antes de reiniciar...');
+                  logger.debug('[OPENAI TOOL CALL] EXECUTANDO: restart_video');
+                  logger.debug('[OPENAI TOOL CALL] Tempo antes:', beforeTime);
+                  logger.debug('[OPENAI TOOL CALL] Aguardando agente terminar de falar antes de reiniciar...');
                   toast.info('Aguardando professor terminar de falar...', { duration: 2000 });
                   await waitForSpeechToEnd();
-                  console.log('[OPENAI TOOL CALL] Agente terminou de falar, reiniciando agora!');
+                  logger.debug('[OPENAI TOOL CALL] Agente terminou de falar, reiniciando agora!');
                   toast.success('Reiniciando video...', { duration: 2000 });
                   videoControlsRef.current.restart();
                   // Verify restart worked
@@ -581,53 +582,53 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                   } else {
                     result = { ok: true, message: "Video reiniciado" };
                   }
-                  console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+                  logger.debug('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
                   break;
                 case "seek_video":
                   const targetSeconds = Number(args.seconds) || 0;
-                  console.log('[OPENAI TOOL CALL] EXECUTANDO: seek_video');
-                  console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Destino:', targetSeconds);
+                  logger.debug('[OPENAI TOOL CALL] EXECUTANDO: seek_video');
+                  logger.debug('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Destino:', targetSeconds);
                   toast.success(`Pulando para ${targetSeconds}s...`, { duration: 2000 });
                   videoControlsRef.current.seekTo(targetSeconds);
                   setTimeout(() => {
-                    console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+                    logger.debug('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
                   }, 100);
                   result = { ok: true, message: `Video pulou para ${targetSeconds} segundos` };
                   break;
                 case "seek_backward":
                   const backwardSeconds = Number(args.seconds) || 10;
                   const newTimeBack = Math.max(0, beforeTime - backwardSeconds);
-                  console.log('[OPENAI TOOL CALL] EXECUTANDO: seek_backward');
-                  console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Voltando:', backwardSeconds, 's -> Novo tempo:', newTimeBack);
+                  logger.debug('[OPENAI TOOL CALL] EXECUTANDO: seek_backward');
+                  logger.debug('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Voltando:', backwardSeconds, 's -> Novo tempo:', newTimeBack);
                   toast.success(`Voltando ${backwardSeconds} segundos...`, { duration: 2000 });
                   videoControlsRef.current.seekTo(newTimeBack);
                   setTimeout(() => {
-                    console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+                    logger.debug('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
                   }, 100);
                   result = { ok: true, message: `Video voltou ${backwardSeconds} segundos para ${newTimeBack}s` };
                   break;
                 case "seek_forward":
                   const forwardSeconds = Number(args.seconds) || 10;
                   const newTimeForward = beforeTime + forwardSeconds;
-                  console.log('[OPENAI TOOL CALL] EXECUTANDO: seek_forward');
-                  console.log('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Avancando:', forwardSeconds, 's -> Novo tempo:', newTimeForward);
+                  logger.debug('[OPENAI TOOL CALL] EXECUTANDO: seek_forward');
+                  logger.debug('[OPENAI TOOL CALL] Tempo antes:', beforeTime, '-> Avancando:', forwardSeconds, 's -> Novo tempo:', newTimeForward);
                   toast.success(`Avançando ${forwardSeconds} segundos...`, { duration: 2000 });
                   videoControlsRef.current.seekTo(newTimeForward);
                   setTimeout(() => {
-                    console.log('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
+                    logger.debug('[OPENAI TOOL CALL] Tempo depois:', videoControlsRef.current?.getCurrentTime());
                   }, 100);
                   result = { ok: true, message: `Video avancou ${forwardSeconds} segundos para ${newTimeForward}s` };
                   break;
                 default:
-                  console.warn('[OPENAI TOOL CALL] ERRO: Funcao desconhecida:', name);
+                  logger.warn('[OPENAI TOOL CALL] ERRO: Funcao desconhecida:', name);
                   result = { ok: false, message: `Funcao desconhecida: ${name}` };
               }
             } 
             // Handle memory functions (don't require video controls)
             else if (name === "save_student_name") {
               const studentName = args.name as string;
-              console.log('[OPENAI TOOL CALL] EXECUTANDO: save_student_name');
-              console.log('[OPENAI TOOL CALL] Nome do aluno:', studentName);
+              logger.debug('[OPENAI TOOL CALL] EXECUTANDO: save_student_name');
+              logger.debug('[OPENAI TOOL CALL] Nome do aluno:', studentName);
               if (studentName && optionsRef.current.onSaveStudentName) {
                 optionsRef.current.onSaveStudentName(studentName);
                 toast.success(`Nome salvo: ${studentName}`, { duration: 2000 });
@@ -639,8 +640,8 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             else if (name === "save_emotional_observation") {
               const emotion = args.emotion as string;
               const context = args.context as string;
-              console.log('[OPENAI TOOL CALL] EXECUTANDO: save_emotional_observation');
-              console.log('[OPENAI TOOL CALL] Emocao:', emotion, 'Contexto:', context);
+              logger.debug('[OPENAI TOOL CALL] EXECUTANDO: save_emotional_observation');
+              logger.debug('[OPENAI TOOL CALL] Emocao:', emotion, 'Contexto:', context);
               if (emotion && context && optionsRef.current.onSaveEmotionalObservation) {
                 optionsRef.current.onSaveEmotionalObservation(emotion, context);
                 result = { ok: true, message: `Observacao emocional registrada: ${emotion}` };
@@ -649,13 +650,13 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
               }
             }
             else {
-              console.error('[OPENAI TOOL CALL] ERRO: videoControlsRef.current e NULL para funcao de video');
-              console.error('[OPENAI TOOL CALL] Nao foi possivel executar:', name);
+              logger.error('[OPENAI TOOL CALL] ERRO: videoControlsRef.current e NULL para funcao de video');
+              logger.error('[OPENAI TOOL CALL] Nao foi possivel executar:', name);
               toast.error('Nenhum video carregado');
               result = { ok: false, message: "Nenhum video carregado" };
             }
 
-            console.log('[OPENAI TOOL CALL] Resultado:', JSON.stringify(result));
+            logger.debug('[OPENAI TOOL CALL] Resultado:', JSON.stringify(result));
 
             // Provide function call output back to the model
             const outputMessage = {
@@ -666,25 +667,25 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 output: JSON.stringify(result),
               },
             };
-            console.log('[OPENAI TOOL CALL] Enviando output:', JSON.stringify(outputMessage, null, 2));
+            logger.debug('[OPENAI TOOL CALL] Enviando output:', JSON.stringify(outputMessage, null, 2));
             ws.send(JSON.stringify(outputMessage));
 
             // Request a response after function call
-            console.log('[OPENAI TOOL CALL] Solicitando response.create');
+            logger.debug('[OPENAI TOOL CALL] Solicitando response.create');
             ws.send(JSON.stringify({ type: "response.create" }));
-            console.log('[OPENAI TOOL CALL] Resposta enviada com sucesso');
-            console.log('='.repeat(60));
+            logger.debug('[OPENAI TOOL CALL] Resposta enviada com sucesso');
+            logger.debug('='.repeat(60));
           };
 
-          const tryHandleFunctionCallItem = async (item: any, source: string) => {
+          const tryHandleFunctionCallItem = async (item: Record<string, unknown> | undefined, source: string) => {
             if (!item) return;
-            console.log(`[OPENAI EVENT] tryHandleFunctionCallItem de ${source}:`, item?.type);
+            logger.debug(`[OPENAI EVENT] tryHandleFunctionCallItem de ${source}:`, item?.type);
             
             // Shapes we may see:
             // - { type:'function_call', name, call_id, arguments }
             // - { type:'function_call', function:{ name, arguments }, call_id }
             if (item.type !== 'function_call') {
-              console.log(`[OPENAI EVENT] Item ignorado - tipo ${item.type} != 'function_call'`);
+              logger.debug(`[OPENAI EVENT] Item ignorado - tipo ${item.type} != 'function_call'`);
               return;
             }
 
@@ -692,55 +693,55 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             const callId = item.call_id ?? item.callId;
             const args = item.arguments ?? item.function?.arguments;
 
-            console.log(`[OPENAI EVENT] Extraido de ${source}: name=${name}, callId=${callId}, args=${args}`);
+            logger.debug(`[OPENAI EVENT] Extraido de ${source}: name=${name}, callId=${callId}, args=${args}`);
 
             if (typeof name === 'string' && typeof callId === 'string') {
-              console.log(`[OPENAI EVENT] Chamando runFunctionCall de ${source}`);
+              logger.debug(`[OPENAI EVENT] Chamando runFunctionCall de ${source}`);
               await runFunctionCall(name, callId, args);
             } else {
-              console.warn(`[OPENAI EVENT] Dados invalidos de ${source}: name=${typeof name}, callId=${typeof callId}`);
+              logger.warn(`[OPENAI EVENT] Dados invalidos de ${source}: name=${typeof name}, callId=${typeof callId}`);
             }
           };
 
           // Function calls (standalone event)
           if (data.type === "response.function_call_arguments.done") {
-            console.log('[OPENAI EVENT] response.function_call_arguments.done detectado!');
-            console.log('[OPENAI EVENT] name:', data.name, 'call_id:', data.call_id);
+            logger.debug('[OPENAI EVENT] response.function_call_arguments.done detectado!');
+            logger.debug('[OPENAI EVENT] name:', data.name, 'call_id:', data.call_id);
             await runFunctionCall(data.name, data.call_id, data.arguments);
           }
 
           // Function calls delivered as output_item events (some SDK variants)
           if (data.type === "response.output_item.added" || data.type === "response.output_item.done") {
-            console.log('[OPENAI EVENT]', data.type, 'detectado!');
+            logger.debug('[OPENAI EVENT]', data.type, 'detectado!');
             await tryHandleFunctionCallItem(data.item, `${data.type}.item`);
             await tryHandleFunctionCallItem(data.output_item, `${data.type}.output_item`);
           }
 
           // Function calls delivered as conversation item events (another common variant)
           if (data.type === "conversation.item.created" || data.type === "conversation.item.updated") {
-            console.log('[OPENAI EVENT]', data.type, 'detectado!');
+            logger.debug('[OPENAI EVENT]', data.type, 'detectado!');
             await tryHandleFunctionCallItem(data.item, data.type);
           }
 
           // Canonical: embedded in response.done
           if (data.type === "response.done") {
-            console.log('[OPENAI EVENT] response.done detectado!');
+            logger.debug('[OPENAI EVENT] response.done detectado!');
             const outputs = data.response?.output;
             if (Array.isArray(outputs)) {
-              console.log('[OPENAI EVENT] Processando', outputs.length, 'outputs');
+              logger.debug('[OPENAI EVENT] Processando', outputs.length, 'outputs');
               for (const item of outputs) {
                 await tryHandleFunctionCallItem(item, 'response.done');
               }
             }
 
             // Don't clear audio here; let playback finish naturally to avoid cutting the last word
-            console.log('[OPENAI EVENT] Response done, audio queue length:', audioQueueRef.current.length);
+            logger.debug('[OPENAI EVENT] Response done, audio queue length:', audioQueueRef.current.length);
             
             // Start silence timeout when agent finishes speaking
             // Wait for audio to finish before starting the timer
             const checkAndStartSilenceTimer = () => {
               if (audioQueueRef.current.length === 0 && !isPlayingRef.current) {
-                console.log('[SILENCE] Agente terminou de falar, iniciando timer de silêncio');
+                logger.debug('[SILENCE] Agente terminou de falar, iniciando timer de silêncio');
                 startSilenceTimeout();
               } else {
                 setTimeout(checkAndStartSilenceTimer, 200);
@@ -751,37 +752,37 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
           // Handle errors
           if (data.type === "error") {
-            console.error('🚨 [OPENAI ERROR] Erro recebido do OpenAI:', data.error);
-            console.error('🚨 [OPENAI ERROR] Código:', data.error?.code);
-            console.error('🚨 [OPENAI ERROR] Mensagem:', data.error?.message);
-            console.error('🚨 [OPENAI ERROR] Detalhes:', JSON.stringify(data.error, null, 2));
+            logger.error('🚨 [OPENAI ERROR] Erro recebido do OpenAI:', data.error);
+            logger.error('🚨 [OPENAI ERROR] Código:', data.error?.code);
+            logger.error('🚨 [OPENAI ERROR] Mensagem:', data.error?.message);
+            logger.error('🚨 [OPENAI ERROR] Detalhes:', JSON.stringify(data.error, null, 2));
             optionsRef.current.onError?.(data.error?.message || 'Unknown error');
           }
           
           // Handle session created/updated
           if (data.type === "session.created" || data.type === "session.updated") {
-            console.log('🔌 [OPENAI SESSION]', data.type);
+            logger.debug('🔌 [OPENAI SESSION]', data.type);
           }
         } catch (e) {
-          console.error('🚨 [OPENAI ERROR] Erro ao processar mensagem:', e);
+          logger.error('🚨 [OPENAI ERROR] Erro ao processar mensagem:', e);
         }
       };
 
       
       ws.onerror = (error) => {
         clearTimeout(connectionTimeout);
-        console.error('🚨 [WEBSOCKET ERROR] Erro no WebSocket:', error);
-        console.error('🚨 [WEBSOCKET ERROR] Detalhes:', JSON.stringify(error, null, 2));
+        logger.error('🚨 [WEBSOCKET ERROR] Erro no WebSocket:', error);
+        logger.error('🚨 [WEBSOCKET ERROR] Detalhes:', JSON.stringify(error, null, 2));
         updateStatus('error');
         optionsRef.current.onError?.('Connection error');
       };
 
       ws.onclose = (event) => {
         clearTimeout(connectionTimeout);
-        console.log('🔌 [WEBSOCKET CLOSE] WebSocket fechado');
-        console.log('🔌 [WEBSOCKET CLOSE] Código:', event.code);
-        console.log('🔌 [WEBSOCKET CLOSE] Motivo:', event.reason || '(sem motivo)');
-        console.log('🔌 [WEBSOCKET CLOSE] wasClean:', event.wasClean);
+        logger.debug('🔌 [WEBSOCKET CLOSE] WebSocket fechado');
+        logger.debug('🔌 [WEBSOCKET CLOSE] Código:', event.code);
+        logger.debug('🔌 [WEBSOCKET CLOSE] Motivo:', event.reason || '(sem motivo)');
+        logger.debug('🔌 [WEBSOCKET CLOSE] wasClean:', event.wasClean);
         
         // Códigos comuns:
         // 1000 = fechamento normal
@@ -790,7 +791,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         // 1011 = unexpected condition
         // 4000+ = application-specific
         if (event.code !== 1000) {
-          console.warn('🚨 [WEBSOCKET CLOSE] Fechamento anormal! Código:', event.code);
+          logger.warn('🚨 [WEBSOCKET CLOSE] Fechamento anormal! Código:', event.code);
         }
         
         updateStatus('disconnected');
@@ -798,15 +799,15 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       };
       
     } catch (error) {
-      console.error('🚨 [OPENAI CONNECT] Erro na conexão:', error);
+      logger.error('🚨 [OPENAI CONNECT] Erro na conexão:', error);
       updateStatus('error');
       optionsRef.current.onError?.(error instanceof Error ? error.message : 'Connection failed');
     }
   }, [updateStatus, playAudioChunk, stopListening, startSilenceTimeout, clearSilenceTimeout]);
 
   const disconnect = useCallback(() => {
-    console.log('🔌 [OPENAI DISCONNECT] Desconectando manualmente...');
-    console.log('🔌 [OPENAI DISCONNECT] Stack trace:', new Error().stack);
+    logger.debug('🔌 [OPENAI DISCONNECT] Desconectando manualmente...');
+    logger.debug('🔌 [OPENAI DISCONNECT] Stack trace:', new Error().stack);
     
     // Clear silence timeout
     clearSilenceTimeout();
@@ -814,18 +815,18 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     stopListening();
     
     if (wsRef.current) {
-      console.log('🔌 [OPENAI DISCONNECT] Fechando WebSocket (readyState:', wsRef.current.readyState, ')');
+      logger.debug('🔌 [OPENAI DISCONNECT] Fechando WebSocket (readyState:', wsRef.current.readyState, ')');
       wsRef.current.close(1000, 'User disconnect');
       wsRef.current = null;
     } else {
-      console.log('🔌 [OPENAI DISCONNECT] WebSocket já era null');
+      logger.debug('🔌 [OPENAI DISCONNECT] WebSocket já era null');
     }
     
     audioQueueRef.current = [];
     isPlayingRef.current = false;
     setIsSpeaking(false);
     updateStatus('disconnected');
-    console.log('🔌 [OPENAI DISCONNECT] Desconexão completa');
+    logger.debug('🔌 [OPENAI DISCONNECT] Desconexão completa');
   }, [updateStatus, stopListening, clearSilenceTimeout]);
 
   const startListening = useCallback(async () => {
@@ -884,7 +885,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       setIsListening(true);
       
     } catch (error) {
-      console.error('Microphone error:', error);
+      logger.error('Microphone error:', error);
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
         toast.error('Permissão de microfone negada. O tutor precisa do microfone para conversar com você. Habilite nas configurações do navegador.', { duration: 8000 });
         optionsRef.current.onError?.('Microphone permission denied');

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
+import { logger } from '@/lib/logger';
 
 interface Profile {
   id: string;
@@ -38,7 +39,7 @@ export function useAuth(): UseAuthReturn {
       if (error) throw error;
       setProfile(data);
     } catch (error) {
-      console.error('[Auth] Error fetching profile:', error);
+      logger.error('[Auth] Error fetching profile:', error);
     }
   }, []);
 
@@ -47,7 +48,7 @@ export function useAuth(): UseAuthReturn {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        console.log('[Auth] State changed:', event);
+        logger.debug('[Auth] State changed:', event);
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
@@ -98,7 +99,7 @@ export function useAuth(): UseAuthReturn {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[Auth] Sign up error:', error);
+      logger.error('[Auth] Sign up error:', error);
       return { error: error as Error };
     }
   }, []);
@@ -114,7 +115,7 @@ export function useAuth(): UseAuthReturn {
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      console.error('[Auth] Sign in error:', error);
+      logger.error('[Auth] Sign in error:', error);
       return { error: error as Error };
     }
   }, []);
@@ -139,7 +140,7 @@ export function useAuth(): UseAuthReturn {
       setProfile(prev => prev ? { ...prev, ...updates } : null);
       return { error: null };
     } catch (error) {
-      console.error('[Auth] Update profile error:', error);
+      logger.error('[Auth] Update profile error:', error);
       return { error: error as Error };
     }
   }, [user]);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 interface LessonProgress {
   id: string;
@@ -102,7 +103,7 @@ export function useStudentProgress(options: UseStudentProgressOptions = {}) {
       setStats(newStats);
       optionsRef.current.onProgressUpdate?.(newStats);
     } catch (error) {
-      console.error('[StudentProgress] Error loading progress:', error);
+      logger.error('[StudentProgress] Error loading progress:', error);
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +147,7 @@ export function useStudentProgress(options: UseStudentProgressOptions = {}) {
       // Reload progress
       await loadProgress();
     } catch (error) {
-      console.error('[StudentProgress] Error marking lesson complete:', error);
+      logger.error('[StudentProgress] Error marking lesson complete:', error);
     }
   }, [studentId, progressMap, loadProgress]);
 
@@ -194,7 +195,7 @@ export function useStudentProgress(options: UseStudentProgressOptions = {}) {
         return newMap;
       });
     } catch (error) {
-      console.error('[StudentProgress] Error updating watch progress:', error);
+      logger.error('[StudentProgress] Error updating watch progress:', error);
     }
   }, [studentId, progressMap]);
 

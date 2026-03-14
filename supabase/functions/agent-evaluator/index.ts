@@ -1,16 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 
 /**
  * AGENTE AVALIADOR DE MISSÕES
- * 
+ *
  * Especialista em avaliar evidências de estudantes contra critérios de missões.
  * Retorna: aprovado, revisão necessária, ou rejeitado + score numérico.
  */
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 interface EvaluationRequest {
   missionTitle: string;
@@ -35,9 +31,8 @@ interface EvaluationResult {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResp = handleCors(req);
+  if (corsResp) return corsResp;
 
   try {
     const request: EvaluationRequest = await req.json();
