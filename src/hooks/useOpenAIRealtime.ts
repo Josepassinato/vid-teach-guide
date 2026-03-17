@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoControls } from '@/types/video';
 import { logger } from '@/lib/logger';
+import { useWebSocketReconnect, ReconnectStatus } from './useWebSocketReconnect';
 
 export type { VideoControls };
 
@@ -39,7 +40,8 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  
+  const [reconnectStatus, setReconnectStatus] = useState<ReconnectStatus>('idle');
+
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -66,6 +68,31 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   useEffect(() => {
     videoControlsRef.current = options.videoControls || null;
   }, [options.videoControls]);
+
+  // WebSocket reconnect with exponential backoff
+  const {
+    scheduleReconnect,
+    markManualDisconnect,
+    setReconnectFn,
+    reset: resetReconnect,
+    getReconnectStatus,
+  } = useWebSocketReconnect({
+    maxAttempts: 5,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    onReconnectAttempt: (attempt, max) => {
+      setReconnectStatus('reconnecting');
+      toast.info(`Reconectando ao tutor... (${attempt}/${max})`, { duration: 3000 });
+    },
+    onReconnected: () => {
+      setReconnectStatus('idle');
+      toast.success('Conexao com o tutor restaurada!', { duration: 3000 });
+    },
+    onReconnectFailed: () => {
+      setReconnectStatus('failed');
+      toast.error('Nao foi possivel reconectar ao tutor. Tente iniciar a aula novamente.', { duration: 8000 });
+    },
+  });
 
   const updateStatus = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
@@ -783,19 +810,16 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         logger.debug('🔌 [WEBSOCKET CLOSE] Código:', event.code);
         logger.debug('🔌 [WEBSOCKET CLOSE] Motivo:', event.reason || '(sem motivo)');
         logger.debug('🔌 [WEBSOCKET CLOSE] wasClean:', event.wasClean);
-        
-        // Códigos comuns:
-        // 1000 = fechamento normal
-        // 1001 = going away (navegador fechando)
-        // 1006 = abnormal closure (sem close frame)
-        // 1011 = unexpected condition
-        // 4000+ = application-specific
-        if (event.code !== 1000) {
-          logger.warn('🚨 [WEBSOCKET CLOSE] Fechamento anormal! Código:', event.code);
-        }
-        
+
         updateStatus('disconnected');
         stopListening();
+
+        // Auto-reconnect for abnormal closures (not user-initiated)
+        // 1000 = normal, 1001 = going away (nav), 1006 = abnormal, 1011 = server error
+        if (event.code !== 1000 && event.code !== 1001) {
+          logger.warn('🔌 [WEBSOCKET CLOSE] Fechamento anormal, tentando reconectar...');
+          scheduleReconnect();
+        }
       };
       
     } catch (error) {
@@ -805,10 +829,18 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     }
   }, [updateStatus, playAudioChunk, stopListening, startSilenceTimeout, clearSilenceTimeout]);
 
+  // Register connect function for auto-reconnect
+  useEffect(() => {
+    setReconnectFn(connect);
+  }, [connect, setReconnectFn]);
+
   const disconnect = useCallback(() => {
     logger.debug('🔌 [OPENAI DISCONNECT] Desconectando manualmente...');
     logger.debug('🔌 [OPENAI DISCONNECT] Stack trace:', new Error().stack);
-    
+
+    // Mark as manual disconnect to prevent auto-reconnect
+    markManualDisconnect();
+
     // Clear silence timeout
     clearSilenceTimeout();
     
@@ -935,6 +967,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     isListening,
     isSpeaking,
     isVoiceDetected: isListening,
+    reconnectStatus,
     connect,
     disconnect,
     startListening,

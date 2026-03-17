@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoControls } from '@/types/video';
 import { logger } from '@/lib/logger';
+import { useWebSocketReconnect, ReconnectStatus } from './useWebSocketReconnect';
 
 interface UseGeminiLiveOptions {
   systemInstruction?: string;
@@ -29,6 +30,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceDetected, setIsVoiceDetected] = useState(false);
+  const [reconnectStatus, setReconnectStatus] = useState<ReconnectStatus>('idle');
   
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -50,6 +52,30 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     logger.debug('[GeminiLive] videoControls updated:', options.videoControls ? 'EXISTS' : 'NULL');
     videoControlsRef.current = options.videoControls || null;
   }, [options.videoControls]);
+
+  // WebSocket reconnect with exponential backoff
+  const {
+    scheduleReconnect,
+    markManualDisconnect,
+    setReconnectFn,
+    reset: resetReconnect,
+  } = useWebSocketReconnect({
+    maxAttempts: 5,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    onReconnectAttempt: (attempt, max) => {
+      setReconnectStatus('reconnecting');
+      toast.info(`Reconectando ao tutor Gemini... (${attempt}/${max})`, { duration: 3000 });
+    },
+    onReconnected: () => {
+      setReconnectStatus('idle');
+      toast.success('Conexao com o tutor restaurada!', { duration: 3000 });
+    },
+    onReconnectFailed: () => {
+      setReconnectStatus('failed');
+      toast.error('Nao foi possivel reconectar ao tutor. Tente iniciar a aula novamente.', { duration: 8000 });
+    },
+  });
 
   const updateStatus = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
@@ -548,20 +574,15 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         logger.debug('[GeminiLive] Close code:', event.code);
         logger.debug('[GeminiLive] Close reason:', event.reason || 'Nenhuma razao fornecida');
         logger.debug('[GeminiLive] Was clean:', event.wasClean);
-        
-        // Common close codes:
-        // 1000 = Normal closure
-        // 1006 = Abnormal closure (connection lost)
-        // 1011 = Server error
-        // 1015 = TLS handshake failure
-         if (event.code !== 1000) {
-           logger.error('[GeminiLive] Conexao fechada com erro. Codigo:', event.code);
-           const reason = event.reason ? ` (${event.reason})` : '';
-           optionsRef.current.onError?.(`Conexao fechada: codigo ${event.code}${reason}`);
-         }
-        
+
         updateStatus('disconnected');
         stopListening();
+
+        // Auto-reconnect for abnormal closures
+        if (event.code !== 1000 && event.code !== 1001) {
+          logger.warn('[GeminiLive] Fechamento anormal, tentando reconectar...');
+          scheduleReconnect();
+        }
       };
       
     } catch (error) {
@@ -571,19 +592,25 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     }
   }, [updateStatus, playAudioChunk, stopListening, handleToolCall]);
 
+  // Register connect function for auto-reconnect
+  useEffect(() => {
+    setReconnectFn(connect);
+  }, [connect, setReconnectFn]);
+
   const disconnect = useCallback(() => {
+    markManualDisconnect();
     stopListening();
-    
+
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-    
+
     audioQueueRef.current = [];
     isPlayingRef.current = false;
     setIsSpeaking(false);
     updateStatus('disconnected');
-  }, [updateStatus, stopListening]);
+  }, [updateStatus, stopListening, markManualDisconnect]);
 
   const startListening = useCallback(async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -768,6 +795,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     isListening,
     isSpeaking,
     isVoiceDetected,
+    reconnectStatus,
     connect,
     disconnect,
     startListening,
