@@ -38,6 +38,11 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
     const [duration, setDuration] = useState(0);
     const [isReady, setIsReady] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [playbackRate, setPlaybackRate] = useState(() => {
+      const stored = localStorage.getItem('vibe-class-playback-rate');
+      return stored ? parseFloat(stored) : 1;
+    });
+    const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
 
     useEffect(() => {
       const video = videoRef.current;
@@ -45,6 +50,7 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
 
       const handleLoadedMetadata = () => {
         setDuration(video.duration);
+        video.playbackRate = playbackRate;
         setIsReady(true);
       };
 
@@ -152,6 +158,15 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
       return <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />;
     };
 
+    const cyclePlaybackRate = () => {
+      const currentIdx = PLAYBACK_RATES.indexOf(playbackRate);
+      const nextIdx = (currentIdx + 1) % PLAYBACK_RATES.length;
+      const newRate = PLAYBACK_RATES[nextIdx];
+      setPlaybackRate(newRate);
+      localStorage.setItem('vibe-class-playback-rate', String(newRate));
+      if (videoRef.current) videoRef.current.playbackRate = newRate;
+    };
+
     const toggleFullscreen = async () => {
       if (!containerRef.current) return;
       
@@ -238,6 +253,9 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
             </div>
             
             <div className="flex items-center gap-1 sm:gap-2">
+              <Button size="sm" variant="ghost" onClick={cyclePlaybackRate} className="h-11 sm:h-9 px-2 text-xs font-mono" title="Velocidade de reprodução">
+                {playbackRate}x
+              </Button>
               <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-11 w-11 sm:h-9 sm:w-9 p-0">
                 {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
               </Button>
