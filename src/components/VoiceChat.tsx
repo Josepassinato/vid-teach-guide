@@ -17,6 +17,7 @@ import { ProcessingIndicator } from './ProcessingIndicator';
 import { MiniQuiz } from './MiniQuiz';
 import { LessonEndScreen } from './LessonEndScreen';
 import { LiveCaptionsOverlay, CaptionsToggle, useCaptions } from './LiveCaptions';
+import { useContextualIntervention } from '@/hooks/useContextualIntervention';
 import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
@@ -66,6 +67,7 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
   const [connectionStep, setConnectionStep] = useState<'idle' | 'fetching_key' | 'connecting_ws' | 'configuring' | 'ready'>('idle');
   const [captionText, setCaptionText] = useState('');
   const { captionsEnabled, toggleCaptions } = useCaptions();
+  const { buildInterventionPrompt } = useContextualIntervention();
   const videoPlayerRef = useRef<VideoPlayerRef | DirectVideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
@@ -440,6 +442,12 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
     systemInstruction,
     videoControls,
     videoDbId,
+    onDisengagement: () => buildInterventionPrompt({
+      currentTime: currentVideoTime,
+      transcript: videoTranscript,
+      videoTitle,
+      teachingMoments: contentPlan?.teaching_moments,
+    }),
     onSaveStudentName: handleSaveStudentName,
     onSaveEmotionalObservation: handleSaveEmotionalObservation,
     onTranscript: (text, role) => {

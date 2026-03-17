@@ -18,6 +18,8 @@ interface UseOpenAIRealtimeOptions {
   videoControls?: VideoControls | null;
   /** Database UUID of the current video (for RAG search) */
   videoDbId?: string;
+  /** Called when silence timeout expires — return a custom prompt or undefined to use default */
+  onDisengagement?: () => string | undefined;
   // Memory callbacks
   onSaveStudentName?: (name: string) => void;
   onSaveEmotionalObservation?: (emotion: string, context: string) => void;
@@ -126,13 +128,16 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       return;
     }
 
-    const prompt = PROACTIVE_PROMPTS[proactivePromptIndexRef.current % PROACTIVE_PROMPTS.length];
-    proactivePromptIndexRef.current++;
-    
-    logger.debug('[SILENCE] ⏰ 3 segundos sem resposta - Professor tomando iniciativa!');
-    logger.debug('[SILENCE] Enviando prompt proativo:', prompt);
-    
-    // Send a system-like message to prompt the agent to speak
+    // Try contextual intervention first, fallback to generic prompts
+    const customPrompt = optionsRef.current.onDisengagement?.();
+    const prompt = customPrompt || (() => {
+      const p = PROACTIVE_PROMPTS[proactivePromptIndexRef.current % PROACTIVE_PROMPTS.length];
+      proactivePromptIndexRef.current++;
+      return `[SISTEMA: O aluno está em silêncio há alguns segundos. Tome a iniciativa e incentive-o a participar. Use uma abordagem amigável como: "${p}"]`;
+    })();
+
+    logger.debug('[SILENCE] Professor tomando iniciativa com prompt contextual');
+
     wsRef.current.send(JSON.stringify({
       type: "conversation.item.create",
       item: {
@@ -140,7 +145,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         role: "user",
         content: [{
           type: "input_text",
-          text: `[SISTEMA: O aluno está em silêncio há alguns segundos. Tome a iniciativa e incentive-o a participar. Use uma abordagem amigável como: "${prompt}"]`
+          text: prompt
         }]
       }
     }));
