@@ -47,7 +47,8 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const gainNodeRef = useRef<GainNode | null>(null);
   const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | AudioWorkletNode | null>(null);
+  const captureContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
   const videoControlsRef = useRef<VideoControls | null>(null);
@@ -273,12 +274,17 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       processorRef.current.disconnect();
       processorRef.current = null;
     }
-    
+
+    if (captureContextRef.current) {
+      captureContextRef.current.close().catch(() => {});
+      captureContextRef.current = null;
+    }
+
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
     }
-    
+
     setIsListening(false);
   }, []);
 
@@ -861,61 +867,88 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     logger.debug('🔌 [OPENAI DISCONNECT] Desconexão completa');
   }, [updateStatus, stopListening, clearSilenceTimeout]);
 
+  /** Convert Int16 ArrayBuffer to base64 and send to OpenAI */
+  const sendAudioBuffer = useCallback((buffer: ArrayBuffer) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    const uint8Array = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < uint8Array.length; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    wsRef.current.send(JSON.stringify({
+      type: "input_audio_buffer.append",
+      audio: btoa(binary),
+    }));
+  }, []);
+
   const startListening = useCallback(async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       optionsRef.current.onError?.('Not connected');
       return;
     }
-    
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 24000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
-        } 
-      });
-      
-      mediaStreamRef.current = stream;
-      
-      const audioContext = new AudioContext({ sampleRate: 24000 });
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      
-      processorRef.current = processor;
-      
-      processor.onaudioprocess = (e) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const inputData = e.inputBuffer.getChannelData(0);
-          
-          // Convert Float32 to Int16
-          const int16Array = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            int16Array[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
-          }
-          
-          // Convert to base64
-          const uint8Array = new Uint8Array(int16Array.buffer);
-          let binary = '';
-          for (let i = 0; i < uint8Array.length; i++) {
-            binary += String.fromCharCode(uint8Array[i]);
-          }
-          const base64Audio = btoa(binary);
-          
-          // Send audio to OpenAI
-          wsRef.current.send(JSON.stringify({
-            type: "input_audio_buffer.append",
-            audio: base64Audio
-          }));
         }
+      });
+
+      mediaStreamRef.current = stream;
+
+      const audioContext = new AudioContext({ sampleRate: 24000 });
+      captureContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+
+      // Try AudioWorklet first, fall back to ScriptProcessor
+      const useWorklet = typeof audioContext.audioWorklet?.addModule === 'function';
+
+      if (useWorklet) {
+        try {
+          await audioContext.audioWorklet.addModule('/audio-processor.worklet.js');
+          const workletNode = new AudioWorkletNode(audioContext, 'audio-capture-processor');
+          processorRef.current = workletNode;
+
+          workletNode.port.postMessage({ type: 'config', data: { vadEnabled: false, bufferSize: 4096 } });
+
+          workletNode.port.onmessage = (event) => {
+            if (event.data.type === 'audio') {
+              sendAudioBuffer(event.data.buffer);
+            }
+          };
+
+          source.connect(workletNode);
+          workletNode.connect(audioContext.destination);
+          logger.debug('[OpenAI] Audio capture via AudioWorklet');
+          setIsListening(true);
+          return;
+        } catch (workletErr) {
+          logger.warn('[OpenAI] AudioWorklet failed, falling back to ScriptProcessor:', workletErr);
+        }
+      }
+
+      // Fallback: ScriptProcessor (deprecated but widely supported)
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      processor.onaudioprocess = (e) => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        const int16Array = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          int16Array[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+        }
+        sendAudioBuffer(int16Array.buffer);
       };
-      
+
       source.connect(processor);
       processor.connect(audioContext.destination);
-      
+      logger.debug('[OpenAI] Audio capture via ScriptProcessor (fallback)');
       setIsListening(true);
-      
+
     } catch (error) {
       logger.error('Microphone error:', error);
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
@@ -926,7 +959,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         optionsRef.current.onError?.('Could not access microphone');
       }
     }
-  }, []);
+  }, [sendAudioBuffer]);
 
   const sendText = useCallback((text: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
