@@ -1,4 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
+import Hls from 'hls.js';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -38,6 +39,9 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
     const [duration, setDuration] = useState(0);
     const [isReady, setIsReady] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const hlsRef = useRef<Hls | null>(null);
+    const [hlsLevels, setHlsLevels] = useState<Array<{ height: number; index: number }>>([]);
+    const [currentLevel, setCurrentLevel] = useState(-1); // -1 = auto
     const [playbackRate, setPlaybackRate] = useState(() => {
       const stored = localStorage.getItem('vibe-class-playback-rate');
       return stored ? parseFloat(stored) : 1;
@@ -90,6 +94,47 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
         video.removeEventListener('seeked', handleSeeked);
       };
     }, [onEnded, onPlay, onPause, onSeek]);
+
+    // HLS.js setup for .m3u8 streams
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video || !videoUrl) return;
+
+      const isHls = videoUrl.endsWith('.m3u8') || videoUrl.includes('.m3u8?');
+
+      if (isHls && Hls.isSupported()) {
+        const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+        hlsRef.current = hls;
+        hls.loadSource(videoUrl);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          const levels = hls.levels.map((l, i) => ({ height: l.height, index: i }));
+          setHlsLevels(levels);
+        });
+
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+          setCurrentLevel(data.level);
+        });
+
+        return () => {
+          hls.destroy();
+          hlsRef.current = null;
+          setHlsLevels([]);
+        };
+      } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS support (Safari)
+        video.src = videoUrl;
+      }
+      // If not HLS, the src attribute on <video> handles it natively
+    }, [videoUrl]);
+
+    const setHlsQuality = (levelIndex: number) => {
+      if (hlsRef.current) {
+        hlsRef.current.currentLevel = levelIndex; // -1 = auto
+        setCurrentLevel(levelIndex);
+      }
+    };
 
     useImperativeHandle(ref, () => ({
       play: () => {
@@ -268,6 +313,20 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
             </div>
             
             <div className="flex items-center gap-1 sm:gap-2">
+              {/* HLS Quality selector */}
+              {hlsLevels.length > 1 && (
+                <select
+                  value={currentLevel}
+                  onChange={(e) => setHlsQuality(Number(e.target.value))}
+                  className="h-9 px-2 text-xs bg-background border rounded-md"
+                  title="Qualidade do video"
+                >
+                  <option value={-1}>Auto</option>
+                  {hlsLevels.map((l) => (
+                    <option key={l.index} value={l.index}>{l.height}p</option>
+                  ))}
+                </select>
+              )}
               <Button size="sm" variant="ghost" onClick={cyclePlaybackRate} className="h-11 sm:h-9 px-2 text-xs font-mono" title="Velocidade de reprodução">
                 {playbackRate}x
               </Button>
