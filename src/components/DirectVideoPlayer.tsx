@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { VideoTimeline } from '@/components/VideoTimeline';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Volume1, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Volume1, Maximize, Minimize, PictureInPicture2 } from 'lucide-react';
 
 export interface DirectVideoPlayerRef {
   play: () => void;
@@ -158,6 +158,21 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
       return <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />;
     };
 
+    const supportsPiP = 'pictureInPictureEnabled' in document;
+
+    const togglePiP = async () => {
+      if (!videoRef.current) return;
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else {
+          await videoRef.current.requestPictureInPicture();
+        }
+      } catch (err) {
+        console.warn('PiP error:', err);
+      }
+    };
+
     const cyclePlaybackRate = () => {
       const currentIdx = PLAYBACK_RATES.indexOf(playbackRate);
       const nextIdx = (currentIdx + 1) % PLAYBACK_RATES.length;
@@ -256,6 +271,11 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
               <Button size="sm" variant="ghost" onClick={cyclePlaybackRate} className="h-11 sm:h-9 px-2 text-xs font-mono" title="Velocidade de reprodução">
                 {playbackRate}x
               </Button>
+              {supportsPiP && (
+                <Button size="sm" variant="ghost" onClick={togglePiP} className="h-11 w-11 sm:h-9 sm:w-9 p-0" title="Picture-in-Picture">
+                  <PictureInPicture2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-11 w-11 sm:h-9 sm:w-9 p-0">
                 {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
               </Button>
