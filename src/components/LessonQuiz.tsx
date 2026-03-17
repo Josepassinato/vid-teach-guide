@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuiz, QuizQuestion } from '@/hooks/useQuiz';
+import { useContextualFeedback } from '@/hooks/useContextualFeedback';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,7 @@ export const LessonQuiz = ({
   } = useQuiz({ videoId, studentId, passingScore });
 
   const [showExplanation, setShowExplanation] = useState<string | null>(null);
+  const { fetchFeedback, getFeedback } = useContextualFeedback();
 
   if (isLoading) {
     return (
@@ -213,7 +215,18 @@ export const LessonQuiz = ({
                 return (
                   <button
                     key={index}
-                    onClick={() => selectAnswer(currentQuestion.id, index)}
+                    onClick={() => {
+                      selectAnswer(currentQuestion.id, index);
+                      setShowExplanation(currentQuestion.id);
+                      // Fetch contextual feedback for wrong answers
+                      if (index !== currentQuestion.correct_option_index) {
+                        fetchFeedback({
+                          question: currentQuestion.question,
+                          selectedOption: currentQuestion.options[index],
+                          correctOption: currentQuestion.options[currentQuestion.correct_option_index],
+                        });
+                      }
+                    }}
                     className={cn(
                       "w-full p-3 text-left text-sm rounded-lg border transition-all",
                       isSelected 
@@ -241,13 +254,42 @@ export const LessonQuiz = ({
               })}
             </div>
 
-            {/* Explanation */}
-            {showExplanation === currentQuestion.id && currentQuestion.explanation && (
-              <div className="p-3 bg-muted rounded-lg text-sm">
-                <p className="font-medium mb-1">Explicação:</p>
-                <p className="text-muted-foreground">{currentQuestion.explanation}</p>
-              </div>
-            )}
+            {/* Explanation / Contextual Feedback */}
+            {showExplanation === currentQuestion.id && (() => {
+              const selectedIdx = answers[currentQuestion.id];
+              const isWrong = selectedIdx !== undefined && selectedIdx !== currentQuestion.correct_option_index;
+              const fb = isWrong
+                ? getFeedback(currentQuestion.question, currentQuestion.options[selectedIdx])
+                : null;
+
+              if (isWrong && fb) {
+                return (
+                  <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg text-sm">
+                    {fb.isLoading ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Gerando feedback...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="font-medium text-orange-600 dark:text-orange-400 mb-1">Por que essa opcao esta incorreta:</p>
+                        <p className="text-muted-foreground">{fb.feedback}</p>
+                      </>
+                    )}
+                  </div>
+                );
+              }
+
+              if (currentQuestion.explanation) {
+                return (
+                  <div className="p-3 bg-muted rounded-lg text-sm">
+                    <p className="font-medium mb-1">Explicacao:</p>
+                    <p className="text-muted-foreground">{currentQuestion.explanation}</p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </>
         )}
 

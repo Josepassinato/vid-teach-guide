@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, XCircle, HelpCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, HelpCircle, Clock, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useContextualFeedback } from '@/hooks/useContextualFeedback';
 
 export interface MiniQuizQuestion {
   id: string;
@@ -18,17 +19,20 @@ interface MiniQuizProps {
   onComplete: (selectedIndex: number, isCorrect: boolean) => void;
   revealDelay?: number; // seconds before revealing answer
   autoAdvanceDelay?: number; // seconds after reveal before calling onComplete
+  videoContext?: string; // transcript/context for contextual feedback
 }
 
-export const MiniQuiz = ({ 
-  question, 
-  onComplete, 
+export const MiniQuiz = ({
+  question,
+  onComplete,
   revealDelay = 8,
-  autoAdvanceDelay = 5
+  autoAdvanceDelay = 5,
+  videoContext,
 }: MiniQuizProps) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [countdown, setCountdown] = useState(revealDelay);
+  const { fetchFeedback, getFeedback } = useContextualFeedback();
 
   // Countdown timer
   useEffect(() => {
@@ -47,6 +51,17 @@ export const MiniQuiz = ({
 
     return () => clearInterval(timer);
   }, [revealed]);
+
+  // Fetch contextual feedback when wrong answer revealed
+  useEffect(() => {
+    if (!revealed || selectedIndex === null || selectedIndex === question.correctIndex) return;
+    fetchFeedback({
+      question: question.question,
+      selectedOption: question.options[selectedIndex],
+      correctOption: question.options[question.correctIndex],
+      videoContext,
+    });
+  }, [revealed, selectedIndex, question, fetchFeedback, videoContext]);
 
   // Auto advance after reveal
   useEffect(() => {
@@ -174,19 +189,52 @@ export const MiniQuiz = ({
             ))}
           </div>
 
-          {/* Explanation after reveal */}
+          {/* Contextual feedback or explanation after reveal */}
           <AnimatePresence>
-            {revealed && question.explanation && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="p-3 bg-muted rounded-lg text-sm"
-              >
-                <p className="font-medium text-primary mb-1">💡 Explicação:</p>
-                <p className="text-muted-foreground">{question.explanation}</p>
-              </motion.div>
-            )}
+            {revealed && (() => {
+              const isWrong = selectedIndex !== null && selectedIndex !== question.correctIndex;
+              const fb = isWrong ? getFeedback(question.question, question.options[selectedIndex]) : null;
+
+              if (isWrong && fb) {
+                return (
+                  <motion.div
+                    key="feedback"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg text-sm"
+                  >
+                    {fb.isLoading ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Gerando feedback personalizado...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="font-medium text-orange-600 dark:text-orange-400 mb-1">Por que essa opcao esta incorreta:</p>
+                        <p className="text-muted-foreground">{fb.feedback}</p>
+                      </>
+                    )}
+                  </motion.div>
+                );
+              }
+
+              if (question.explanation) {
+                return (
+                  <motion.div
+                    key="explanation"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-3 bg-muted rounded-lg text-sm"
+                  >
+                    <p className="font-medium text-primary mb-1">Explicacao:</p>
+                    <p className="text-muted-foreground">{question.explanation}</p>
+                  </motion.div>
+                );
+              }
+              return null;
+            })()}
           </AnimatePresence>
 
           {/* Progress indicator */}
