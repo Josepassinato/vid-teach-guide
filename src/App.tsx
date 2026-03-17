@@ -4,6 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { IntlProvider } from "react-intl";
+import { useState } from "react";
+import { LOCALES, getSavedLocale, saveLocale, SupportedLocale } from "./i18n";
 import Admin from "./pages/Admin";
 import Analytics from "./pages/Analytics";
 import Student from "./pages/Student";
@@ -101,21 +104,33 @@ const AppRoutes = () => (
   </Routes>
 );
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <ErrorBoundary>
-            <AppRoutes />
-          </ErrorBoundary>
-        </BrowserRouter>
-        <DebugPanel />
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [locale, setLocale] = useState<SupportedLocale>(getSavedLocale());
+  const messages = LOCALES[locale].messages;
+
+  const handleLocaleChange = (newLocale: SupportedLocale) => {
+    setLocale(newLocale);
+    saveLocale(newLocale);
+  };
+
+  return (
+    <IntlProvider locale={locale} messages={messages} defaultLocale="pt-BR">
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <ErrorBoundary>
+                <AppRoutes />
+              </ErrorBoundary>
+            </BrowserRouter>
+            <DebugPanel />
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </IntlProvider>
+  );
+};
 
 export default App;
