@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuiz, QuizQuestion } from '@/hooks/useQuiz';
 import { useContextualFeedback } from '@/hooks/useContextualFeedback';
+import { OpenQuestionInput } from './OpenQuestionInput';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -200,7 +201,18 @@ export const LessonQuiz = ({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {currentQuestion && (
+        {currentQuestion && (currentQuestion as any).question_type === 'open' ? (
+          <OpenQuestionInput
+            quizId={currentQuestion.id}
+            videoId={videoId}
+            studentId={studentId}
+            question={currentQuestion.question}
+            rubric={(currentQuestion as any).rubric}
+            onComplete={(score, passed) => {
+              if (passed) onQuizComplete(true);
+            }}
+          />
+        ) : currentQuestion && (
           <>
             <CardDescription className="text-foreground font-medium text-sm leading-relaxed">
               {currentQuestion.question}
