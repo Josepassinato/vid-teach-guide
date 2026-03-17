@@ -16,6 +16,7 @@ import { VoiceIndicator } from './VoiceIndicator';
 import { ProcessingIndicator } from './ProcessingIndicator';
 import { MiniQuiz } from './MiniQuiz';
 import { LessonEndScreen } from './LessonEndScreen';
+import { LiveCaptionsOverlay, CaptionsToggle, useCaptions } from './LiveCaptions';
 import { Phone, PhoneOff, Send, AlertCircle, Bug, Play, Pause, RotateCcw, BookOpen, Target, Lightbulb, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
@@ -63,6 +64,8 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
   const [nextPauseInfo, setNextPauseInfo] = useState<{time: number; type: 'quiz' | 'moment'; topic?: string} | null>(null);
   const [lessonEndData, setLessonEndData] = useState<{ weeklyTask?: string; summaryPoints?: string[]; mission?: Mission }>({});
   const [connectionStep, setConnectionStep] = useState<'idle' | 'fetching_key' | 'connecting_ws' | 'configuring' | 'ready'>('idle');
+  const [captionText, setCaptionText] = useState('');
+  const { captionsEnabled, toggleCaptions } = useCaptions();
   const videoPlayerRef = useRef<VideoPlayerRef | DirectVideoPlayerRef>(null);
   const timeCheckIntervalRef = useRef<number | null>(null);
   const lastCheckedMomentRef = useRef<number>(-1);
@@ -446,6 +449,11 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
         role,
         timestamp: new Date()
       }]);
+
+      // Update live captions for assistant speech
+      if (role === 'assistant') {
+        setCaptionText(text);
+      }
       
       // Capture end-of-lesson data from assistant messages
       if (role === 'assistant' && isCapturingEndDataRef.current) {
@@ -1055,6 +1063,13 @@ INSTRUÇÕES:
               ) : null}
             </div>
             
+            {/* Live Captions Overlay */}
+            <LiveCaptionsOverlay
+              text={captionText}
+              isActive={isSpeaking}
+              enabled={captionsEnabled}
+            />
+
             {/* Next Pause Timer - Discrete overlay at bottom of video */}
             {agentMode === 'playing' && nextPauseInfo && timeUntilNextPause !== null && timeUntilNextPause > 0 && (
               <div className="absolute bottom-2 right-2 z-10">
@@ -1550,10 +1565,13 @@ INSTRUÇÕES:
                   </div>
                 </Button>
               ) : status === 'connected' ? (
-                <Button onClick={disconnect} variant="destructive" className="flex-1 h-10 text-sm">
-                  <PhoneOff className="h-4 w-4 mr-2" />
-                  Encerrar
-                </Button>
+                <>
+                  <CaptionsToggle enabled={captionsEnabled} onToggle={toggleCaptions} />
+                  <Button onClick={disconnect} variant="destructive" className="flex-1 h-10 text-sm">
+                    <PhoneOff className="h-4 w-4 mr-2" />
+                    Encerrar
+                  </Button>
+                </>
               ) : (
                 <Button onClick={handleStartClass} className="flex-1 h-10 text-sm">
                   <Phone className="h-4 w-4 mr-2" />
