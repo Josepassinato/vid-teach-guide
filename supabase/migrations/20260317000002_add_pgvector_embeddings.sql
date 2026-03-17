@@ -1,63 +1,100 @@
--- Enable pgvector extension
-CREATE EXTENSION IF NOT EXISTS vector;
+-- =============================================
+-- MIGRATION: pgvector Embeddings for RAG (F3-T1)
+-- Enables semantic search over video transcripts
+-- =============================================
 
--- Table to store transcript chunk embeddings for RAG
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+
+-- Table: transcript chunks with embeddings
 CREATE TABLE IF NOT EXISTS public.transcript_embeddings (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  video_id uuid NOT NULL REFERENCES public.videos(id) ON DELETE CASCADE,
-  chunk_text text NOT NULL,
-  chunk_index integer NOT NULL,
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  video_id UUID NOT NULL REFERENCES public.videos(id) ON DELETE CASCADE,
+  chunk_index INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  start_time_seconds NUMERIC(10,2),
+  end_time_seconds NUMERIC(10,2),
   embedding vector(1536),
-  metadata jsonb DEFAULT '{}'::jsonb,
-  created_at timestamptz DEFAULT now()
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Index for fast similarity search
-CREATE INDEX IF NOT EXISTS idx_transcript_embeddings_video ON public.transcript_embeddings(video_id);
-CREATE INDEX IF NOT EXISTS idx_transcript_embeddings_vector ON public.transcript_embeddings
-  USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-
--- RLS
+-- Enable RLS
 ALTER TABLE public.transcript_embeddings ENABLE ROW LEVEL SECURITY;
 
--- Allow authenticated users to read embeddings
+-- RLS: authenticated users can read embeddings (needed for search)
 CREATE POLICY "Authenticated users can read embeddings"
-  ON public.transcript_embeddings FOR SELECT
-  TO authenticated
-  USING (true);
+ON public.transcript_embeddings FOR SELECT
+USING (auth.role() = 'authenticated');
 
--- Allow service role to insert/update/delete
+-- Service role can manage
 CREATE POLICY "Service role can manage embeddings"
-  ON public.transcript_embeddings FOR ALL
-  TO service_role
-  USING (true);
+ON public.transcript_embeddings FOR ALL
+USING (public.is_admin());
 
--- Function to search transcript by similarity
-CREATE OR REPLACE FUNCTION match_transcript_chunks(
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_embeddings_video ON public.transcript_embeddings(video_id);
+CREATE INDEX IF NOT EXISTS idx_embeddings_chunk ON public.transcript_embeddings(video_id, chunk_index);
+
+-- HNSW index for fast similarity search
+CREATE INDEX IF NOT EXISTS idx_embeddings_vector
+ON public.transcript_embeddings
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+-- Function: search similar transcript chunks
+CREATE OR REPLACE FUNCTION public.search_transcripts(
   query_embedding vector(1536),
-  match_video_id uuid,
-  match_count int DEFAULT 5,
-  match_threshold float DEFAULT 0.7
-)
-RETURNS TABLE (
-  id uuid,
-  chunk_text text,
-  chunk_index integer,
-  similarity float
-)
-LANGUAGE plpgsql
-AS $$
+  match_threshold FLOAT DEFAULT 0.7,
+  match_count INT DEFAULT 5,
+  filter_video_id UUID DEFAULT NULL
+) RETURNS TABLE (
+  id UUID,
+  video_id UUID,
+  content TEXT,
+  start_time_seconds NUMERIC,
+  end_time_seconds NUMERIC,
+  similarity FLOAT
+) AS $$
 BEGIN
   RETURN QUERY
   SELECT
     te.id,
-    te.chunk_text,
-    te.chunk_index,
+    te.video_id,
+    te.content,
+    te.start_time_seconds,
+    te.end_time_seconds,
     1 - (te.embedding <=> query_embedding) AS similarity
   FROM public.transcript_embeddings te
-  WHERE te.video_id = match_video_id
+  WHERE
+    (filter_video_id IS NULL OR te.video_id = filter_video_id)
     AND 1 - (te.embedding <=> query_embedding) > match_threshold
   ORDER BY te.embedding <=> query_embedding
   LIMIT match_count;
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function: get context around a timestamp
+CREATE OR REPLACE FUNCTION public.get_transcript_context(
+  p_video_id UUID,
+  p_timestamp_seconds NUMERIC,
+  p_window_seconds NUMERIC DEFAULT 30
+) RETURNS TABLE (
+  content TEXT,
+  start_time_seconds NUMERIC,
+  end_time_seconds NUMERIC
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    te.content,
+    te.start_time_seconds,
+    te.end_time_seconds
+  FROM public.transcript_embeddings te
+  WHERE
+    te.video_id = p_video_id
+    AND te.start_time_seconds >= (p_timestamp_seconds - p_window_seconds)
+    AND te.end_time_seconds <= (p_timestamp_seconds + p_window_seconds)
+  ORDER BY te.start_time_seconds;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
