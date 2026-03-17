@@ -439,6 +439,7 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
   } = useOpenAIRealtime({
     systemInstruction,
     videoControls,
+    videoDbId,
     onSaveStudentName: handleSaveStudentName,
     onSaveEmotionalObservation: handleSaveEmotionalObservation,
     onTranscript: (text, role) => {

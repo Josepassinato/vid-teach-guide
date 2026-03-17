@@ -16,6 +16,8 @@ interface UseOpenAIRealtimeOptions {
   onStatusChange?: (status: ConnectionStatus) => void;
   onConnectionStepChange?: (step: ConnectionStep) => void;
   videoControls?: VideoControls | null;
+  /** Database UUID of the current video (for RAG search) */
+  videoDbId?: string;
   // Memory callbacks
   onSaveStudentName?: (name: string) => void;
   onSaveEmotionalObservation?: (emotion: string, context: string) => void;
@@ -430,9 +432,22 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
               },
               required: ["emotion", "context"]
             }
+          },
+          // RAG: search transcript for precise answers
+          {
+            type: "function",
+            name: "search_transcript",
+            description: "Busca trechos relevantes da transcricao do video para responder perguntas do aluno com precisao. Use SEMPRE que o aluno fizer uma pergunta sobre o conteudo da aula. Isso retorna trechos exatos do video.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: { type: "string", description: "A pergunta ou topico para buscar na transcricao" }
+              },
+              required: ["query"]
+            }
           }
         ];
-        
+
         // Send session update with configuration and tools
         // Using "echo" voice - young masculine voice, energetic and friendly
         // Other options: "coral" (warm female), "nova" (warm female), "alloy" (neutral), "onyx" (deep male)
@@ -680,6 +695,27 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 result = { ok: true, message: `Observacao emocional registrada: ${emotion}` };
               } else {
                 result = { ok: false, message: "Nao foi possivel registrar a observacao" };
+              }
+            }
+            else if (name === "search_transcript") {
+              const query = args.query as string;
+              logger.debug('[OPENAI TOOL CALL] EXECUTANDO: search_transcript');
+              logger.debug('[OPENAI TOOL CALL] Query:', query);
+              try {
+                const { data, error } = await supabase.functions.invoke('search-transcript', {
+                  body: { query, video_id: optionsRef.current.videoDbId || '' },
+                });
+                if (error || !data?.chunks?.length) {
+                  result = { ok: false, message: "Nenhum trecho relevante encontrado na transcricao" };
+                } else {
+                  const contextText = data.chunks
+                    .map((c: any) => c.chunk_text)
+                    .join('\n\n---\n\n');
+                  result = { ok: true, message: `Trechos encontrados na transcricao:\n\n${contextText}` };
+                }
+              } catch (err) {
+                logger.error('[OPENAI TOOL CALL] search_transcript error:', err);
+                result = { ok: false, message: "Erro ao buscar na transcricao" };
               }
             }
             else {
