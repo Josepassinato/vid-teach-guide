@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import * as Sentry from '@sentry/react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
@@ -53,13 +54,16 @@ export function useAuth(): UseAuthReturn {
         setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
+          Sentry.setUser({ id: newSession.user.id, email: newSession.user.email });
           // Use setTimeout to avoid potential deadlock with Supabase
           setTimeout(() => fetchProfile(newSession.user.id), 0);
         } else {
+          Sentry.setUser(null);
           setProfile(null);
         }
 
         if (event === 'SIGNED_OUT') {
+          Sentry.setUser(null);
           setProfile(null);
         }
       }

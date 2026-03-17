@@ -1,4 +1,5 @@
 import React from 'react';
+import * as Sentry from '@sentry/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Home, RotateCcw } from 'lucide-react';
@@ -56,6 +57,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('[ErrorBoundary] Component crash:', error, errorInfo);
+    Sentry.captureException(error, { contexts: { react: { componentStack: errorInfo.componentStack || '' } } });
   }
 
   render() {
