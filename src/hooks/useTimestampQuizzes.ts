@@ -8,6 +8,7 @@ export interface TimestampQuiz {
   correctIndex: number;
   explanation?: string;
   timestampSeconds: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 interface UseTimestampQuizzesOptions {
@@ -41,6 +42,7 @@ export function useTimestampQuizzes({ videoId, studentId }: UseTimestampQuizzesO
         correctIndex: q.correct_option_index,
         explanation: q.explanation || undefined,
         timestampSeconds: q.timestamp_seconds!,
+        difficulty: (q as any).difficulty || 'medium',
       }));
 
       setQuizzes(mapped);

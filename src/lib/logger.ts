@@ -1,13 +1,15 @@
 /**
- * Lightweight logger that suppresses debug/info logs in production.
- * Only warnings and errors are always visible.
+ * Centralized logger with Sentry integration.
+ *
+ * - dev mode: all levels go to console
+ * - prod mode: warn/error go to console + Sentry
  *
  * Usage:
  *   import { logger } from '@/lib/logger';
- *   logger.debug('[GeminiLive]', 'connecting...');
- *   logger.warn('[GeminiLive]', 'fallback model');
- *   logger.error('[GeminiLive]', 'connection failed', err);
+ *   logger.debug('[Module]', 'message');
+ *   logger.error('[Module]', 'crash', err);
  */
+import * as Sentry from '@sentry/react';
 
 const isDev = import.meta.env.DEV;
 
@@ -16,15 +18,30 @@ function noop(..._args: unknown[]) {
 }
 
 export const logger = {
-  /** Only visible during development (vite dev server). */
+  /** Only visible during development. */
   debug: isDev ? console.log.bind(console) : noop,
 
   /** Only visible during development. */
   info: isDev ? console.info.bind(console) : noop,
 
-  /** Always visible. */
-  warn: console.warn.bind(console),
+  /** Always visible. In production, also captured by Sentry. */
+  warn: (...args: unknown[]) => {
+    console.warn(...args);
+    if (!isDev) {
+      Sentry.captureMessage(args.map(String).join(' '), 'warning');
+    }
+  },
 
-  /** Always visible. */
-  error: console.error.bind(console),
+  /** Always visible. In production, also captured by Sentry. */
+  error: (...args: unknown[]) => {
+    console.error(...args);
+    if (!isDev) {
+      const err = args.find(a => a instanceof Error);
+      if (err) {
+        Sentry.captureException(err);
+      } else {
+        Sentry.captureMessage(args.map(String).join(' '), 'error');
+      }
+    }
+  },
 };

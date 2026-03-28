@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoControls } from '@/types/video';
 import { logger } from '@/lib/logger';
+import { useWebSocketReconnect, ReconnectStatus } from './useWebSocketReconnect';
 
 export type { VideoControls };
 
@@ -15,6 +16,10 @@ interface UseOpenAIRealtimeOptions {
   onStatusChange?: (status: ConnectionStatus) => void;
   onConnectionStepChange?: (step: ConnectionStep) => void;
   videoControls?: VideoControls | null;
+  /** Database UUID of the current video (for RAG search) */
+  videoDbId?: string;
+  /** Called when silence timeout expires — return a custom prompt or undefined to use default */
+  onDisengagement?: () => string | undefined;
   // Memory callbacks
   onSaveStudentName?: (name: string) => void;
   onSaveEmotionalObservation?: (emotion: string, context: string) => void;
@@ -39,13 +44,15 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  
+  const [reconnectStatus, setReconnectStatus] = useState<ReconnectStatus>('idle');
+
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | AudioWorkletNode | null>(null);
+  const captureContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
   const videoControlsRef = useRef<VideoControls | null>(null);
@@ -66,6 +73,31 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   useEffect(() => {
     videoControlsRef.current = options.videoControls || null;
   }, [options.videoControls]);
+
+  // WebSocket reconnect with exponential backoff
+  const {
+    scheduleReconnect,
+    markManualDisconnect,
+    setReconnectFn,
+    reset: resetReconnect,
+    getReconnectStatus,
+  } = useWebSocketReconnect({
+    maxAttempts: 5,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    onReconnectAttempt: (attempt, max) => {
+      setReconnectStatus('reconnecting');
+      toast.info(`Reconectando ao tutor... (${attempt}/${max})`, { duration: 3000 });
+    },
+    onReconnected: () => {
+      setReconnectStatus('idle');
+      toast.success('Conexao com o tutor restaurada!', { duration: 3000 });
+    },
+    onReconnectFailed: () => {
+      setReconnectStatus('failed');
+      toast.error('Nao foi possivel reconectar ao tutor. Tente iniciar a aula novamente.', { duration: 8000 });
+    },
+  });
 
   const updateStatus = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
@@ -96,13 +128,16 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       return;
     }
 
-    const prompt = PROACTIVE_PROMPTS[proactivePromptIndexRef.current % PROACTIVE_PROMPTS.length];
-    proactivePromptIndexRef.current++;
-    
-    logger.debug('[SILENCE] ⏰ 3 segundos sem resposta - Professor tomando iniciativa!');
-    logger.debug('[SILENCE] Enviando prompt proativo:', prompt);
-    
-    // Send a system-like message to prompt the agent to speak
+    // Try contextual intervention first, fallback to generic prompts
+    const customPrompt = optionsRef.current.onDisengagement?.();
+    const prompt = customPrompt || (() => {
+      const p = PROACTIVE_PROMPTS[proactivePromptIndexRef.current % PROACTIVE_PROMPTS.length];
+      proactivePromptIndexRef.current++;
+      return `[SISTEMA: O aluno está em silêncio há alguns segundos. Tome a iniciativa e incentive-o a participar. Use uma abordagem amigável como: "${p}"]`;
+    })();
+
+    logger.debug('[SILENCE] Professor tomando iniciativa com prompt contextual');
+
     wsRef.current.send(JSON.stringify({
       type: "conversation.item.create",
       item: {
@@ -110,7 +145,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         role: "user",
         content: [{
           type: "input_text",
-          text: `[SISTEMA: O aluno está em silêncio há alguns segundos. Tome a iniciativa e incentive-o a participar. Use uma abordagem amigável como: "${prompt}"]`
+          text: prompt
         }]
       }
     }));
@@ -246,12 +281,17 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       processorRef.current.disconnect();
       processorRef.current = null;
     }
-    
+
+    if (captureContextRef.current) {
+      captureContextRef.current.close().catch(() => {});
+      captureContextRef.current = null;
+    }
+
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
     }
-    
+
     setIsListening(false);
   }, []);
 
@@ -266,30 +306,49 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       
       const currentOptions = optionsRef.current;
       
-      // Get API key from edge function
-      logger.debug('🔌 [OPENAI CONNECT] Buscando API key...');
-      const { data, error } = await supabase.functions.invoke('openai-realtime-token', {
-        body: { systemInstruction: currentOptions.systemInstruction }
+      // Try Grok first, fallback to OpenAI
+      logger.debug('🔌 [VOICE CONNECT] Buscando token (tentando Grok primeiro)...');
+      let { data, error } = await supabase.functions.invoke('openai-realtime-token', {
+        body: { systemInstruction: currentOptions.systemInstruction, provider: 'grok' }
       });
-      
-      if (error || !data?.apiKey) {
-        logger.error('🔌 [OPENAI CONNECT] ❌ Erro ao buscar API key:', error);
-        optionsRef.current.onConnectionStepChange?.('idle');
-        throw new Error(error?.message || 'Failed to get API key');
+
+      // Fallback to OpenAI if Grok fails
+      if (error || (!data?.clientSecret && !data?.apiKey)) {
+        logger.warn('🔌 [VOICE CONNECT] Grok falhou, tentando OpenAI como fallback...');
+        const fallback = await supabase.functions.invoke('openai-realtime-token', {
+          body: { systemInstruction: currentOptions.systemInstruction, provider: 'openai' }
+        });
+        data = fallback.data;
+        error = fallback.error;
       }
-      
-      logger.debug('🔌 [OPENAI CONNECT] ✅ API key obtida, conectando WebSocket...');
+
+      if (error || (!data?.clientSecret && !data?.apiKey)) {
+        logger.error('🔌 [VOICE CONNECT] ❌ Nenhum provider disponível:', error);
+        optionsRef.current.onConnectionStepChange?.('idle');
+        throw new Error(error?.message || 'Failed to get voice token');
+      }
+
+      const activeVoiceProvider = data.provider || 'grok';
+      logger.debug(`🔌 [VOICE CONNECT] ✅ Usando provider: ${activeVoiceProvider}`);
       optionsRef.current.onConnectionStepChange?.('connecting_ws');
-      
-      // Connect to OpenAI Realtime API
-      const wsUrl = `wss://api.openai.com/v1/realtime?model=${data.model}`;
-      logger.debug('🔌 [OPENAI CONNECT] URL:', wsUrl);
-      
-      const ws = new WebSocket(wsUrl, [
-        "realtime",
-        `openai-insecure-api-key.${data.apiKey}`,
-        "openai-beta.realtime-v1"
-      ]);
+
+      // Connect via WebSocket — different auth per provider
+      let ws: WebSocket;
+      if (activeVoiceProvider === 'grok') {
+        const wsUrl = data.wsUrl || 'wss://api.x.ai/v1/realtime';
+        logger.debug('🔌 [VOICE CONNECT] Grok URL:', wsUrl);
+        ws = new WebSocket(wsUrl, [
+          `xai-client-secret.${data.clientSecret}`,
+        ]);
+      } else {
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=${data.model}`;
+        logger.debug('🔌 [VOICE CONNECT] OpenAI URL:', wsUrl);
+        ws = new WebSocket(wsUrl, [
+          "realtime",
+          `openai-insecure-api-key.${data.apiKey}`,
+          "openai-beta.realtime-v1",
+        ]);
+      }
       wsRef.current = ws;
       logger.debug('🔌 [OPENAI CONNECT] WebSocket criado');
 
@@ -306,7 +365,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
       ws.onopen = () => {
         clearTimeout(connectionTimeout);
-        logger.debug('WebSocket connected to OpenAI');
+        logger.debug('WebSocket connected to Grok Voice Agent');
         processedCallIdsRef.current.clear();
         optionsRef.current.onConnectionStepChange?.('configuring');
         
@@ -397,33 +456,62 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
               },
               required: ["emotion", "context"]
             }
+          },
+          // RAG: search transcript for precise answers
+          {
+            type: "function",
+            name: "search_transcript",
+            description: "Busca trechos relevantes da transcricao do video para responder perguntas do aluno com precisao. Use SEMPRE que o aluno fizer uma pergunta sobre o conteudo da aula. Isso retorna trechos exatos do video.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: { type: "string", description: "A pergunta ou topico para buscar na transcricao" }
+              },
+              required: ["query"]
+            }
           }
         ];
-        
-        // Send session update with configuration and tools
-        // Using "echo" voice - young masculine voice, energetic and friendly
-        // Other options: "coral" (warm female), "nova" (warm female), "alloy" (neutral), "onyx" (deep male)
-        ws.send(JSON.stringify({
-          type: "session.update",
-          session: {
-            modalities: ["text", "audio"],
-            instructions: currentOptions.systemInstruction || "Você é um professor jovem, descontraído e didático. Fale de forma natural como um amigo mais experiente que quer ajudar. Use gírias leves e seja animado. Fale em português brasileiro.",
-            voice: "echo",
-            input_audio_format: "pcm16",
-            output_audio_format: "pcm16",
-            input_audio_transcription: {
-              model: "whisper-1"
-            },
-            turn_detection: {
-              type: "server_vad",
-              threshold: 0.5,
-              prefix_padding_ms: 500,
-              silence_duration_ms: 1400
-            },
-            tools: tools,
-            tool_choice: "auto"
-          }
-        }));
+
+        // Send session update — format varies per provider
+        const baseInstruction = currentOptions.systemInstruction || "Você é um professor jovem, descontraído e didático. Fale de forma natural como um amigo mais experiente que quer ajudar. Use gírias leves e seja animado. Fale em português brasileiro.";
+
+        if (activeVoiceProvider === 'grok') {
+          // Grok voices: Eve (energetic), Ara (warm/friendly), Rex (confident), Sal (balanced), Leo (authoritative)
+          ws.send(JSON.stringify({
+            type: "session.update",
+            session: {
+              voice: data.voice || "Ara",
+              instructions: baseInstruction,
+              turn_detection: { type: "server_vad" },
+              audio: {
+                input: { format: { type: "audio/pcm", rate: 24000 } },
+                output: { format: { type: "audio/pcm", rate: 24000 } },
+              },
+              tools: tools,
+            }
+          }));
+        } else {
+          // OpenAI voices: echo, coral, nova, alloy, onyx
+          ws.send(JSON.stringify({
+            type: "session.update",
+            session: {
+              modalities: ["text", "audio"],
+              instructions: baseInstruction,
+              voice: data.voice || "echo",
+              input_audio_format: "pcm16",
+              output_audio_format: "pcm16",
+              input_audio_transcription: { model: "whisper-1" },
+              turn_detection: {
+                type: "server_vad",
+                threshold: 0.5,
+                prefix_padding_ms: 500,
+                silence_duration_ms: 1400,
+              },
+              tools: tools,
+              tool_choice: "auto",
+            }
+          }));
+        }
         
         updateStatus('connected');
         optionsRef.current.onConnectionStepChange?.('ready');
@@ -649,6 +737,27 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
                 result = { ok: false, message: "Nao foi possivel registrar a observacao" };
               }
             }
+            else if (name === "search_transcript") {
+              const query = args.query as string;
+              logger.debug('[OPENAI TOOL CALL] EXECUTANDO: search_transcript');
+              logger.debug('[OPENAI TOOL CALL] Query:', query);
+              try {
+                const { data, error } = await supabase.functions.invoke('search-transcript', {
+                  body: { query, video_id: optionsRef.current.videoDbId || '' },
+                });
+                if (error || !data?.chunks?.length) {
+                  result = { ok: false, message: "Nenhum trecho relevante encontrado na transcricao" };
+                } else {
+                  const contextText = data.chunks
+                    .map((c: any) => c.chunk_text)
+                    .join('\n\n---\n\n');
+                  result = { ok: true, message: `Trechos encontrados na transcricao:\n\n${contextText}` };
+                }
+              } catch (err) {
+                logger.error('[OPENAI TOOL CALL] search_transcript error:', err);
+                result = { ok: false, message: "Erro ao buscar na transcricao" };
+              }
+            }
             else {
               logger.error('[OPENAI TOOL CALL] ERRO: videoControlsRef.current e NULL para funcao de video');
               logger.error('[OPENAI TOOL CALL] Nao foi possivel executar:', name);
@@ -783,19 +892,16 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         logger.debug('🔌 [WEBSOCKET CLOSE] Código:', event.code);
         logger.debug('🔌 [WEBSOCKET CLOSE] Motivo:', event.reason || '(sem motivo)');
         logger.debug('🔌 [WEBSOCKET CLOSE] wasClean:', event.wasClean);
-        
-        // Códigos comuns:
-        // 1000 = fechamento normal
-        // 1001 = going away (navegador fechando)
-        // 1006 = abnormal closure (sem close frame)
-        // 1011 = unexpected condition
-        // 4000+ = application-specific
-        if (event.code !== 1000) {
-          logger.warn('🚨 [WEBSOCKET CLOSE] Fechamento anormal! Código:', event.code);
-        }
-        
+
         updateStatus('disconnected');
         stopListening();
+
+        // Auto-reconnect for abnormal closures (not user-initiated)
+        // 1000 = normal, 1001 = going away (nav), 1006 = abnormal, 1011 = server error
+        if (event.code !== 1000 && event.code !== 1001) {
+          logger.warn('🔌 [WEBSOCKET CLOSE] Fechamento anormal, tentando reconectar...');
+          scheduleReconnect();
+        }
       };
       
     } catch (error) {
@@ -805,10 +911,18 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     }
   }, [updateStatus, playAudioChunk, stopListening, startSilenceTimeout, clearSilenceTimeout]);
 
+  // Register connect function for auto-reconnect
+  useEffect(() => {
+    setReconnectFn(connect);
+  }, [connect, setReconnectFn]);
+
   const disconnect = useCallback(() => {
     logger.debug('🔌 [OPENAI DISCONNECT] Desconectando manualmente...');
     logger.debug('🔌 [OPENAI DISCONNECT] Stack trace:', new Error().stack);
-    
+
+    // Mark as manual disconnect to prevent auto-reconnect
+    markManualDisconnect();
+
     // Clear silence timeout
     clearSilenceTimeout();
     
@@ -829,61 +943,88 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     logger.debug('🔌 [OPENAI DISCONNECT] Desconexão completa');
   }, [updateStatus, stopListening, clearSilenceTimeout]);
 
+  /** Convert Int16 ArrayBuffer to base64 and send to OpenAI */
+  const sendAudioBuffer = useCallback((buffer: ArrayBuffer) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    const uint8Array = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < uint8Array.length; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    wsRef.current.send(JSON.stringify({
+      type: "input_audio_buffer.append",
+      audio: btoa(binary),
+    }));
+  }, []);
+
   const startListening = useCallback(async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       optionsRef.current.onError?.('Not connected');
       return;
     }
-    
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 24000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
-        } 
-      });
-      
-      mediaStreamRef.current = stream;
-      
-      const audioContext = new AudioContext({ sampleRate: 24000 });
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      
-      processorRef.current = processor;
-      
-      processor.onaudioprocess = (e) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const inputData = e.inputBuffer.getChannelData(0);
-          
-          // Convert Float32 to Int16
-          const int16Array = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            int16Array[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
-          }
-          
-          // Convert to base64
-          const uint8Array = new Uint8Array(int16Array.buffer);
-          let binary = '';
-          for (let i = 0; i < uint8Array.length; i++) {
-            binary += String.fromCharCode(uint8Array[i]);
-          }
-          const base64Audio = btoa(binary);
-          
-          // Send audio to OpenAI
-          wsRef.current.send(JSON.stringify({
-            type: "input_audio_buffer.append",
-            audio: base64Audio
-          }));
         }
+      });
+
+      mediaStreamRef.current = stream;
+
+      const audioContext = new AudioContext({ sampleRate: 24000 });
+      captureContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+
+      // Try AudioWorklet first, fall back to ScriptProcessor
+      const useWorklet = typeof audioContext.audioWorklet?.addModule === 'function';
+
+      if (useWorklet) {
+        try {
+          await audioContext.audioWorklet.addModule('/audio-processor.worklet.js');
+          const workletNode = new AudioWorkletNode(audioContext, 'audio-capture-processor');
+          processorRef.current = workletNode;
+
+          workletNode.port.postMessage({ type: 'config', data: { vadEnabled: false, bufferSize: 4096 } });
+
+          workletNode.port.onmessage = (event) => {
+            if (event.data.type === 'audio') {
+              sendAudioBuffer(event.data.buffer);
+            }
+          };
+
+          source.connect(workletNode);
+          workletNode.connect(audioContext.destination);
+          logger.debug('[OpenAI] Audio capture via AudioWorklet');
+          setIsListening(true);
+          return;
+        } catch (workletErr) {
+          logger.warn('[OpenAI] AudioWorklet failed, falling back to ScriptProcessor:', workletErr);
+        }
+      }
+
+      // Fallback: ScriptProcessor (deprecated but widely supported)
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      processor.onaudioprocess = (e) => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        const int16Array = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          int16Array[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+        }
+        sendAudioBuffer(int16Array.buffer);
       };
-      
+
       source.connect(processor);
       processor.connect(audioContext.destination);
-      
+      logger.debug('[OpenAI] Audio capture via ScriptProcessor (fallback)');
       setIsListening(true);
-      
+
     } catch (error) {
       logger.error('Microphone error:', error);
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
@@ -894,7 +1035,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         optionsRef.current.onError?.('Could not access microphone');
       }
     }
-  }, []);
+  }, [sendAudioBuffer]);
 
   const sendText = useCallback((text: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -935,6 +1076,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
     isListening,
     isSpeaking,
     isVoiceDetected: isListening,
+    reconnectStatus,
     connect,
     disconnect,
     startListening,

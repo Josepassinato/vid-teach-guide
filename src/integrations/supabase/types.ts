@@ -654,6 +654,7 @@ export type Database = {
         Row: {
           correct_option_index: number
           created_at: string
+          difficulty: string
           explanation: string | null
           id: string
           options: Json
@@ -666,6 +667,7 @@ export type Database = {
         Insert: {
           correct_option_index: number
           created_at?: string
+          difficulty?: string
           explanation?: string | null
           id?: string
           options?: Json
@@ -678,6 +680,7 @@ export type Database = {
         Update: {
           correct_option_index?: number
           created_at?: string
+          difficulty?: string
           explanation?: string | null
           id?: string
           options?: Json

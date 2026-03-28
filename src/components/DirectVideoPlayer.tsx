@@ -1,9 +1,10 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
+import Hls from 'hls.js';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { VideoTimeline } from '@/components/VideoTimeline';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Volume1, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Volume1, Maximize, Minimize, PictureInPicture2 } from 'lucide-react';
 
 export interface DirectVideoPlayerRef {
   play: () => void;
@@ -38,6 +39,14 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
     const [duration, setDuration] = useState(0);
     const [isReady, setIsReady] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const hlsRef = useRef<Hls | null>(null);
+    const [hlsLevels, setHlsLevels] = useState<Array<{ height: number; index: number }>>([]);
+    const [currentLevel, setCurrentLevel] = useState(-1); // -1 = auto
+    const [playbackRate, setPlaybackRate] = useState(() => {
+      const stored = localStorage.getItem('vibe-class-playback-rate');
+      return stored ? parseFloat(stored) : 1;
+    });
+    const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
 
     useEffect(() => {
       const video = videoRef.current;
@@ -45,6 +54,7 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
 
       const handleLoadedMetadata = () => {
         setDuration(video.duration);
+        video.playbackRate = playbackRate;
         setIsReady(true);
       };
 
@@ -84,6 +94,47 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
         video.removeEventListener('seeked', handleSeeked);
       };
     }, [onEnded, onPlay, onPause, onSeek]);
+
+    // HLS.js setup for .m3u8 streams
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video || !videoUrl) return;
+
+      const isHls = videoUrl.endsWith('.m3u8') || videoUrl.includes('.m3u8?');
+
+      if (isHls && Hls.isSupported()) {
+        const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+        hlsRef.current = hls;
+        hls.loadSource(videoUrl);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          const levels = hls.levels.map((l, i) => ({ height: l.height, index: i }));
+          setHlsLevels(levels);
+        });
+
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+          setCurrentLevel(data.level);
+        });
+
+        return () => {
+          hls.destroy();
+          hlsRef.current = null;
+          setHlsLevels([]);
+        };
+      } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS support (Safari)
+        video.src = videoUrl;
+      }
+      // If not HLS, the src attribute on <video> handles it natively
+    }, [videoUrl]);
+
+    const setHlsQuality = (levelIndex: number) => {
+      if (hlsRef.current) {
+        hlsRef.current.currentLevel = levelIndex; // -1 = auto
+        setCurrentLevel(levelIndex);
+      }
+    };
 
     useImperativeHandle(ref, () => ({
       play: () => {
@@ -150,6 +201,30 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
       if (isMuted || volume === 0) return <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" />;
       if (volume < 50) return <Volume1 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />;
       return <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />;
+    };
+
+    const supportsPiP = 'pictureInPictureEnabled' in document;
+
+    const togglePiP = async () => {
+      if (!videoRef.current) return;
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else {
+          await videoRef.current.requestPictureInPicture();
+        }
+      } catch (err) {
+        console.warn('PiP error:', err);
+      }
+    };
+
+    const cyclePlaybackRate = () => {
+      const currentIdx = PLAYBACK_RATES.indexOf(playbackRate);
+      const nextIdx = (currentIdx + 1) % PLAYBACK_RATES.length;
+      const newRate = PLAYBACK_RATES[nextIdx];
+      setPlaybackRate(newRate);
+      localStorage.setItem('vibe-class-playback-rate', String(newRate));
+      if (videoRef.current) videoRef.current.playbackRate = newRate;
     };
 
     const toggleFullscreen = async () => {
@@ -238,6 +313,28 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
             </div>
             
             <div className="flex items-center gap-1 sm:gap-2">
+              {/* HLS Quality selector */}
+              {hlsLevels.length > 1 && (
+                <select
+                  value={currentLevel}
+                  onChange={(e) => setHlsQuality(Number(e.target.value))}
+                  className="h-9 px-2 text-xs bg-background border rounded-md"
+                  title="Qualidade do video"
+                >
+                  <option value={-1}>Auto</option>
+                  {hlsLevels.map((l) => (
+                    <option key={l.index} value={l.index}>{l.height}p</option>
+                  ))}
+                </select>
+              )}
+              <Button size="sm" variant="ghost" onClick={cyclePlaybackRate} className="h-11 sm:h-9 px-2 text-xs font-mono" title="Velocidade de reprodução">
+                {playbackRate}x
+              </Button>
+              {supportsPiP && (
+                <Button size="sm" variant="ghost" onClick={togglePiP} className="h-11 w-11 sm:h-9 sm:w-9 p-0" title="Picture-in-Picture">
+                  <PictureInPicture2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-11 w-11 sm:h-9 sm:w-9 p-0">
                 {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
               </Button>

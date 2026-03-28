@@ -27,3 +27,11 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Large media files
+*.mp4
+*.mov
+*.avi
+
+# Supabase temp
+supabase/.temp/

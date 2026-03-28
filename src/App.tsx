@@ -2,82 +2,64 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import Admin from "./pages/Admin";
-import Student from "./pages/Student";
-import StudentDashboard from "./pages/StudentDashboard";
+import { IntlProvider } from "react-intl";
+import { useState, lazy, Suspense } from "react";
+import { LOCALES, getSavedLocale, saveLocale, SupportedLocale } from "./i18n";
 import NotFound from "./pages/NotFound";
-import DebugPanel from "./components/DebugPanel";
-import { AuthPage } from "./components/auth";
-import { useAuth } from "./hooks/useAuth";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useAuth } from "./hooks/useAuth";
+
+const Admin = lazy(() => import("./pages/Admin"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const Student = lazy(() => import("./pages/Student"));
+const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
+const DebugPanel = lazy(() => import("./components/DebugPanel"));
+const AuthPage = lazy(() => import("./components/auth/AuthPage"));
 
 const queryClient = new QueryClient();
 
-// DEV BYPASS CHECK - Only works in development mode
-const isDevBypass = () => import.meta.env.DEV && localStorage.getItem('dev_bypass_auth') === 'true';
-
-// Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { isSignedIn, isLoading } = useAuth();
+  const [searchParams] = useSearchParams();
 
-  // Allow dev bypass
-  if (isDevBypass()) {
+  // Bypass auth for testing: ?bypass=test
+  if (searchParams.get('bypass') === 'test') {
     return <>{children}</>;
   }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
-  if (!user) {
+  if (!isSignedIn) {
     return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
 }
 
-// Public route - redirect to /aluno if already logged in
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
-
-  // Allow dev bypass to still see login page (for switching modes)
-  if (isDevBypass()) {
-    return <>{children}</>;
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-
-  if (user) {
-    return <Navigate to="/aluno" replace />;
-  }
-
-  return <>{children}</>;
-}
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
 
 const AppRoutes = () => (
+  <Suspense fallback={<PageLoader />}>
   <Routes>
     <Route path="/" element={<Navigate to="/aluno" replace />} />
     <Route
       path="/login"
-      element={
-        <PublicRoute>
-          <AuthPage />
-        </PublicRoute>
-      }
+      element={<AuthPage />}
     />
     <Route path="/admin" element={<Admin />} />
+    <Route path="/admin/analytics" element={<Analytics />} />
     <Route
       path="/aluno"
       element={
@@ -94,26 +76,38 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
     <Route path="*" element={<NotFound />} />
   </Routes>
+  </Suspense>
 );
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <ErrorBoundary>
-            <AppRoutes />
-          </ErrorBoundary>
-        </BrowserRouter>
-        <DebugPanel />
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [locale, setLocale] = useState<SupportedLocale>(getSavedLocale());
+  const messages = LOCALES[locale].messages;
+
+  const handleLocaleChange = (newLocale: SupportedLocale) => {
+    setLocale(newLocale);
+    saveLocale(newLocale);
+  };
+
+  return (
+    <IntlProvider locale={locale} messages={messages} defaultLocale="pt-BR">
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <ErrorBoundary>
+                <AppRoutes />
+              </ErrorBoundary>
+            </BrowserRouter>
+            <DebugPanel />
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </IntlProvider>
+  );
+};
 
 export default App;

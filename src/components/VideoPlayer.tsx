@@ -56,7 +56,12 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     const [userInteracted, setUserInteracted] = useState(false);
     const userInteractedRef = useRef(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [playbackRate, setPlaybackRate] = useState(() => {
+      const stored = localStorage.getItem('vibe-class-playback-rate');
+      return stored ? parseFloat(stored) : 1;
+    });
     const containerRef = useRef<HTMLDivElement>(null);
+    const PLAYBACK_RATES = [0.75, 1, 1.25, 1.5, 2];
 
     useEffect(() => {
       // Load YouTube IFrame API
@@ -130,10 +135,11 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
               // ignore
             }
 
-            // Start with full volume unmuted
+            // Start with full volume unmuted and apply stored playback rate
             try {
               playerRef.current?.unMute();
               playerRef.current?.setVolume(100);
+              playerRef.current?.setPlaybackRate(playbackRate);
               setIsMuted(false);
               setVolume(100);
             } catch {
@@ -356,6 +362,17 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
       }
     };
 
+    const cyclePlaybackRate = () => {
+      const currentIdx = PLAYBACK_RATES.indexOf(playbackRate);
+      const nextIdx = (currentIdx + 1) % PLAYBACK_RATES.length;
+      const newRate = PLAYBACK_RATES[nextIdx];
+      setPlaybackRate(newRate);
+      localStorage.setItem('vibe-class-playback-rate', String(newRate));
+      try {
+        playerRef.current?.setPlaybackRate(newRate);
+      } catch {}
+    };
+
     // Fullscreen toggle using native browser API
     const toggleFullscreen = async () => {
       if (!containerRef.current) return;
@@ -455,6 +472,10 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
             </div>
             
             <div className="flex items-center gap-1 sm:gap-2">
+              {/* Playback Speed */}
+              <Button size="sm" variant="ghost" onClick={cyclePlaybackRate} className="h-11 sm:h-9 px-2 text-xs font-mono" title="Velocidade de reprodução">
+                {playbackRate}x
+              </Button>
               {/* Fullscreen Button */}
               <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-11 w-11 sm:h-9 sm:w-9 p-0" title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}>
                 {isFullscreen ? (

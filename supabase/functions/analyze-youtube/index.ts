@@ -247,11 +247,11 @@ serve(async (req) => {
   if (corsResp) return corsResp;
 
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
     const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
-    
-    if (!OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is not configured");
+
+    if (!XAI_API_KEY) {
+      throw new Error("XAI_API_KEY is not configured");
     }
 
     const { youtubeUrl, manualTranscript } = await req.json();
@@ -320,17 +320,17 @@ NOTA: Não foi possível obter a transcrição deste vídeo. A análise é basea
 Responda em português brasileiro com uma lista numerada dos tópicos principais que o aluno deve prestar atenção nesta aula.`;
     }
 
-    // Use OpenAI API to analyze
+    // Use Grok API to analyze
     const aiResponse = await fetch(
-      "https://api.openai.com/v1/chat/completions",
+      "https://api.x.ai/v1/chat/completions",
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+          "Authorization": `Bearer ${XAI_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o",
+          model: "grok-3-mini-fast",
           messages: [{
             role: "user",
             content: prompt
@@ -342,13 +342,13 @@ Responda em português brasileiro com uma lista numerada dos tópicos principais
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("OpenAI API error:", aiResponse.status, errorText);
-      
+      console.error("Grok API error:", aiResponse.status, errorText);
+
       if (aiResponse.status === 429) {
         throw new Error("Rate limit exceeded. Please try again later.");
       }
       if (aiResponse.status === 401) {
-        throw new Error("Invalid OpenAI API key.");
+        throw new Error("Invalid XAI API key.");
       }
       throw new Error("Failed to analyze video");
     }

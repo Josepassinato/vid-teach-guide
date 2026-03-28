@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VideoControls } from '@/types/video';
 import { logger } from '@/lib/logger';
+import { useWebSocketReconnect, ReconnectStatus } from './useWebSocketReconnect';
 
 interface UseGeminiLiveOptions {
   systemInstruction?: string;
@@ -29,11 +30,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceDetected, setIsVoiceDetected] = useState(false);
+  const [reconnectStatus, setReconnectStatus] = useState<ReconnectStatus>('idle');
   
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | AudioWorkletNode | null>(null);
+  const captureContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingRef = useRef(false);
   const videoControlsRef = useRef<VideoControls | null>(null);
@@ -50,6 +53,30 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     logger.debug('[GeminiLive] videoControls updated:', options.videoControls ? 'EXISTS' : 'NULL');
     videoControlsRef.current = options.videoControls || null;
   }, [options.videoControls]);
+
+  // WebSocket reconnect with exponential backoff
+  const {
+    scheduleReconnect,
+    markManualDisconnect,
+    setReconnectFn,
+    reset: resetReconnect,
+  } = useWebSocketReconnect({
+    maxAttempts: 5,
+    initialDelayMs: 1000,
+    maxDelayMs: 30000,
+    onReconnectAttempt: (attempt, max) => {
+      setReconnectStatus('reconnecting');
+      toast.info(`Reconectando ao tutor Gemini... (${attempt}/${max})`, { duration: 3000 });
+    },
+    onReconnected: () => {
+      setReconnectStatus('idle');
+      toast.success('Conexao com o tutor restaurada!', { duration: 3000 });
+    },
+    onReconnectFailed: () => {
+      setReconnectStatus('failed');
+      toast.error('Nao foi possivel reconectar ao tutor. Tente iniciar a aula novamente.', { duration: 8000 });
+    },
+  });
 
   const updateStatus = useCallback((newStatus: ConnectionStatus) => {
     setStatus(newStatus);
@@ -115,12 +142,17 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
       processorRef.current.disconnect();
       processorRef.current = null;
     }
-    
+
+    if (captureContextRef.current) {
+      captureContextRef.current.close().catch(() => {});
+      captureContextRef.current = null;
+    }
+
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
     }
-    
+
     setIsListening(false);
   }, []);
 
@@ -548,20 +580,15 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
         logger.debug('[GeminiLive] Close code:', event.code);
         logger.debug('[GeminiLive] Close reason:', event.reason || 'Nenhuma razao fornecida');
         logger.debug('[GeminiLive] Was clean:', event.wasClean);
-        
-        // Common close codes:
-        // 1000 = Normal closure
-        // 1006 = Abnormal closure (connection lost)
-        // 1011 = Server error
-        // 1015 = TLS handshake failure
-         if (event.code !== 1000) {
-           logger.error('[GeminiLive] Conexao fechada com erro. Codigo:', event.code);
-           const reason = event.reason ? ` (${event.reason})` : '';
-           optionsRef.current.onError?.(`Conexao fechada: codigo ${event.code}${reason}`);
-         }
-        
+
         updateStatus('disconnected');
         stopListening();
+
+        // Auto-reconnect for abnormal closures
+        if (event.code !== 1000 && event.code !== 1001) {
+          logger.warn('[GeminiLive] Fechamento anormal, tentando reconectar...');
+          scheduleReconnect();
+        }
       };
       
     } catch (error) {
@@ -571,28 +598,75 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     }
   }, [updateStatus, playAudioChunk, stopListening, handleToolCall]);
 
+  // Register connect function for auto-reconnect
+  useEffect(() => {
+    setReconnectFn(connect);
+  }, [connect, setReconnectFn]);
+
   const disconnect = useCallback(() => {
+    markManualDisconnect();
     stopListening();
-    
+
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-    
+
     audioQueueRef.current = [];
     isPlayingRef.current = false;
     setIsSpeaking(false);
     updateStatus('disconnected');
-  }, [updateStatus, stopListening]);
+  }, [updateStatus, stopListening, markManualDisconnect]);
+
+  /** Convert Int16 ArrayBuffer to base64 and send to Gemini */
+  const sendGeminiAudio = useCallback((buffer: ArrayBuffer) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    const uint8Array = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < uint8Array.length; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    wsRef.current.send(JSON.stringify({
+      realtimeInput: {
+        mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: btoa(binary) }]
+      }
+    }));
+  }, []);
+
+  /** Build audio filter chain: highpass -> lowpass -> compressor */
+  const buildFilterChain = useCallback((ctx: AudioContext, source: MediaStreamAudioSourceNode) => {
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = 85;
+    highpass.Q.value = 0.7;
+
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 8000;
+    lowpass.Q.value = 0.7;
+
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = -24;
+    compressor.knee.value = 12;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.005;
+    compressor.release.value = 0.1;
+
+    source.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(compressor);
+
+    return compressor;
+  }, []);
 
   const startListening = useCallback(async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       optionsRef.current.onError?.('Not connected');
       return;
     }
-    
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
           channelCount: 1,
@@ -602,138 +676,102 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
           // @ts-ignore - experimental features for better noise resistance
           suppressLocalAudioPlayback: true,
           voiceIsolation: true,
-        } 
-      });
-      
-      mediaStreamRef.current = stream;
-      
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      const source = audioContext.createMediaStreamSource(stream);
-      
-      // Create high-pass filter to remove low-frequency noise (AC hum, background rumble)
-      const highpassFilter = audioContext.createBiquadFilter();
-      highpassFilter.type = 'highpass';
-      highpassFilter.frequency.value = 85; // Cut frequencies below 85Hz (human voice starts ~85Hz)
-      highpassFilter.Q.value = 0.7;
-      
-      // Create low-pass filter to remove high-frequency noise (hiss, static)
-      const lowpassFilter = audioContext.createBiquadFilter();
-      lowpassFilter.type = 'lowpass';
-      lowpassFilter.frequency.value = 8000; // Cut frequencies above 8kHz (speech range is 300Hz-3400Hz, keep some headroom)
-      lowpassFilter.Q.value = 0.7;
-      
-      // Create compressor to normalize volume and reduce sudden loud noises
-      const compressor = audioContext.createDynamicsCompressor();
-      compressor.threshold.value = -24; // Start compressing at -24dB
-      compressor.knee.value = 12; // Soft knee for natural compression
-      compressor.ratio.value = 4; // 4:1 compression ratio
-      compressor.attack.value = 0.005; // Fast attack to catch loud sounds
-      compressor.release.value = 0.1; // Quick release for natural speech
-      
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      
-      processorRef.current = processor;
-      
-      // VAD (Voice Activity Detection) parameters for speakerphone resistance
-      const VAD_ENERGY_THRESHOLD = 0.008; // Minimum RMS energy to consider as speech
-      const VAD_ZERO_CROSSING_MIN = 10; // Minimum zero crossings (voice has more variation than noise)
-      const VAD_ZERO_CROSSING_MAX = 800; // Maximum (too high = likely noise/static)
-      let silentFrameCount = 0;
-      const SILENT_FRAMES_BEFORE_MUTE = 3; // Number of silent frames before stopping transmission
-      let noiseFloor = 0.002; // Adaptive noise floor estimation
-      const NOISE_ADAPTATION_RATE = 0.05; // How fast to adapt to ambient noise
-      
-      processor.onaudioprocess = (e) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const inputData = e.inputBuffer.getChannelData(0);
-          
-          // Calculate RMS energy (volume level)
-          let sumSquares = 0;
-          let zeroCrossings = 0;
-          let prevSample = 0;
-          
-          for (let i = 0; i < inputData.length; i++) {
-            sumSquares += inputData[i] * inputData[i];
-            // Count zero crossings (sign changes)
-            if ((prevSample >= 0 && inputData[i] < 0) || (prevSample < 0 && inputData[i] >= 0)) {
-              zeroCrossings++;
-            }
-            prevSample = inputData[i];
-          }
-          
-          const rmsEnergy = Math.sqrt(sumSquares / inputData.length);
-          
-          // Adaptive noise floor - slowly adjust to ambient noise level
-          if (rmsEnergy < noiseFloor * 2) {
-            noiseFloor = noiseFloor * (1 - NOISE_ADAPTATION_RATE) + rmsEnergy * NOISE_ADAPTATION_RATE;
-          }
-          
-          // Dynamic threshold based on noise floor
-          const dynamicThreshold = Math.max(VAD_ENERGY_THRESHOLD, noiseFloor * 3);
-          
-          // Voice Activity Detection check
-          const hasEnoughEnergy = rmsEnergy > dynamicThreshold;
-          const hasNormalZeroCrossings = zeroCrossings >= VAD_ZERO_CROSSING_MIN && zeroCrossings <= VAD_ZERO_CROSSING_MAX;
-          const isVoiceDetected = hasEnoughEnergy && hasNormalZeroCrossings;
-          
-          // Update voice detection state for UI feedback
-          setIsVoiceDetected(isVoiceDetected);
-          
-          if (!isVoiceDetected) {
-            silentFrameCount++;
-            // Skip sending if too many silent frames (reduces bandwidth and noise)
-            if (silentFrameCount > SILENT_FRAMES_BEFORE_MUTE) {
-              return;
-            }
-          } else {
-            silentFrameCount = 0;
-          }
-          
-          // Apply soft gate - reduce volume of quiet sounds (likely noise)
-          const gateMultiplier = rmsEnergy > dynamicThreshold ? 1.0 : Math.pow(rmsEnergy / dynamicThreshold, 2);
-          
-          // Convert Float32 to Int16 with gating applied
-          const int16Array = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            const gatedSample = inputData[i] * gateMultiplier;
-            int16Array[i] = Math.max(-32768, Math.min(32767, gatedSample * 32768));
-          }
-          
-          // Convert to base64
-          const uint8Array = new Uint8Array(int16Array.buffer);
-          let binary = '';
-          for (let i = 0; i < uint8Array.length; i++) {
-            binary += String.fromCharCode(uint8Array[i]);
-          }
-          const base64Audio = btoa(binary);
-          
-          // Send audio to Gemini
-          wsRef.current.send(JSON.stringify({
-            realtimeInput: {
-              mediaChunks: [{
-                mimeType: "audio/pcm;rate=16000",
-                data: base64Audio
-              }]
-            }
-          }));
         }
+      });
+
+      mediaStreamRef.current = stream;
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      captureContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const lastFilterNode = buildFilterChain(audioContext, source);
+
+      // Try AudioWorklet first, fall back to ScriptProcessor
+      const useWorklet = typeof audioContext.audioWorklet?.addModule === 'function';
+
+      if (useWorklet) {
+        try {
+          await audioContext.audioWorklet.addModule('/audio-processor.worklet.js');
+          const workletNode = new AudioWorkletNode(audioContext, 'audio-capture-processor');
+          processorRef.current = workletNode;
+
+          workletNode.port.postMessage({ type: 'config', data: { vadEnabled: true, bufferSize: 4096 } });
+
+          workletNode.port.onmessage = (event) => {
+            if (event.data.type === 'audio') {
+              sendGeminiAudio(event.data.buffer);
+            } else if (event.data.type === 'vad') {
+              setIsVoiceDetected(event.data.isVoice);
+            }
+          };
+
+          lastFilterNode.connect(workletNode);
+          workletNode.connect(audioContext.destination);
+          logger.debug('[GeminiLive] Audio pipeline via AudioWorklet com VAD');
+          setIsListening(true);
+          return;
+        } catch (workletErr) {
+          logger.warn('[GeminiLive] AudioWorklet failed, falling back to ScriptProcessor:', workletErr);
+        }
+      }
+
+      // Fallback: ScriptProcessor with inline VAD
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      const VAD_ENERGY_THRESHOLD = 0.008;
+      const VAD_ZERO_CROSSING_MIN = 10;
+      const VAD_ZERO_CROSSING_MAX = 800;
+      let silentFrameCount = 0;
+      const SILENT_FRAMES_BEFORE_MUTE = 3;
+      let noiseFloor = 0.002;
+      const NOISE_ADAPTATION_RATE = 0.05;
+
+      processor.onaudioprocess = (e) => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+
+        let sumSquares = 0;
+        let zeroCrossings = 0;
+        let prevSample = 0;
+        for (let i = 0; i < inputData.length; i++) {
+          sumSquares += inputData[i] * inputData[i];
+          if ((prevSample >= 0 && inputData[i] < 0) || (prevSample < 0 && inputData[i] >= 0)) zeroCrossings++;
+          prevSample = inputData[i];
+        }
+
+        const rmsEnergy = Math.sqrt(sumSquares / inputData.length);
+        if (rmsEnergy < noiseFloor * 2) {
+          noiseFloor = noiseFloor * (1 - NOISE_ADAPTATION_RATE) + rmsEnergy * NOISE_ADAPTATION_RATE;
+        }
+        const dynamicThreshold = Math.max(VAD_ENERGY_THRESHOLD, noiseFloor * 3);
+        const detected = rmsEnergy > dynamicThreshold && zeroCrossings >= VAD_ZERO_CROSSING_MIN && zeroCrossings <= VAD_ZERO_CROSSING_MAX;
+        setIsVoiceDetected(detected);
+
+        if (!detected) {
+          silentFrameCount++;
+          if (silentFrameCount > SILENT_FRAMES_BEFORE_MUTE) return;
+        } else {
+          silentFrameCount = 0;
+        }
+
+        const gateMultiplier = rmsEnergy > dynamicThreshold ? 1.0 : Math.pow(rmsEnergy / dynamicThreshold, 2);
+        const int16Array = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          int16Array[i] = Math.max(-32768, Math.min(32767, inputData[i] * gateMultiplier * 32768));
+        }
+        sendGeminiAudio(int16Array.buffer);
       };
-      
-      // Connect audio processing chain: source -> highpass -> lowpass -> compressor -> processor
-      source.connect(highpassFilter);
-      highpassFilter.connect(lowpassFilter);
-      lowpassFilter.connect(compressor);
-      compressor.connect(processor);
+
+      lastFilterNode.connect(processor);
       processor.connect(audioContext.destination);
-      
       setIsListening(true);
-      logger.debug('[GeminiLive] Audio pipeline com VAD e filtros de ruido ativado');
-      
+      logger.debug('[GeminiLive] Audio pipeline via ScriptProcessor (fallback) com VAD');
+
     } catch (error) {
       logger.error('Microphone error:', error);
       optionsRef.current.onError?.('Could not access microphone');
     }
-  }, []);
+  }, [sendGeminiAudio, buildFilterChain]);
 
   const sendText = useCallback((text: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -768,6 +806,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}) {
     isListening,
     isSpeaking,
     isVoiceDetected,
+    reconnectStatus,
     connect,
     disconnect,
     startListening,

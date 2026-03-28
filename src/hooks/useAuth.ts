@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
-import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/react';
 
 interface Profile {
   id: string;
@@ -11,148 +11,87 @@ interface Profile {
 }
 
 interface UseAuthReturn {
-  user: User | null;
-  session: Session | null;
+  user: { id: string; email?: string; fullName?: string; imageUrl?: string } | null;
   profile: Profile | null;
+  session: Session | null;
   isLoading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  isSignedIn: boolean;
   signOut: () => Promise<void>;
-  updateProfile: (updates: Partial<Pick<Profile, 'full_name' | 'avatar_url'>>) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
 }
 
 export function useAuth(): UseAuthReturn {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch user profile
-  const fetchProfile = useCallback(async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      logger.error('[Auth] Error fetching profile:', error);
-    }
-  }, []);
-
-  // Initialize auth state
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        logger.debug('[Auth] State changed:', event);
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-
-        if (newSession?.user) {
-          // Use setTimeout to avoid potential deadlock with Supabase
-          setTimeout(() => fetchProfile(newSession.user.id), 0);
-        } else {
-          setProfile(null);
-        }
-
-        if (event === 'SIGNED_OUT') {
-          setProfile(null);
-        }
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      setUser(s?.user ?? null);
+      if (s?.user) {
+        Sentry.setUser({ id: s.user.id, email: s.user.email });
       }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
-        fetchProfile(currentSession.user.id);
-      }
-      
       setIsLoading(false);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [fetchProfile]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      setUser(s?.user ?? null);
+      if (s?.user) {
+        Sentry.setUser({ id: s.user.id, email: s.user.email });
+      } else {
+        Sentry.setUser(null);
+      }
+    });
 
-  // Sign up
-  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: {
-            full_name: fullName,
-          },
-        },
-      });
-
-      if (error) throw error;
-      return { error: null };
-    } catch (error) {
-      logger.error('[Auth] Sign up error:', error);
-      return { error: error as Error };
-    }
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Sign in
-  const signIn = useCallback(async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-      return { error: null };
-    } catch (error) {
-      logger.error('[Auth] Sign in error:', error);
-      return { error: error as Error };
-    }
-  }, []);
-
-  // Sign out
   const signOut = useCallback(async () => {
+    Sentry.setUser(null);
     await supabase.auth.signOut();
   }, []);
 
-  // Update profile
-  const updateProfile = useCallback(async (updates: Partial<Pick<Profile, 'full_name' | 'avatar_url'>>) => {
-    if (!user) return { error: new Error('Not authenticated') };
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { error: error as Error | null };
+  }, []);
 
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('user_id', user.id);
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
+    return { error: error as Error | null };
+  }, []);
 
-      if (error) throw error;
-
-      setProfile(prev => prev ? { ...prev, ...updates } : null);
-      return { error: null };
-    } catch (error) {
-      logger.error('[Auth] Update profile error:', error);
-      return { error: error as Error };
-    }
-  }, [user]);
+  const profile: Profile | null = user
+    ? {
+        id: user.id,
+        user_id: user.id,
+        full_name: user.user_metadata?.full_name ?? null,
+        avatar_url: user.user_metadata?.avatar_url ?? null,
+      }
+    : null;
 
   return {
-    user,
-    session,
+    user: user
+      ? {
+          id: user.id,
+          email: user.email,
+          fullName: user.user_metadata?.full_name,
+          imageUrl: user.user_metadata?.avatar_url,
+        }
+      : null,
     profile,
+    session,
     isLoading,
-    signUp,
-    signIn,
+    isSignedIn: !!session,
     signOut,
-    updateProfile,
+    signIn,
+    signUp,
   };
 }

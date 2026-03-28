@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { GoogleSignInButton } from './GoogleSignInButton';
 
 const signupSchema = z.object({
   fullName: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
@@ -146,6 +147,18 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
           'Criar conta'
         )}
       </Button>
+
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">ou</span>
+        </div>
+      </div>
+
+      {/* Google OAuth disabled until credentials are configured */}
+      {/* <GoogleSignInButton label="Cadastrar com Google" /> */}
     </form>
   );
 }
