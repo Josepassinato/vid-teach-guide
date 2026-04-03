@@ -26,6 +26,9 @@ import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
 import { CertificatesPanel } from '@/components/certificates';
 import { useAuth } from '@/hooks/useAuth';
+import { AIAnalyticsDashboard } from '@/components/AIAnalyticsDashboard';
+import { GamificationHub } from '@/components/GamificationHub';
+import { PersonalizedRecommendations } from '@/components/PersonalizedRecommendations';
 
 interface QuizResult {
   id: string;
@@ -625,6 +628,15 @@ const StudentDashboard = () => {
             <CertificatesPanel studentId={studentId} />
           </CardContent>
         </Card>
+
+        {/* Personalized Learning Recommendations */}
+        <PersonalizedRecommendations studentId={studentId} />
+
+        {/* AI Analytics Dashboard */}
+        <AIAnalyticsDashboard studentId={studentId} />
+
+        {/* Gamification Hub */}
+        <GamificationHub studentId={studentId} />
 
         {/* Back to Classroom */}
         <div className="text-center pt-4">

@@ -1,7 +1,7 @@
-import { Video, Play, Target, ClipboardCheck } from 'lucide-react';
+import { Video, Play, Target, ClipboardCheck, MessageCircle, Trophy, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type MobileTab = 'lessons' | 'video' | 'missions' | 'quiz';
+export type MobileTab = 'lessons' | 'video' | 'missions' | 'quiz' | 'chat' | 'xp' | 'ai-quiz';
 
 interface MobileNavigationProps {
   activeTab: MobileTab;
@@ -23,6 +23,9 @@ export function MobileNavigation({
     { id: 'video' as const, icon: Play, label: 'Vídeo', show: true },
     { id: 'missions' as const, icon: Target, label: 'Missões', show: hasMissions },
     { id: 'quiz' as const, icon: ClipboardCheck, label: 'Quiz', show: hasQuiz && !lessonCompleted },
+    { id: 'chat' as const, icon: MessageCircle, label: 'Chat IA', show: true },
+    { id: 'ai-quiz' as const, icon: Brain, label: 'Quiz IA', show: true },
+    { id: 'xp' as const, icon: Trophy, label: 'XP', show: true },
   ].filter((tab) => tab.show);
 
   return (

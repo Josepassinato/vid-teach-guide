@@ -23,6 +23,10 @@ interface GeneratorRequest {
   videoDurationMinutes?: number;
   numberOfQuestions?: number;
   teachingMoments?: Array<{ timestamp_seconds: number; topic: string; key_insight: string }>;
+  // Adaptive difficulty based on student mastery
+  student_id?: string;
+  weak_concepts?: Array<{ concept: string; mastery_level: number }>;
+  avg_quiz_score?: number;
 }
 
 serve(async (req) => {
@@ -52,6 +56,21 @@ serve(async (req) => {
     if (request.teachingMoments && request.teachingMoments.length > 0) {
       momentsContext = `\n\n📍 MOMENTOS-CHAVE DA AULA (use como base para as perguntas):
 ${request.teachingMoments.map((m, i) => `${i + 1}. [${Math.floor(m.timestamp_seconds / 60)}:${(m.timestamp_seconds % 60).toString().padStart(2, '0')}] ${m.topic}: ${m.key_insight}`).join('\n')}`;
+    }
+
+    // Adaptive difficulty context based on student mastery
+    let adaptiveContext = "";
+    if (request.weak_concepts && request.weak_concepts.length > 0) {
+      adaptiveContext += `\n\n🎯 CONCEITOS QUE O ALUNO TEM DIFICULDADE (priorize perguntas sobre estes):
+${request.weak_concepts.map(c => `- ${c.concept} (domínio: ${Math.round(c.mastery_level * 100)}%)`).join('\n')}`;
+    }
+    if (request.avg_quiz_score !== undefined && request.avg_quiz_score !== null) {
+      const score = request.avg_quiz_score;
+      if (score < 40) {
+        adaptiveContext += `\n\n⚠️ AJUSTE DE DIFICULDADE: O aluno tem média de ${score}% nos quizzes. Gere mais perguntas BÁSICAS (3 básicas, 1 intermediária, 1 avançada) para reforçar fundamentos.`;
+      } else if (score > 80) {
+        adaptiveContext += `\n\n🚀 AJUSTE DE DIFICULDADE: O aluno tem média de ${score}% nos quizzes. Gere perguntas mais DESAFIADORAS (1 básica, 2 intermediárias, 2 avançadas) para estimular crescimento.`;
+      }
     }
 
     const systemPrompt = `Você é o QUIZ GENERATOR AGENT - especialista em criar avaliações pedagógicas para cursos de programação e vibe coding.
@@ -89,7 +108,7 @@ Criar ${numQuestions} perguntas de múltipla escolha que avaliem a compreensão 
 
 📹 TÍTULO: "${request.title}"
 ⏱️ DURAÇÃO: ${duration} minutos
-${momentsContext}
+${momentsContext}${adaptiveContext}
 
 📝 TRANSCRIÇÃO/CONTEÚDO:
 ${request.transcript.substring(0, 12000)}

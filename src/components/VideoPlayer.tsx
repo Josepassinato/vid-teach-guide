@@ -401,8 +401,8 @@ export const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(
     }, []);
 
     return (
-      <Card ref={containerRef} className={`overflow-hidden transition-all duration-300 ${expanded || isFullscreen ? 'h-full border-0 rounded-none' : ''} ${isFullscreen ? 'bg-black' : ''}`}>
-        <div className={`relative bg-black ${expanded || isFullscreen ? 'h-[calc(100%-56px)]' : 'aspect-video'}`}>
+      <Card ref={containerRef} className={`overflow-hidden transition-all duration-300 h-full ${expanded || isFullscreen ? 'border-0 rounded-none' : ''} ${isFullscreen ? 'bg-black' : ''}`}>
+        <div className={`relative bg-black ${expanded || isFullscreen ? 'h-[calc(100%-56px)]' : 'h-[calc(100%-56px)]'}`}>
           <div id={`youtube-player-${videoId}`} className="absolute inset-0 w-full h-full [&>iframe]:w-full [&>iframe]:h-full" />
           
           {!isReady && (

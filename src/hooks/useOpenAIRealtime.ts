@@ -27,8 +27,8 @@ interface UseOpenAIRealtimeOptions {
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
-// Silence timeout configuration (ms)
-const SILENCE_TIMEOUT_MS = 5000;
+// Silence timeout configuration (ms) — increased to reduce false triggers
+const SILENCE_TIMEOUT_MS = 15000;
 
 // Proactive prompts to encourage student engagement
 const PROACTIVE_PROMPTS = [
@@ -57,7 +57,11 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   const isPlayingRef = useRef(false);
   const videoControlsRef = useRef<VideoControls | null>(null);
   const processedCallIdsRef = useRef<Set<string>>(new Set());
-  
+  // Track whether the model is currently generating a response (prevents silence prompt collisions)
+  const isRespondingRef = useRef(false);
+  // Track recent assistant transcripts to prevent deduplication
+  const recentTranscriptsRef = useRef<string[]>([]);
+
   // Silence detection refs
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastAgentSpeechEndRef = useRef<number | null>(null);
@@ -73,6 +77,12 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   useEffect(() => {
     videoControlsRef.current = options.videoControls || null;
   }, [options.videoControls]);
+
+  // Helper: returns true when video is actively playing (not paused)
+  const isVideoPlaying = useCallback(() => {
+    const vc = videoControlsRef.current;
+    return vc ? !vc.isPaused() : false;
+  }, []);
 
   // WebSocket reconnect with exponential backoff
   const {
@@ -120,11 +130,10 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
       return;
     }
     
-    // Don't interrupt if agent is speaking
-    if (isPlayingRef.current || audioQueueRef.current.length > 0) {
-      logger.debug('[SILENCE] Agente ainda falando, adiando prompt proativo');
-      // Retry in 1 second
-      silenceTimeoutRef.current = setTimeout(sendProactivePrompt, 1000);
+    // Don't interrupt if agent is speaking or model is generating a response
+    if (isPlayingRef.current || audioQueueRef.current.length > 0 || isRespondingRef.current) {
+      logger.debug('[SILENCE] Agente ainda falando/respondendo, adiando prompt proativo');
+      silenceTimeoutRef.current = setTimeout(sendProactivePrompt, 2000);
       return;
     }
 
@@ -245,6 +254,11 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   }, []);
 
   const playAudioChunk = useCallback(async (base64Audio: string) => {
+    // Mute tutor while video is playing — discard audio chunks
+    if (isVideoPlaying()) {
+      return;
+    }
+
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext({ sampleRate: 24000 });
     }
@@ -367,6 +381,8 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
         clearTimeout(connectionTimeout);
         logger.debug('WebSocket connected to Grok Voice Agent');
         processedCallIdsRef.current.clear();
+        isRespondingRef.current = false;
+        recentTranscriptsRef.current = [];
         optionsRef.current.onConnectionStepChange?.('configuring');
         
         // Define tools for video control and memory - use detailed descriptions for better understanding
@@ -503,9 +519,9 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
               input_audio_transcription: { model: "whisper-1" },
               turn_detection: {
                 type: "server_vad",
-                threshold: 0.5,
-                prefix_padding_ms: 500,
-                silence_duration_ms: 1400,
+                threshold: 0.6,
+                prefix_padding_ms: 400,
+                silence_duration_ms: 1800,
               },
               tools: tools,
               tool_choice: "auto",
@@ -526,14 +542,35 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
             logger.debug('[realtime:event]', data.type);
           }
 
-          // Handle audio response
-          if (data.type === "response.audio.delta" && data.delta) {
+          // Handle audio response (OpenAI: response.audio.delta, Grok: response.output_audio.delta)
+          if ((data.type === "response.audio.delta" || data.type === "response.output_audio.delta") && data.delta) {
             await playAudioChunk(data.delta);
           }
 
-          // Handle text transcript from assistant
-          if (data.type === "response.audio_transcript.done" && data.transcript) {
-            optionsRef.current.onTranscript?.(data.transcript, 'assistant');
+          // Track when the model starts generating a response
+          if (data.type === "response.created") {
+            isRespondingRef.current = true;
+            clearSilenceTimeout();
+          }
+
+          // Handle text transcript from assistant — with deduplication + video mute guard
+          if ((data.type === "response.audio_transcript.done" || data.type === "response.text.done") && data.transcript) {
+            // Suppress tutor transcripts while video is playing
+            if (isVideoPlaying()) {
+              logger.debug('[MUTE] Video rodando, transcript do tutor suprimido');
+            } else {
+              const transcript = data.transcript.trim();
+              // Deduplicate: skip if this exact transcript was just emitted
+              const recent = recentTranscriptsRef.current;
+              if (transcript && !recent.includes(transcript)) {
+                recent.push(transcript);
+                // Keep only last 5 transcripts for comparison
+                if (recent.length > 5) recent.shift();
+                optionsRef.current.onTranscript?.(transcript, 'assistant');
+              } else {
+                logger.debug('[DEDUP] Transcript duplicado ignorado:', transcript.slice(0, 50));
+              }
+            }
           }
 
           // Handle user transcript
@@ -834,6 +871,7 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
 
           // Canonical: embedded in response.done
           if (data.type === "response.done") {
+            isRespondingRef.current = false;
             logger.debug('[OPENAI EVENT] response.done detectado!');
             const outputs = data.response?.output;
             if (Array.isArray(outputs)) {
@@ -946,6 +984,8 @@ export function useOpenAIRealtime(options: UseOpenAIRealtimeOptions = {}) {
   /** Convert Int16 ArrayBuffer to base64 and send to OpenAI */
   const sendAudioBuffer = useCallback((buffer: ArrayBuffer) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    // Don't send mic audio while video is playing — prevents model from hearing video audio
+    if (isVideoPlaying()) return;
     const uint8Array = new Uint8Array(buffer);
     let binary = '';
     for (let i = 0; i < uint8Array.length; i++) {

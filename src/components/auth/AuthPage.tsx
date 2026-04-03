@@ -1,11 +1,17 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { GraduationCap, Sparkles } from 'lucide-react';
+import { GraduationCap, Sparkles, FlaskConical } from 'lucide-react';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const navigate = useNavigate();
+
+  const handleTestBypass = () => {
+    navigate('/aluno?bypass=test');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
@@ -73,6 +79,17 @@ export default function AuthPage() {
             ) : (
               <SignupForm onSuccess={() => setIsLogin(true)} />
             )}
+          </div>
+
+          {/* Test Bypass */}
+          <div className="mt-6 pt-4 border-t border-dashed border-muted-foreground/30">
+            <button
+              onClick={handleTestBypass}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted hover:text-foreground transition-all border border-dashed border-muted-foreground/30"
+            >
+              <FlaskConical className="h-4 w-4" />
+              Entrar como Teste (bypass)
+            </button>
           </div>
 
           {/* Footer */}

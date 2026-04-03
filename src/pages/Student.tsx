@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { VoiceChat } from '@/components/VoiceChat';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ChevronLeft, ChevronRight, CheckCircle, Lock, Target, ClipboardCheck, Video } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, Lock, Target, ClipboardCheck, Video, MessageCircle, Brain, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -25,6 +25,13 @@ import { ModuleAccordion } from '@/components/student/ModuleAccordion';
 import { MobileNavigation, MobileTab } from '@/components/student/MobileNavigation';
 import { EmptyState } from '@/components/student/EmptyState';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+
+// New disruptive features
+import { TranscriptChat } from '@/components/TranscriptChat';
+import { DynamicQuiz } from '@/components/DynamicQuiz';
+import { GamificationHub } from '@/components/GamificationHub';
+import { EnhancedCaptions, EnhancedCaptionsToggle } from '@/components/EnhancedCaptions';
+import { AvatarFeedback } from '@/components/AvatarFeedback';
 
 interface SavedVideo {
   id: string;
@@ -91,6 +98,9 @@ const Student = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('video');
   const [hasAutoCollapsedForThisLesson, setHasAutoCollapsedForThisLesson] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(false);
+  const [captionsLanguage, setCaptionsLanguage] = useState<'pt-BR' | 'en' | 'es'>('pt-BR');
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
 
   const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
     if (newStats.progressPercentage === 100) {
@@ -259,6 +269,7 @@ const Student = () => {
       setShowQuiz(false);
       setShowMissions(false);
     }
+    // New tabs don't affect quiz/missions state
   };
 
   // Render lessons list (used in sidebar and sheet)
@@ -556,6 +567,68 @@ const Student = () => {
                 )}
               </AnimatePresence>
 
+              {/* Chat com Aulas (RAG) */}
+              <AnimatePresence>
+                {mobileTab === 'chat' && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="flex-1 lg:flex-none border-t bg-card/50 backdrop-blur-sm overflow-y-auto"
+                  >
+                    <div className="p-4 max-w-3xl mx-auto h-[60vh]">
+                      <TranscriptChat
+                        videoTitles={Object.fromEntries(savedVideos.map(v => [v.id, v.title]))}
+                        onNavigateToMoment={(videoId) => {
+                          const video = savedVideos.find(v => v.id === videoId);
+                          if (video) {
+                            const index = savedVideos.findIndex(v => v.id === videoId);
+                            selectVideo(video, index);
+                            setMobileTab('video');
+                          }
+                        }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Quiz IA Dinâmico */}
+              <AnimatePresence>
+                {mobileTab === 'ai-quiz' && currentLesson && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="flex-1 lg:flex-none border-t bg-card/50 backdrop-blur-sm overflow-y-auto"
+                  >
+                    <div className="p-4 max-w-3xl mx-auto">
+                      <DynamicQuiz
+                        videoId={currentLesson.id}
+                        videoTitle={currentLesson.title}
+                        transcript={currentLesson.transcript}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Gamificação / XP Hub */}
+              <AnimatePresence>
+                {mobileTab === 'xp' && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="flex-1 lg:flex-none border-t bg-card/50 backdrop-blur-sm overflow-y-auto"
+                  >
+                    <div className="p-4 max-w-3xl mx-auto">
+                      <GamificationHub studentId={studentId} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Desktop Bottom Action Bar */}
               <div className="hidden lg:flex border-t bg-card/80 backdrop-blur-sm p-3 items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -624,6 +697,36 @@ const Student = () => {
                       Fazer Quiz
                     </Button>
                   )}
+
+                  <Button
+                    size="sm"
+                    variant={mobileTab === 'chat' ? 'default' : 'outline'}
+                    onClick={() => handleMobileTabChange(mobileTab === 'chat' ? 'video' : 'chat')}
+                    className="rounded-full"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-1.5" />
+                    Chat IA
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={mobileTab === 'ai-quiz' ? 'default' : 'outline'}
+                    onClick={() => handleMobileTabChange(mobileTab === 'ai-quiz' ? 'video' : 'ai-quiz')}
+                    className="rounded-full"
+                  >
+                    <Brain className="h-4 w-4 mr-1.5" />
+                    Quiz IA
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={mobileTab === 'xp' ? 'default' : 'outline'}
+                    onClick={() => handleMobileTabChange(mobileTab === 'xp' ? 'video' : 'xp')}
+                    className="rounded-full"
+                  >
+                    <Trophy className="h-4 w-4 mr-1.5" />
+                    XP
+                  </Button>
 
                   {currentLessonIndex < savedVideos.length - 1 && (
                     <>

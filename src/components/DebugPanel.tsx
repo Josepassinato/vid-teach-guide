@@ -133,7 +133,7 @@ export const DebugPanel: React.FC = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-50 rounded-full h-12 w-12 p-0 shadow-lg"
+        className="fixed bottom-20 right-4 z-[60] rounded-full h-12 w-12 p-0 shadow-lg"
         variant={errorCount > 0 ? 'destructive' : 'secondary'}
       >
         <Bug className="h-5 w-5" />
@@ -147,7 +147,7 @@ export const DebugPanel: React.FC = () => {
   }
 
   return (
-    <Card className="fixed bottom-4 right-4 z-50 w-[500px] max-w-[calc(100vw-2rem)] shadow-xl border-2">
+    <Card className="fixed bottom-20 right-4 z-[60] w-[500px] max-w-[calc(100vw-2rem)] shadow-xl border-2">
       <CardHeader className="py-2 px-3 flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
           <Bug className="h-4 w-4" />

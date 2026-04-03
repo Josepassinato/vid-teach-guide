@@ -26,18 +26,72 @@ serve(async (req) => {
   if (corsResp) return corsResp;
 
   try {
-    const { transcript, title, analysis, videoDurationMinutes } = await req.json();
+    const body = await req.json();
+    const { action } = body;
+
+    const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
+    if (!XAI_API_KEY) {
+      throw new Error("XAI_API_KEY is not configured");
+    }
+
+    // ── RAG Conversational Answer (Grok) ──────────────────────
+    if (action === 'rag_answer') {
+      const { query, context, system_prompt } = body;
+      const ragResponse = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${XAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "grok-3-mini-fast",
+          messages: [
+            { role: "system", content: system_prompt || "Você é um tutor educacional. Responda usando os trechos fornecidos." },
+            { role: "user", content: `Pergunta do aluno: ${query}\n\nTrechos das aulas:\n${context}` },
+          ],
+          temperature: 0.7,
+          max_tokens: 800,
+        }),
+      });
+      const ragData = await ragResponse.json();
+      const answer = ragData.choices?.[0]?.message?.content || "Não consegui gerar uma resposta.";
+      return new Response(
+        JSON.stringify({ answer }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Translation (Grok) ────────────────────────────────────
+    if (action === 'translate') {
+      const { text, targetLanguage } = body;
+      const langMap: Record<string, string> = { 'en': 'English', 'es': 'Spanish', 'pt-BR': 'Brazilian Portuguese' };
+      const targetLang = langMap[targetLanguage] || targetLanguage;
+      const translateResponse = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${XAI_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "grok-3-mini-fast",
+          messages: [
+            { role: "system", content: `Translate the following text to ${targetLang}. Return ONLY the translated text, no explanations.` },
+            { role: "user", content: text },
+          ],
+          temperature: 0.3,
+          max_tokens: 500,
+        }),
+      });
+      const transData = await translateResponse.json();
+      const translated = transData.choices?.[0]?.message?.content || text;
+      return new Response(
+        JSON.stringify({ translated }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Original: Teaching Moments Analysis ───────────────────
+    const { transcript, title, analysis, videoDurationMinutes } = body;
 
     if (!transcript && !analysis) {
       return new Response(
         JSON.stringify({ error: "Transcript or analysis is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    const XAI_API_KEY = Deno.env.get("XAI_API_KEY");
-    if (!XAI_API_KEY) {
-      throw new Error("XAI_API_KEY is not configured");
     }
 
     const contentToAnalyze = transcript || analysis;

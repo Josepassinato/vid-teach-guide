@@ -10,6 +10,7 @@ import { useTimestampQuizzes, TimestampQuiz } from '@/hooks/useTimestampQuizzes'
 
 import { useMissions, Mission } from '@/hooks/useMissions';
 import { useStudentMemory, StudentProfile } from '@/hooks/useStudentMemory';
+import { useTutorMemory } from '@/hooks/useTutorMemory';
 import { VideoPlayer, VideoPlayerRef } from './VideoPlayer';
 import { DirectVideoPlayer, DirectVideoPlayerRef } from './DirectVideoPlayer';
 import { VoiceIndicator } from './VoiceIndicator';
@@ -139,6 +140,26 @@ export function VoiceChat({ videoContext, videoId, videoUrl, videoType, videoDbI
   useEffect(() => {
     studentProfileRef.current = studentProfile;
   }, [studentProfile]);
+
+  // Tutor Memory — long-term memory + conversation persistence + mid-session updates
+  const {
+    memoryContext: tutorMemoryContext,
+    fetchMemoryContext: fetchTutorMemory,
+    addMessage: addTutorMessage,
+    endSession: endTutorSession,
+  } = useTutorMemory({
+    studentId: studentProfile?.student_id || null,
+    videoDbId,
+  });
+
+  // Fetch memory context on mount / when student profile loads
+  const tutorMemoryFetchedRef = useRef(false);
+  useEffect(() => {
+    if (studentProfile?.student_id && !tutorMemoryFetchedRef.current) {
+      tutorMemoryFetchedRef.current = true;
+      fetchTutorMemory();
+    }
+  }, [studentProfile?.student_id, fetchTutorMemory]);
 
   // Load missions when videoDbId changes
   useEffect(() => {
@@ -296,50 +317,41 @@ Quando o vídeo terminar (você receberá a mensagem "O vídeo terminou"):
    - Ex: "TAREFA DA SEMANA: criar um projeto simples usando X" ou "TAREFA DA SEMANA: Pratique Y fazendo Z"
 5. Despeça-se de forma motivadora e informal`;
 
-    // Student Memory Context
+    // Student Memory Context — injected from tutor-memory edge function (long-term memory)
     const profile = studentProfileRef.current;
-    instruction += `
 
-=== MEMÓRIA PERSISTENTE DO ALUNO (BANCO DE DADOS) ===
-Você tem MEMÓRIA DE LONGO PRAZO que persiste entre sessões. Use as funções de memória!
+    // Dynamic memory context from DB (includes profile, insights, weak concepts, quiz stats, recent conversations)
+    if (tutorMemoryContext) {
+      instruction += `\n\n${tutorMemoryContext}`;
+    } else {
+      // Fallback to basic profile data if edge function hasn't responded yet
+      instruction += `\n\n=== MEMÓRIA DO ALUNO ===`;
+      if (profile?.name) instruction += `\nNome: ${profile.name}`;
+      if (profile?.interaction_count) instruction += `\nSessões anteriores: ${profile.interaction_count}`;
+      if (profile?.learning_style) instruction += `\nEstilo: ${profile.learning_style}`;
+    }
 
-DADOS SALVOS ATUALMENTE:
-- Nome do aluno: ${profile?.name || '❌ NÃO SABE AINDA - VOCÊ PRECISA PERGUNTAR!'}
-- ID único: ${profile?.student_id || 'carregando...'}
-- Interações anteriores: ${profile?.interaction_count || 0} sessões
-- Tempo total de estudo: ${profile?.total_study_time_minutes || 0} minutos
-${profile?.learning_style ? `- Estilo de aprendizagem: ${profile.learning_style}` : ''}
-${profile?.strengths?.length ? `- Pontos fortes: ${profile.strengths.join(', ')}` : ''}
-${profile?.areas_to_improve?.length ? `- Áreas a melhorar: ${profile.areas_to_improve.join(', ')}` : ''}
-${profile?.personality_notes ? `- Observações: ${profile.personality_notes}` : ''}
-
-🚨 INSTRUÇÕES CRÍTICAS DE MEMÓRIA:
+    instruction += `\n
+=== INSTRUÇÕES DE MEMÓRIA ===
 ${!profile?.name ? `
-1. O NOME DO ALUNO É DESCONHECIDO! Na sua PRIMEIRA fala, pergunte o nome de forma NATURAL:
-   - "E aí! Antes de começar, como posso te chamar?"
-   - "Opa! Prazer te conhecer! Qual é o seu nome?"
-   - "Fala! Qual o seu nome pra gente se conhecer melhor?"
-
-2. ASSIM QUE o aluno disser o nome, você DEVE chamar a função save_student_name IMEDIATAMENTE!
-   - Exemplo: Se ele disser "Meu nome é João" -> chame save_student_name({ name: "João" })
-   - Isso é OBRIGATÓRIO! O nome será salvo permanentemente no banco de dados.
+NOME DESCONHECIDO! Na sua PRIMEIRA fala, pergunte o nome naturalmente:
+- "E aí! Como posso te chamar?"
+ASSIM QUE o aluno disser o nome, chame save_student_name IMEDIATAMENTE!
 ` : `
-1. Você JÁ CONHECE o aluno! Use o nome "${profile.name}" naturalmente:
-   - "E aí, ${profile.name}! Preparado pra mais uma aula?"
-   - "Bora lá, ${profile.name}! Hoje vai ser incrível!"
+Você JÁ CONHECE o aluno: "${profile.name}". Use o nome naturalmente.
 `}
 
-=== FUNÇÕES DE MEMÓRIA (USE SEMPRE!) ===
-Você TEM acesso a estas funções que salvam dados PERMANENTEMENTE:
+=== FUNÇÕES DE MEMÓRIA ===
+1. save_student_name({ name: "..." }) — OBRIGATÓRIO quando o aluno disser o nome
+2. save_emotional_observation({ emotion: "...", context: "..." }) — Registra estados emocionais
 
-1. save_student_name({ name: "..." })
-   - OBRIGATÓRIO quando o aluno disser o nome pela primeira vez
-   - O nome será salvo no banco de dados para sempre
-
-2. save_emotional_observation({ emotion: "...", context: "..." })
-   - Use para registrar estados emocionais importantes
-   - Emoções: empolgado, confuso, frustrado, cansado, curioso, feliz, ansioso
-   - Exemplo: save_emotional_observation({ emotion: "empolgado", context: "Ficou animado ao entender loops" })`;
+=== PERSONALIZAÇÃO BASEADA EM DADOS ===
+Use os dados de memória acima para:
+- Referenciar conceitos que o aluno tem DIFICULDADE (seção "conceitos a reforçar")
+- Adaptar explicações ao ESTILO DE APRENDIZAGEM do aluno
+- Celebrar PROGRESSOS comparando com sessões anteriores
+- Evitar repetir explicações que já funcionaram (conversas recentes)
+- Se houver INSIGHTS de aprendizagem, use-os para ajustar seu tom e abordagem`;
 
     // Emotional Perception
     instruction += `
@@ -360,7 +372,7 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
 
 
     return instruction;
-  }, [videoContext, videoTitle, moduleTitle, videoTranscript, contentPlan, timestampQuizzes.length, studentProfile, currentVideoTime]);
+  }, [videoContext, videoTitle, moduleTitle, videoTranscript, contentPlan, timestampQuizzes.length, studentProfile, currentVideoTime, tutorMemoryContext]);
 
   const systemInstruction = buildSystemInstruction();
 
@@ -434,7 +446,7 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
     isSpeaking,
     isVoiceDetected,
     connect,
-    disconnect,
+    disconnect: rawDisconnect,
     startListening,
     stopListening,
     sendText,
@@ -458,6 +470,9 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
         role,
         timestamp: new Date()
       }]);
+
+      // Persist conversation to long-term memory
+      addTutorMessage(role, text, Math.floor(currentVideoTime));
 
       // Update live captions for assistant speech
       if (role === 'assistant') {
@@ -499,8 +514,11 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
     }
   });
 
-
-
+  // Wrapped disconnect — end tutor memory session before disconnecting
+  const disconnect = useCallback(() => {
+    endTutorSession();
+    rawDisconnect();
+  }, [endTutorSession, rawDisconnect]);
 
   // Handle agent connection events - process pending actions
   useEffect(() => {
@@ -1037,16 +1055,16 @@ INSTRUÇÕES:
         isVideoExpanded ? 'pt-0' : ''
       }`}>
         {/* Desktop: 2-column grid (video | chat). Mobile: single column */}
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_360px] overflow-hidden">
-        {/* ===== LEFT: Video Stage ===== */}
-        <div className="flex flex-col overflow-hidden p-3 sm:p-4 lg:p-6">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[85fr_15fr] overflow-hidden">
+        {/* ===== LEFT: Video Stage (85% of screen) ===== */}
+        <div className="flex flex-col overflow-hidden p-1 sm:p-2 lg:p-3">
         {hasVideo && (
           <div className={`relative transition-all duration-500 ${
-            isVideoExpanded 
-              ? 'flex-1 min-h-0' 
-              : 'flex-shrink-0'
+            isVideoExpanded
+              ? 'flex-1 min-h-0'
+              : 'h-[calc(85vh-54px)]'
           }`}>
-            <div className={isVideoExpanded ? 'h-full' : ''}>
+            <div className="h-full">
               {isDirectVideo && videoUrl ? (
                 <DirectVideoPlayer
                   ref={videoPlayerRef as React.RefObject<DirectVideoPlayerRef>}

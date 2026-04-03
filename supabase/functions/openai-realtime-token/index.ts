@@ -31,6 +31,7 @@ serve(async (req) => {
           Authorization: `Bearer ${XAI_API_KEY}`,
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({}),
       });
 
       if (!tokenResponse.ok) {
@@ -40,7 +41,7 @@ serve(async (req) => {
       }
 
       const tokenData = await tokenResponse.json();
-      const clientSecret = tokenData.client_secret?.value || tokenData.client_secret || tokenData.token;
+      const clientSecret = tokenData.value || tokenData.client_secret?.value || tokenData.client_secret || tokenData.token;
 
       if (!clientSecret) {
         console.error("[voice-token] No client_secret in response:", JSON.stringify(tokenData));

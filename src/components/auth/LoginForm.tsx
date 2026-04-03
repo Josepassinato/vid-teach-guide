@@ -38,7 +38,9 @@ export function LoginForm() {
       const { error } = await signIn(data.email, data.password);
       
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
+        if (error.message.includes('Email not confirmed')) {
+          toast.error('Confirme seu email antes de fazer login. Verifique sua caixa de entrada.', { duration: 8000 });
+        } else if (error.message.includes('Invalid login credentials')) {
           toast.error('Email ou senha incorretos');
         } else {
           toast.error('Erro ao fazer login. Tente novamente.');

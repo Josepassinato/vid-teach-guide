@@ -18,7 +18,7 @@ interface UseAuthReturn {
   isSignedIn: boolean;
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null; needsConfirmation?: boolean }>;
 }
 
 export function useAuth(): UseAuthReturn {
@@ -60,12 +60,15 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } },
     });
-    return { error: error as Error | null };
+    // Supabase returns a user with identities=[] when email confirmation is required
+    // but the user already exists (or email confirmation is pending)
+    const needsConfirmation = !error && data?.user && !data.session;
+    return { error: error as Error | null, needsConfirmation };
   }, []);
 
   const profile: Profile | null = user

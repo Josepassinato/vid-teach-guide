@@ -17,6 +17,7 @@ const Student = lazy(() => import("./pages/Student"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const DebugPanel = lazy(() => import("./components/DebugPanel"));
 const AuthPage = lazy(() => import("./components/auth/AuthPage"));
+const VerifyCertificate = lazy(() => import("./pages/VerifyCertificate"));
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,7 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
+    <Route path="/verificar/:code" element={<VerifyCertificate />} />
     <Route path="*" element={<NotFound />} />
   </Routes>
   </Suspense>

@@ -42,18 +42,24 @@ export function SignupForm({ onSuccess }: SignupFormProps) {
   const onSubmit = async (data: SignupFormData) => {
     setIsLoading(true);
     try {
-      const { error } = await signUp(data.email, data.password, data.fullName);
-      
+      const { error, needsConfirmation } = await signUp(data.email, data.password, data.fullName);
+
       if (error) {
         if (error.message.includes('User already registered')) {
           toast.error('Este email já está cadastrado');
+        } else if (error.message.includes('rate limit')) {
+          toast.error('Muitas tentativas. Aguarde alguns minutos e tente novamente.', { duration: 6000 });
         } else {
           toast.error('Erro ao criar conta. Tente novamente.');
         }
         return;
       }
 
-      toast.success('Conta criada com sucesso! Você já pode fazer login.');
+      if (needsConfirmation) {
+        toast.success('Conta criada! Verifique seu email para confirmar o cadastro.', { duration: 8000 });
+      } else {
+        toast.success('Conta criada com sucesso! Você já pode fazer login.');
+      }
       onSuccess?.();
     } finally {
       setIsLoading(false);
