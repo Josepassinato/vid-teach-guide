@@ -19,6 +19,7 @@ import { QuizEditor } from '@/components/QuizEditor';
 import { MissionsAdmin } from '@/components/MissionsAdmin';
 import { ModulesAdmin } from '@/components/ModulesAdmin';
 import { NarrativeLibrary } from '@/components/NarrativeLibrary';
+import { WhiteLabelSettings } from '@/components/WhiteLabelSettings';
 import { Switch } from '@/components/ui/switch';
 
 interface TeachingMoment {
@@ -59,7 +60,7 @@ export default function Admin() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isGeneratingMoments, setIsGeneratingMoments] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
-  const [adminSection, setAdminSection] = useState<'lessons' | 'missions' | 'modules' | 'library'>('lessons');
+  const [adminSection, setAdminSection] = useState<'lessons' | 'missions' | 'modules' | 'library' | 'branding'>('lessons');
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   
   // Form states for new lesson
@@ -457,7 +458,15 @@ export default function Admin() {
             <div>
               <h1 className="text-xl font-bold">Painel Administrativo</h1>
               <p className="text-xs text-muted-foreground">
-                {adminSection === 'lessons' ? `${lessons.length} aulas` : 'Gerenciar missões'}
+                {adminSection === 'lessons'
+                  ? `${lessons.length} aulas`
+                  : adminSection === 'missions'
+                  ? 'Gerenciar missões'
+                  : adminSection === 'modules'
+                  ? 'Gerenciar módulos'
+                  : adminSection === 'library'
+                  ? 'Biblioteca pedagógica'
+                  : 'Configuração white-label'}
               </p>
             </div>
           </div>
@@ -518,6 +527,15 @@ export default function Admin() {
               Módulos
             </Button>
             <Button
+              variant={adminSection === 'branding' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none rounded-t-lg mt-1"
+              onClick={() => setAdminSection('branding')}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              White-label
+            </Button>
+            <Button
               variant={adminSection === 'library' ? 'default' : 'ghost'}
               size="sm"
               className="rounded-none rounded-t-lg mt-1"
@@ -536,6 +554,8 @@ export default function Admin() {
           <MissionsAdmin />
         ) : adminSection === 'modules' ? (
           <ModulesAdmin password={password} />
+        ) : adminSection === 'branding' ? (
+          <WhiteLabelSettings />
         ) : adminSection === 'library' ? (
           <NarrativeLibrary password={password} />
         ) : (

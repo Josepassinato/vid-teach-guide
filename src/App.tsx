@@ -10,6 +10,7 @@ import { LOCALES, getSavedLocale, saveLocale, SupportedLocale } from "./i18n";
 import NotFound from "./pages/NotFound";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useAuth } from "./hooks/useAuth";
+import { BrandingProvider } from "./branding";
 
 const Admin = lazy(() => import("./pages/Admin"));
 const Analytics = lazy(() => import("./pages/Analytics"));
@@ -83,7 +84,7 @@ const AppRoutes = () => (
   </Suspense>
 );
 
-const App = () => {
+const AppContent = () => {
   const [locale, setLocale] = useState<SupportedLocale>(getSavedLocale());
   const messages = LOCALES[locale].messages;
 
@@ -111,5 +112,11 @@ const App = () => {
     </IntlProvider>
   );
 };
+
+const App = () => (
+  <BrandingProvider>
+    <AppContent />
+  </BrandingProvider>
+);
 
 export default App;

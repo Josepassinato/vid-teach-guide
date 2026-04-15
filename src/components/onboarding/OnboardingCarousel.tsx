@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   GraduationCap, 
@@ -13,59 +13,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { useBranding } from '@/branding';
 
 interface OnboardingCarouselProps {
   onComplete: () => void;
   userName?: string;
 }
-
-const steps = [
-  {
-    id: 'welcome',
-    icon: GraduationCap,
-    color: 'primary',
-    title: 'Bem-vindo ao Vibe Class!',
-    subtitle: 'Sua jornada de aprendizado começa agora',
-    description: 'Aprenda programação de um jeito diferente, com um professor de IA que te acompanha em tempo real.',
-    image: '🎓',
-  },
-  {
-    id: 'lessons',
-    icon: Video,
-    color: 'google-blue',
-    title: 'Aulas em Vídeo',
-    subtitle: 'Aprenda no seu ritmo',
-    description: 'Assista aulas em vídeo com conteúdo de alta qualidade. O sistema acompanha seu progresso automaticamente.',
-    image: '📺',
-  },
-  {
-    id: 'ai-tutor',
-    icon: MessageCircle,
-    color: 'google-green',
-    title: 'Professor de IA',
-    subtitle: 'Converse e tire dúvidas',
-    description: 'Um tutor de IA está sempre disponível para explicar conceitos, responder perguntas e te ajudar a entender o conteúdo.',
-    image: '🤖',
-  },
-  {
-    id: 'quizzes',
-    icon: Target,
-    color: 'google-yellow',
-    title: 'Quizzes Interativos',
-    subtitle: 'Teste seu conhecimento',
-    description: 'Após cada aula, faça quizzes para verificar se você entendeu o conteúdo. Feedback instantâneo!',
-    image: '✅',
-  },
-  {
-    id: 'missions',
-    icon: Trophy,
-    color: 'google-red',
-    title: 'Missões Práticas',
-    subtitle: 'Aplique o que aprendeu',
-    description: 'Complete missões práticas para ganhar pontos e subir de nível. Aprenda fazendo!',
-    image: '🚀',
-  },
-];
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -83,8 +36,55 @@ const slideVariants = {
 };
 
 export function OnboardingCarousel({ onComplete, userName }: OnboardingCarouselProps) {
+  const { config, labels } = useBranding();
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState(0);
+
+  const steps = useMemo(
+    () => [
+      {
+        id: 'welcome',
+        icon: GraduationCap,
+        title: `Bem-vindo ao ${config.brandName}!`,
+        subtitle: config.tagline,
+        description: config.valueProposition,
+        image: config.logoEmoji || '🎓',
+      },
+      {
+        id: 'lessons',
+        icon: Video,
+        title: `${labels.lessonPluralTitle} em Vídeo`,
+        subtitle: `Aprenda ${config.subjectArea} no seu ritmo`,
+        description: `Acompanhe ${labels.lessonPlural} com conteúdo de qualidade. O sistema registra seu progresso automaticamente.`,
+        image: '📺',
+      },
+      {
+        id: 'ai-tutor',
+        icon: MessageCircle,
+        title: config.aiTutorName,
+        subtitle: 'Converse e tire dúvidas',
+        description: `Seu ${config.aiTutorRoleDescription} está sempre disponível para explicar conceitos, responder perguntas e apoiar sua evolução.`,
+        image: '🤖',
+      },
+      {
+        id: 'quizzes',
+        icon: Target,
+        title: 'Quizzes Interativos',
+        subtitle: 'Teste seu conhecimento',
+        description: `Ao final de cada ${labels.lessonSingular}, valide o aprendizado com feedback instantâneo.`,
+        image: '✅',
+      },
+      {
+        id: 'missions',
+        icon: Trophy,
+        title: `${labels.missionPluralTitle} Práticas`,
+        subtitle: 'Aplique o que aprendeu',
+        description: `Complete ${labels.missionPlural} para consolidar competências e acelerar sua evolução.`,
+        image: '🚀',
+      },
+    ],
+    [config, labels],
+  );
 
   const step = steps[currentStep];
   const progress = ((currentStep + 1) / steps.length) * 100;
@@ -115,10 +115,10 @@ export function OnboardingCarousel({ onComplete, userName }: OnboardingCarouselP
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Colorful top accent */}
       <div className="h-1 flex">
-        <div className="flex-1 bg-google-blue" />
-        <div className="flex-1 bg-google-red" />
-        <div className="flex-1 bg-google-yellow" />
-        <div className="flex-1 bg-google-green" />
+        <div className="flex-1" style={{ backgroundColor: config.accentPalette[0] }} />
+        <div className="flex-1" style={{ backgroundColor: config.accentPalette[1] }} />
+        <div className="flex-1" style={{ backgroundColor: config.accentPalette[2] }} />
+        <div className="flex-1" style={{ backgroundColor: config.accentPalette[3] }} />
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">

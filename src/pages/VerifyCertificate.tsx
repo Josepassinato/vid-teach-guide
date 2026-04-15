@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, XCircle, Loader2, ArrowLeft, Award, Calendar, BookOpen, User } from 'lucide-react';
+import { useBranding } from '@/branding';
 
 interface CertificateData {
   id: string;
@@ -17,6 +18,7 @@ interface CertificateData {
 
 export default function VerifyCertificate() {
   const { code } = useParams<{ code: string }>();
+  const { config, labels } = useBranding();
   const [status, setStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
   const [certificate, setCertificate] = useState<CertificateData | null>(null);
 
@@ -57,8 +59,8 @@ export default function VerifyCertificate() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-white">Vibe Class</h1>
-          <p className="text-sm text-slate-400">12Brain Solutions LLC</p>
+          <h1 className="text-2xl font-bold text-white">{config.brandName}</h1>
+          <p className="text-sm text-slate-400">{config.legalName}</p>
         </div>
 
         {status === 'loading' && (
@@ -89,7 +91,7 @@ export default function VerifyCertificate() {
                 <div className="flex items-start gap-3">
                   <User className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wide">Aluno</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">{labels.learnerSingularTitle}</p>
                     <p className="text-white font-medium">{certificate.student_name}</p>
                   </div>
                 </div>
@@ -98,10 +100,10 @@ export default function VerifyCertificate() {
                   <BookOpen className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
                   <div>
                     <p className="text-xs text-slate-500 uppercase tracking-wide">
-                      {certificate.certificate_type === 'course' ? 'Curso Completo' : 'Modulo'}
+                      {certificate.certificate_type === 'course' ? 'Programa Completo' : labels.moduleSingularTitle}
                     </p>
                     <p className="text-white font-medium">
-                      {certificate.module_title || 'Empreendedor Vibe — Curso Completo'}
+                      {certificate.module_title || config.certificateProgramFallback}
                     </p>
                   </div>
                 </div>

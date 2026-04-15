@@ -4,10 +4,12 @@ import { motion } from 'framer-motion';
 import { GraduationCap, Sparkles, FlaskConical } from 'lucide-react';
 import { LoginForm } from './LoginForm';
 import { SignupForm } from './SignupForm';
+import { useBranding } from '@/branding';
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
+  const { config, labels } = useBranding();
 
   const handleTestBypass = () => {
     navigate('/aluno?bypass=test');
@@ -17,10 +19,10 @@ export default function AuthPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Colorful top accent */}
       <div className="h-1 flex">
-        <div className="flex-1 bg-google-blue" />
-        <div className="flex-1 bg-google-red" />
-        <div className="flex-1 bg-google-yellow" />
-        <div className="flex-1 bg-google-green" />
+        <div className="flex-1" style={{ backgroundColor: config.accentPalette[0] }} />
+        <div className="flex-1" style={{ backgroundColor: config.accentPalette[1] }} />
+        <div className="flex-1" style={{ backgroundColor: config.accentPalette[2] }} />
+        <div className="flex-1" style={{ backgroundColor: config.accentPalette[3] }} />
       </div>
 
       <div className="flex-1 flex items-center justify-center p-4">
@@ -40,11 +42,11 @@ export default function AuthPage() {
             </motion.div>
 
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
-              Vibe Class
+              {config.brandName}
             </h1>
             <p className="text-muted-foreground mt-2 flex items-center justify-center gap-2">
               <Sparkles className="h-4 w-4" />
-              Aprenda programação com IA
+              {config.valueProposition}
             </p>
           </div>
 
@@ -88,7 +90,7 @@ export default function AuthPage() {
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium text-muted-foreground bg-muted/50 hover:bg-muted hover:text-foreground transition-all border border-dashed border-muted-foreground/30"
             >
               <FlaskConical className="h-4 w-4" />
-              Entrar como Teste (bypass)
+              Entrar como {labels.learnerSingularTitle} de Teste
             </button>
           </div>
 

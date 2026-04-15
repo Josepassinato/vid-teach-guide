@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useBranding } from '@/branding';
 
 interface StudentHeaderProps {
   lessonNumber?: number;
@@ -41,6 +42,8 @@ export function StudentHeader({
   userAvatar,
   onSignOut,
 }: StudentHeaderProps) {
+  const { config, labels } = useBranding();
+
   const initials = userName
     ?.split(' ')
     .map((n) => n[0])
@@ -58,7 +61,7 @@ export function StudentHeader({
             size="icon"
             className="h-9 w-9 lg:hidden flex-shrink-0"
             onClick={onMenuClick}
-            aria-label="Abrir menu de aulas"
+            aria-label={`Abrir menu de ${labels.lessonPlural}`}
           >
             <Menu className="h-4 w-4" />
           </Button>
@@ -71,7 +74,7 @@ export function StudentHeader({
             size="icon"
             className="h-9 w-9 hidden lg:inline-flex flex-shrink-0"
             onClick={onToggleSidebar}
-            aria-label={sidebarCollapsed ? 'Abrir lista de aulas' : 'Fechar lista de aulas'}
+            aria-label={sidebarCollapsed ? `Abrir lista de ${labels.lessonPlural}` : `Fechar lista de ${labels.lessonPlural}`}
           >
             {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </Button>
@@ -79,7 +82,7 @@ export function StudentHeader({
 
         {/* Logo */}
         <span className="text-base font-semibold tracking-tight flex-shrink-0">
-          Vibe Class
+          {config.brandName}
         </span>
 
         {/* Lesson title */}
@@ -132,8 +135,8 @@ export function StudentHeader({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <div className="px-2 py-1.5">
-                <p className="text-sm font-medium">{userName || 'Aluno'}</p>
-                <p className="text-xs text-muted-foreground">Estudante</p>
+                <p className="text-sm font-medium">{userName || labels.learnerSingularTitle}</p>
+                <p className="text-xs text-muted-foreground">{labels.learnerSingularTitle}</p>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

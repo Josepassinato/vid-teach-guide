@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { BrandingProvider } from '@/branding';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,9 +26,11 @@ const AllTheProviders = ({ children, withRouter = true }: AllTheProvidersProps) 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <TooltipProvider>
-          {wrappedChildren}
-        </TooltipProvider>
+        <BrandingProvider>
+          <TooltipProvider>
+            {wrappedChildren}
+          </TooltipProvider>
+        </BrandingProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

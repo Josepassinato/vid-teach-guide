@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { GraduationCap, Play, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useBranding } from '@/branding';
 
 interface EmptyStateProps {
   type: 'no-lessons' | 'no-video' | 'welcome';
@@ -8,13 +9,15 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ type, onAction }: EmptyStateProps) {
+  const { config, labels } = useBranding();
+
   if (type === 'no-lessons') {
     return (
       <div className="text-center py-12 px-4">
         <div className="p-4 rounded-full bg-muted inline-block mb-4">
           <Video className="h-8 w-8 text-muted-foreground" />
         </div>
-        <p className="text-muted-foreground">Nenhuma aula disponível ainda</p>
+        <p className="text-muted-foreground">Nenhuma {labels.lessonSingular} disponível ainda</p>
       </div>
     );
   }
@@ -38,15 +41,15 @@ export function EmptyState({ type, onAction }: EmptyStateProps) {
           </div>
 
           <h2 className="text-xl sm:text-2xl font-bold mb-2">
-            Bem-vindo ao <span className="text-primary">Vibe Class</span>
+            Bem-vindo ao <span className="text-primary">{config.brandName}</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base mb-6">
-            Aprenda programação de um jeito diferente, com IA conversacional
+            {config.valueProposition}
           </p>
           {onAction && (
             <Button onClick={onAction} size="lg" className="rounded-full px-6">
               <Play className="h-4 w-4 mr-2" />
-              Começar a Aprender
+              Começar Agora
             </Button>
           )}
         </div>

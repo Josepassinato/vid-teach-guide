@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, MessageCircle, Play, Send, Bot, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useBranding } from '@/branding';
 
 interface SearchResult {
   chunk_text: string;
@@ -29,6 +30,7 @@ interface TranscriptChatProps {
 }
 
 export function TranscriptChat({ onNavigateToMoment, videoTitles }: TranscriptChatProps) {
+  const { config, labels } = useBranding();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -91,7 +93,7 @@ export function TranscriptChat({ onNavigateToMoment, videoTitles }: TranscriptCh
               action: 'rag_answer',
               query,
               context,
-              system_prompt: `Você é o tutor IA da escola Vibe Class (12Brain). Responda a pergunta do aluno usando APENAS os trechos fornecidos das aulas. Seja direto, educativo e motivador. Cite qual aula/trecho quando relevante. Responda em português brasileiro. Se os trechos não cobrirem a pergunta completamente, diga isso. Máximo 3 parágrafos.`
+              system_prompt: `Você é o ${config.aiTutorRoleDescription} da escola ${config.brandName}. Responda à pergunta do ${labels.learnerSingular} usando APENAS os trechos fornecidos das ${labels.lessonPlural}. Seja direto, educativo e motivador. Cite qual ${labels.lessonSingular}/trecho quando relevante. Responda em português brasileiro. Se os trechos não cobrirem a pergunta completamente, diga isso. Máximo 3 parágrafos.`
             },
           });
           responseText = grokData?.answer || `Encontrei ${results.length} trecho${results.length > 1 ? 's' : ''} relevante${results.length > 1 ? 's' : ''} nas aulas:`;
@@ -140,7 +142,7 @@ export function TranscriptChat({ onNavigateToMoment, videoTitles }: TranscriptCh
       <CardHeader className="pb-3 border-b border-gray-700">
         <CardTitle className="flex items-center gap-2 text-white text-lg">
           <MessageCircle className="h-5 w-5 text-purple-400" />
-          Chat com as Aulas
+          Chat com {labels.lessonPluralTitle}
         </CardTitle>
       </CardHeader>
 
@@ -151,7 +153,7 @@ export function TranscriptChat({ onNavigateToMoment, videoTitles }: TranscriptCh
             <div className="flex flex-col items-center justify-center h-full text-gray-500 py-12">
               <Search className="h-10 w-10 mb-3 text-gray-600" />
               <p className="text-sm text-center">
-                Faça perguntas sobre o conteúdo das aulas.
+                Faça perguntas sobre o conteúdo de {labels.lessonPlural}.
                 <br />
                 A IA vai buscar os trechos mais relevantes.
               </p>
@@ -256,7 +258,7 @@ export function TranscriptChat({ onNavigateToMoment, videoTitles }: TranscriptCh
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Pergunte sobre qualquer aula..."
+              placeholder={`Pergunte sobre qualquer ${labels.lessonSingular}...`}
               className="flex-1 bg-gray-800 border-gray-600 text-white placeholder:text-gray-500 focus-visible:ring-purple-500"
               disabled={isLoading}
             />

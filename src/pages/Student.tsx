@@ -32,6 +32,7 @@ import { DynamicQuiz } from '@/components/DynamicQuiz';
 import { GamificationHub } from '@/components/GamificationHub';
 import { EnhancedCaptions, EnhancedCaptionsToggle } from '@/components/EnhancedCaptions';
 import { AvatarFeedback } from '@/components/AvatarFeedback';
+import { useBranding } from '@/branding';
 
 interface SavedVideo {
   id: string;
@@ -72,6 +73,7 @@ interface VideoInfo {
 
 const Student = () => {
   const { user, profile, signOut } = useAuth();
+  const { labels } = useBranding();
   useNetworkStatus();
 
   // DEV BYPASS: Only works in development mode
@@ -104,9 +106,9 @@ const Student = () => {
 
   const handleProgressUpdate = useCallback((newStats: { progressPercentage: number }) => {
     if (newStats.progressPercentage === 100) {
-      toast.success('🎉 Parabéns! Você completou todas as aulas!');
+      toast.success(`🎉 Parabéns! Você completou todas as ${labels.lessonPlural}!`);
     }
-  }, []);
+  }, [labels.lessonPlural]);
 
   const { stats, isLessonCompleted, markLessonComplete, refreshProgress } = useStudentProgress({
     onProgressUpdate: handleProgressUpdate,
@@ -208,7 +210,7 @@ const Student = () => {
         selectVideo(nextVideo, currentLessonIndex + 1);
       } else {
         const currentTitle = savedVideos[currentLessonIndex]?.title || 'atual';
-        toast.error(`Complete o quiz e a missão da aula "${currentTitle}" primeiro.`);
+        toast.error(`Complete o quiz e a ${labels.missionSingular} da ${labels.lessonSingular} "${currentTitle}" primeiro.`);
       }
     }
   };
@@ -223,7 +225,7 @@ const Student = () => {
     const currentVideo = savedVideos[currentLessonIndex];
     if (currentVideo) {
       await markLessonComplete(currentVideo.id);
-      toast.success('✅ Aula marcada como concluída!');
+      toast.success(`✅ ${labels.lessonSingularTitle} marcada como concluída!`);
       refreshProgress();
       setShowQuiz(false);
     }
@@ -248,7 +250,7 @@ const Student = () => {
     if (passed) {
       await handleMarkComplete();
       refreshModuleProgress();
-      toast.success('🎉 Quiz concluído! Complete a missão para desbloquear a próxima aula.');
+      toast.success(`🎉 Quiz concluído! Complete a ${labels.missionSingular} para desbloquear a próxima ${labels.lessonSingular}.`);
     }
   };
 
@@ -338,7 +340,7 @@ const Student = () => {
           {/* Unassigned lessons */}
           {savedVideos.filter((v) => !v.module_id).length > 0 && (
             <div className="mt-4">
-              <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">Aulas Avulsas</h3>
+              <h3 className="text-sm font-medium text-muted-foreground mb-2 px-1">{labels.lessonPluralTitle} Avulsas</h3>
               <div className="space-y-2">
                 {savedVideos
                   .filter((v) => !v.module_id)
@@ -389,7 +391,7 @@ const Student = () => {
                 if (checkLessonUnlocked(video)) {
                   selectVideo(video, index);
                 } else {
-                  toast.error('Complete a aula anterior para desbloquear!');
+                  toast.error(`Complete a ${labels.lessonSingular} anterior para desbloquear!`);
                 }
               }}
             />
@@ -439,13 +441,13 @@ const Student = () => {
           }`}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b">
-            <h2 className="text-sm font-semibold text-sidebar-foreground">Aulas</h2>
+            <h2 className="text-sm font-semibold text-sidebar-foreground">{labels.lessonPluralTitle}</h2>
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7"
               onClick={() => setSidebarCollapsed(true)}
-              aria-label="Minimizar lista de aulas"
+              aria-label={`Minimizar lista de ${labels.lessonPlural}`}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -466,7 +468,7 @@ const Student = () => {
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent side="left" className="w-[80vw] sm:w-[350px] p-0 bg-sidebar">
             <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h2 className="text-sm font-semibold">Aulas</h2>
+              <h2 className="text-sm font-semibold">{labels.lessonPluralTitle}</h2>
             </div>
             <div className="overflow-y-auto h-[calc(100vh-50px)]">
               {renderLessonsList()}
@@ -567,7 +569,7 @@ const Student = () => {
                 )}
               </AnimatePresence>
 
-              {/* Chat com Aulas (RAG) */}
+              {/* Chat com conteúdo (RAG) */}
               <AnimatePresence>
                 {mobileTab === 'chat' && (
                   <motion.div
@@ -660,11 +662,11 @@ const Student = () => {
                   {isCurrentLessonCompleted ? (
                     <Badge className="bg-accent text-accent-foreground border-0">
                       <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-                      Aula concluída
+                      {labels.lessonSingularTitle} concluída
                     </Badge>
                   ) : (
                     <span className="text-sm text-muted-foreground">
-                      Aula {selectedVideo.lessonNumber} de {savedVideos.length}
+                      {labels.lessonSingularTitle} {selectedVideo.lessonNumber} de {savedVideos.length}
                     </span>
                   )}
                 </div>
@@ -732,7 +734,7 @@ const Student = () => {
                     <>
                       {checkLessonUnlocked(savedVideos[currentLessonIndex + 1]) ? (
                         <Button size="sm" onClick={goToNextLesson} className="rounded-full">
-                          Próxima Aula
+                          Próxima {labels.lessonSingularTitle}
                           <ChevronRight className="h-4 w-4 ml-1" />
                         </Button>
                       ) : (

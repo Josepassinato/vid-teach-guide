@@ -1,5 +1,6 @@
 import { Video, Play, Target, ClipboardCheck, MessageCircle, Trophy, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useBranding } from '@/branding';
 
 export type MobileTab = 'lessons' | 'video' | 'missions' | 'quiz' | 'chat' | 'xp' | 'ai-quiz';
 
@@ -18,10 +19,12 @@ export function MobileNavigation({
   hasMissions = true,
   lessonCompleted = false,
 }: MobileNavigationProps) {
+  const { labels } = useBranding();
+
   const tabs = [
-    { id: 'lessons' as const, icon: Video, label: 'Aulas', show: true },
+    { id: 'lessons' as const, icon: Video, label: labels.lessonPluralTitle, show: true },
     { id: 'video' as const, icon: Play, label: 'Vídeo', show: true },
-    { id: 'missions' as const, icon: Target, label: 'Missões', show: hasMissions },
+    { id: 'missions' as const, icon: Target, label: labels.missionPluralTitle, show: hasMissions },
     { id: 'quiz' as const, icon: ClipboardCheck, label: 'Quiz', show: hasQuiz && !lessonCompleted },
     { id: 'chat' as const, icon: MessageCircle, label: 'Chat IA', show: true },
     { id: 'ai-quiz' as const, icon: Brain, label: 'Quiz IA', show: true },

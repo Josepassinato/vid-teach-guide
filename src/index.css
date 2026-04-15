@@ -44,6 +44,11 @@
     --sidebar-accent-foreground: 220 13% 18%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 221 83% 53%;
+
+    --brand-accent-1: #2563eb;
+    --brand-accent-2: #ef4444;
+    --brand-accent-3: #f59e0b;
+    --brand-accent-4: #22c55e;
   }
 
   .dark {
@@ -83,6 +88,11 @@
     --sidebar-accent-foreground: 210 20% 93%;
     --sidebar-border: 224 14% 12%;
     --sidebar-ring: 217 91% 60%;
+
+    --brand-accent-1: #2563eb;
+    --brand-accent-2: #ef4444;
+    --brand-accent-3: #f59e0b;
+    --brand-accent-4: #22c55e;
   }
 }
 
