@@ -4,6 +4,7 @@ import { X, Download, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useBranding } from '@/branding';
 
 /**
  * Sanitize SVG string to prevent XSS.
@@ -73,6 +74,7 @@ interface CertificateViewerProps {
 export function CertificateViewer({ certificate, onClose, onDownload }: CertificateViewerProps) {
   const [svg, setSvg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { config } = useBranding();
 
   useEffect(() => {
     const fetchSvg = async () => {
@@ -104,12 +106,12 @@ export function CertificateViewer({ certificate, onClose, onDownload }: Certific
   const safeSvg = useMemo(() => (svg ? sanitizeSvg(svg) : null), [svg]);
 
   const handleShare = async () => {
-    const shareText = `🎓 Certificado Vibe Class\n\nCódigo: ${certificate.certificate_code}\nAluno: ${certificate.student_name}`;
+    const shareText = `🎓 Certificado ${config.brandName}\n\nCódigo: ${certificate.certificate_code}\nAluno: ${certificate.student_name}`;
     
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Meu Certificado Vibe Class',
+          title: `Meu Certificado ${config.brandName}`,
           text: shareText,
         });
       } catch (err) {

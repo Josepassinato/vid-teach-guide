@@ -1,10 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { DEFAULT_WHITE_LABEL_CONFIG, PRESET_BY_ID, SCHOOL_PRESETS } from './presets';
+import { DEFAULT_WHITE_LABEL_CONFIG, PRESET_BY_ID, SCHOOL_PRESETS, VIBE_CODE_CONFIG } from './presets';
+import { IS_WHITE_LABEL_PRODUCT, PRODUCT_MODE, type ProductMode } from './product';
 import type { SchoolPresetId, WhiteLabelConfig } from './types';
 
 const STORAGE_KEY = 'adaptive-school-white-label-v1';
 
 interface BrandingContextValue {
+  productMode: ProductMode;
+  isWhiteLabelProduct: boolean;
   config: WhiteLabelConfig;
   presets: typeof SCHOOL_PRESETS;
   setConfig: (updater: (prev: WhiteLabelConfig) => WhiteLabelConfig) => void;
@@ -41,9 +44,17 @@ function capitalize(value: string) {
 }
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
-  const [config, setConfig] = useState<WhiteLabelConfig>(() => loadStoredConfig());
+  const [config, setConfigState] = useState<WhiteLabelConfig>(() =>
+    IS_WHITE_LABEL_PRODUCT ? loadStoredConfig() : VIBE_CODE_CONFIG,
+  );
+
+  const setConfig = useCallback((updater: (prev: WhiteLabelConfig) => WhiteLabelConfig) => {
+    if (!IS_WHITE_LABEL_PRODUCT) return;
+    setConfigState(updater);
+  }, []);
 
   useEffect(() => {
+    if (!IS_WHITE_LABEL_PRODUCT) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   }, [config]);
 
@@ -61,11 +72,13 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   }, [config.brandName]);
 
   const patchConfig = useCallback((patch: Partial<WhiteLabelConfig>) => {
-    setConfig((prev) => ({ ...prev, ...patch }));
+    if (!IS_WHITE_LABEL_PRODUCT) return;
+    setConfigState((prev) => ({ ...prev, ...patch }));
   }, []);
 
   const patchTerminology = useCallback((patch: Partial<WhiteLabelConfig['terminology']>) => {
-    setConfig((prev) => ({
+    if (!IS_WHITE_LABEL_PRODUCT) return;
+    setConfigState((prev) => ({
       ...prev,
       terminology: {
         ...prev.terminology,
@@ -75,20 +88,24 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const applyPreset = useCallback((presetId: SchoolPresetId) => {
+    if (!IS_WHITE_LABEL_PRODUCT) return;
     const preset = PRESET_BY_ID[presetId];
     if (!preset) return;
-    setConfig({
+    setConfigState({
       ...preset.config,
       presetId,
     });
   }, []);
 
   const resetBranding = useCallback(() => {
-    setConfig(DEFAULT_WHITE_LABEL_CONFIG);
+    if (!IS_WHITE_LABEL_PRODUCT) return;
+    setConfigState(DEFAULT_WHITE_LABEL_CONFIG);
   }, []);
 
   const value = useMemo<BrandingContextValue>(
     () => ({
+      productMode: PRODUCT_MODE,
+      isWhiteLabelProduct: IS_WHITE_LABEL_PRODUCT,
       config,
       presets: SCHOOL_PRESETS,
       setConfig,

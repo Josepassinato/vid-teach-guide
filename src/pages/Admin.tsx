@@ -21,6 +21,7 @@ import { ModulesAdmin } from '@/components/ModulesAdmin';
 import { NarrativeLibrary } from '@/components/NarrativeLibrary';
 import { WhiteLabelSettings } from '@/components/WhiteLabelSettings';
 import { Switch } from '@/components/ui/switch';
+import { useBranding } from '@/branding';
 
 interface TeachingMoment {
   timestamp_seconds: number;
@@ -48,7 +49,9 @@ interface VideoLesson {
 }
 
 export default function Admin() {
+  type AdminSection = 'lessons' | 'missions' | 'modules' | 'library' | 'branding';
   const navigate = useNavigate();
+  const { isWhiteLabelProduct } = useBranding();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -60,7 +63,7 @@ export default function Admin() {
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isGeneratingMoments, setIsGeneratingMoments] = useState(false);
   const [activeTab, setActiveTab] = useState('info');
-  const [adminSection, setAdminSection] = useState<'lessons' | 'missions' | 'modules' | 'library' | 'branding'>('lessons');
+  const [adminSection, setAdminSection] = useState<AdminSection>('lessons');
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   
   // Form states for new lesson
@@ -79,6 +82,12 @@ export default function Admin() {
   const [editAnalysis, setEditAnalysis] = useState('');
   const [editMoments, setEditMoments] = useState<TeachingMoment[]>([]);
   const [editTeacherIntro, setEditTeacherIntro] = useState('');
+
+  useEffect(() => {
+    if (!isWhiteLabelProduct && adminSection === 'branding') {
+      setAdminSection('lessons');
+    }
+  }, [isWhiteLabelProduct, adminSection]);
 
   const extractYoutubeId = (url: string): string | null => {
     const patterns = [
@@ -466,7 +475,9 @@ export default function Admin() {
                   ? 'Gerenciar módulos'
                   : adminSection === 'library'
                   ? 'Biblioteca pedagógica'
-                  : 'Configuração white-label'}
+                  : isWhiteLabelProduct
+                  ? 'Configuração white-label'
+                  : 'Administração de conteúdo'}
               </p>
             </div>
           </div>
@@ -526,15 +537,17 @@ export default function Admin() {
               <FolderOpen className="h-4 w-4 mr-2" />
               Módulos
             </Button>
-            <Button
-              variant={adminSection === 'branding' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-none rounded-t-lg mt-1"
-              onClick={() => setAdminSection('branding')}
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              White-label
-            </Button>
+            {isWhiteLabelProduct && (
+              <Button
+                variant={adminSection === 'branding' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-none rounded-t-lg mt-1"
+                onClick={() => setAdminSection('branding')}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                White-label
+              </Button>
+            )}
             <Button
               variant={adminSection === 'library' ? 'default' : 'ghost'}
               size="sm"
@@ -554,7 +567,7 @@ export default function Admin() {
           <MissionsAdmin />
         ) : adminSection === 'modules' ? (
           <ModulesAdmin password={password} />
-        ) : adminSection === 'branding' ? (
+        ) : adminSection === 'branding' && isWhiteLabelProduct ? (
           <WhiteLabelSettings />
         ) : adminSection === 'library' ? (
           <NarrativeLibrary password={password} />

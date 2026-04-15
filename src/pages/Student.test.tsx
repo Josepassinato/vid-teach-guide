@@ -120,7 +120,7 @@ describe('Student Page', () => {
     render(<Student />);
 
     await waitFor(() => {
-      expect(screen.getByText('Vibe Class')).toBeInTheDocument();
+      expect(screen.getByText('Vibe Code')).toBeInTheDocument();
     });
   });
 

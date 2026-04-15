@@ -4,6 +4,7 @@ import { Award, Download, Share2, ExternalLink, Copy, Check } from 'lucide-react
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useBranding } from '@/branding';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ export function VerifiableCertificate({
   const [copied, setCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const certificateRef = useRef<HTMLDivElement>(null);
+  const { config } = useBranding();
 
   const verificationUrl = `${VERIFICATION_BASE_URL}/${certificateCode}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verificationUrl)}&bgcolor=0f172a&color=d4af37&format=svg`;
@@ -134,8 +136,8 @@ export function VerifiableCertificate({
                     <Award className="h-8 w-8 text-white" />
                   </div>
                   <div className="text-left">
-                    <p className="text-violet-400 font-bold text-lg tracking-wide">VIBE CLASS</p>
-                    <p className="text-slate-500 text-xs tracking-widest uppercase">12Brain Solutions</p>
+                    <p className="text-violet-400 font-bold text-lg tracking-wide">{config.brandName.toUpperCase()}</p>
+                    <p className="text-slate-500 text-xs tracking-widest uppercase">{config.legalName}</p>
                   </div>
                 </motion.div>
 
@@ -187,7 +189,7 @@ export function VerifiableCertificate({
                     &ldquo;{moduleName}&rdquo;
                   </p>
                   <p className="text-slate-500 text-sm">
-                    da plataforma de ensino Vibe Class
+                    da plataforma de ensino {config.brandName}
                   </p>
                 </motion.div>
 

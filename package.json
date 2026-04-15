@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:vibe": "VITE_PRODUCT_MODE=vibe-code vite",
+    "dev:white-label": "VITE_PRODUCT_MODE=white-label vite",
     "build": "vite build",
+    "build:vibe": "VITE_PRODUCT_MODE=vibe-code vite build",
+    "build:white-label": "VITE_PRODUCT_MODE=white-label vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"

@@ -2,29 +2,45 @@ import type { SchoolPreset, WhiteLabelConfig } from './types';
 
 const basePalette: [string, string, string, string] = ['#2563eb', '#ef4444', '#f59e0b', '#22c55e'];
 
-export const DEFAULT_WHITE_LABEL_CONFIG: WhiteLabelConfig = {
+const baseTerminology = {
+  learnerSingular: 'aluno',
+  learnerPlural: 'alunos',
+  lessonSingular: 'aula',
+  lessonPlural: 'aulas',
+  moduleSingular: 'módulo',
+  modulePlural: 'módulos',
+  missionSingular: 'missão',
+  missionPlural: 'missões',
+};
+
+export const VIBE_CODE_CONFIG: WhiteLabelConfig = {
   presetId: 'coding-academy',
-  brandName: 'Vibe Class',
+  brandName: 'Vibe Code',
   legalName: '12Brain Solutions LLC',
   logoEmoji: '🎓',
-  tagline: 'Sua jornada de aprendizado começa agora',
-  valueProposition: 'Aprenda programação de um jeito diferente, com um professor de IA que te acompanha em tempo real.',
+  tagline: 'Escola prática para dominar código com IA',
+  valueProposition: 'Aprenda programação com aulas guiadas, exercícios práticos e tutor de IA em tempo real.',
   subjectArea: 'programação',
-  aiTutorName: 'Professor IA',
-  aiTutorRoleDescription: 'tutor de IA da escola',
-  certificateProgramFallback: 'Programa Completo',
-  certificateIssuer: 'Equipe Acadêmica',
+  aiTutorName: 'Lucas',
+  aiTutorRoleDescription: 'CEO e tutor estratégico da escola',
+  certificateProgramFallback: 'Programa Vibe Code',
+  certificateIssuer: 'Equipe Vibe Code',
   accentPalette: basePalette,
-  terminology: {
-    learnerSingular: 'aluno',
-    learnerPlural: 'alunos',
-    lessonSingular: 'aula',
-    lessonPlural: 'aulas',
-    moduleSingular: 'módulo',
-    modulePlural: 'módulos',
-    missionSingular: 'missão',
-    missionPlural: 'missões',
-  },
+  terminology: baseTerminology,
+};
+
+export const DEFAULT_WHITE_LABEL_CONFIG: WhiteLabelConfig = {
+  ...VIBE_CODE_CONFIG,
+  presetId: 'custom',
+  brandName: 'Minha Escola IA',
+  legalName: 'Sua Organização',
+  logoEmoji: '🏫',
+  tagline: 'Uma escola adaptável para qualquer tipo de ensino',
+  valueProposition: 'Crie sua própria escola digital com identidade visual, linguagem pedagógica e operação personalizada.',
+  aiTutorName: 'Tutor IA',
+  aiTutorRoleDescription: 'tutor especialista da escola',
+  certificateProgramFallback: 'Programa Principal',
+  certificateIssuer: 'Coordenação Acadêmica',
 };
 
 export const SCHOOL_PRESETS: SchoolPreset[] = [
@@ -32,7 +48,7 @@ export const SCHOOL_PRESETS: SchoolPreset[] = [
     id: 'coding-academy',
     name: 'Academia de Tecnologia',
     description: 'Formato clássico para cursos de tecnologia e programação.',
-    config: DEFAULT_WHITE_LABEL_CONFIG,
+    config: VIBE_CODE_CONFIG,
   },
   {
     id: 'language-school',

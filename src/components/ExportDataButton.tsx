@@ -24,7 +24,7 @@ function toInsert(table: string, rows: Record<string, unknown>[]): string {
 }
 
 const SCHEMA = `-- ============================================
--- VIBE CLASS / 12 BRAIN - Schema Completo
+-- VIBE CODE / WHITE LABEL - Schema Completo
 -- ============================================
 
 CREATE TYPE public.app_role AS ENUM ('admin', 'student');
