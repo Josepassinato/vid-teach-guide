@@ -16,23 +16,37 @@ const queryClient = new QueryClient({
 
 interface AllTheProvidersProps {
   children: React.ReactNode;
+  withRouter?: boolean;
 }
 
-const AllTheProviders = ({ children }: AllTheProvidersProps) => {
+const AllTheProviders = ({ children, withRouter = true }: AllTheProvidersProps) => {
+  const wrappedChildren = withRouter ? <BrowserRouter>{children}</BrowserRouter> : <>{children}</>;
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
-          <BrowserRouter>{children}</BrowserRouter>
+          {wrappedChildren}
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
 };
 
+type CustomRenderOptions = Omit<RenderOptions, 'wrapper'> & {
+  withRouter?: boolean;
+};
+
 const render = (
   ui: ReactElement,
-  options?: Omit<RenderOptions, 'wrapper'>
-) => rtlRender(ui, { wrapper: AllTheProviders, ...options });
+  options?: CustomRenderOptions
+) => {
+  const { withRouter = true, ...renderOptions } = options || {};
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <AllTheProviders withRouter={withRouter}>{children}</AllTheProviders>
+  );
+
+  return rtlRender(ui, { wrapper: Wrapper, ...renderOptions });
+};
 
 export { render, screen, waitFor, within, fireEvent, renderHook, act };

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@/test/utils';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import App from './App';
 
 // Mock all page components
@@ -24,13 +23,20 @@ vi.mock('./components/DebugPanel', () => ({
   default: () => null,
 }));
 
+vi.mock('./hooks/useAuth', () => ({
+  useAuth: () => ({
+    isSignedIn: true,
+    isLoading: false,
+  }),
+}));
+
 describe('App Routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('redirects root path to /aluno', async () => {
-    render(<App />);
+    render(<App />, { withRouter: false });
     
     await waitFor(() => {
       expect(screen.getByTestId('student-page')).toBeInTheDocument();
@@ -40,7 +46,7 @@ describe('App Routing', () => {
 
 describe('App Navigation', () => {
   it('renders the app without crashing', () => {
-    render(<App />);
+    render(<App />, { withRouter: false });
     // If it renders, the test passes
     expect(document.body).toBeDefined();
   });

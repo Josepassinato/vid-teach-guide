@@ -10,7 +10,7 @@ describe('Card Component', () => {
 
   it('renders Card with custom className', () => {
     render(<Card className="custom-class">Card</Card>);
-    expect(screen.getByText('Card').parentElement).toHaveClass('custom-class');
+    expect(screen.getByText('Card')).toHaveClass('custom-class');
   });
 
   it('renders CardHeader correctly', () => {
