@@ -36,3 +36,4 @@ dist-ssr
 # Supabase temp
 supabase/.temp/
 .env.*.bak
+qa/reports/
