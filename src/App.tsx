@@ -60,8 +60,22 @@ const AppRoutes = () => (
       path="/login"
       element={<AuthPage />}
     />
-    <Route path="/admin" element={<Admin />} />
-    <Route path="/admin/analytics" element={<Analytics />} />
+    <Route
+      path="/admin"
+      element={
+        <ProtectedRoute>
+          <Admin />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/analytics"
+      element={
+        <ProtectedRoute>
+          <Analytics />
+        </ProtectedRoute>
+      }
+    />
     <Route
       path="/aluno"
       element={
