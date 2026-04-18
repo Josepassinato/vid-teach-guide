@@ -140,8 +140,12 @@ export function useBranding() {
       lessonPluralTitle: capitalize(config.terminology.lessonPlural),
       moduleSingular: config.terminology.moduleSingular,
       modulePlural: config.terminology.modulePlural,
+      moduleSingularTitle: capitalize(config.terminology.moduleSingular),
+      modulePluralTitle: capitalize(config.terminology.modulePlural),
       missionSingular: config.terminology.missionSingular,
       missionPlural: config.terminology.missionPlural,
+      missionSingularTitle: capitalize(config.terminology.missionSingular),
+      missionPluralTitle: capitalize(config.terminology.missionPlural),
     },
   };
 }
