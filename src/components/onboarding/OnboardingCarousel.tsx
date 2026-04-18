@@ -196,20 +196,27 @@ export function OnboardingCarousel({ onComplete, userName }: OnboardingCarouselP
                 {step.description}
               </motion.p>
 
-              {/* Step indicators */}
-              <div className="flex justify-center gap-2 mb-6">
+              {/* Step indicators — WCAG 2.5.5 touch target via invisible padding */}
+              <div className="flex justify-center gap-0 mb-6" role="tablist">
                 {steps.map((_, index) => (
                   <button
                     key={index}
+                    role="tab"
                     onClick={() => goToStep(index)}
-                    className={cn(
-                      'h-2 rounded-full transition-all',
-                      index === currentStep
-                        ? 'w-8 bg-primary'
-                        : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50'
-                    )}
                     aria-label={`Ir para passo ${index + 1}`}
-                  />
+                    aria-current={index === currentStep ? 'step' : undefined}
+                    aria-selected={index === currentStep}
+                    className="p-3 relative inline-flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                  >
+                    <span
+                      className={cn(
+                        'block h-2 rounded-full transition-all pointer-events-none',
+                        index === currentStep
+                          ? 'w-8 bg-primary'
+                          : 'w-2 bg-muted-foreground/30'
+                      )}
+                    />
+                  </button>
                 ))}
               </div>
 

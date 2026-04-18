@@ -1,6 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { toastEdgeError } from '@/lib/toastError';
+
+// Shared counter so we only toast after 2 consecutive failures (avoids noise
+// during brief network hiccups, but user IS notified if service is down)
+const ctxErrorCounter = { value: 0 };
+const flushErrorCounter = { value: 0 };
 
 /**
  * useTutorMemory — Manages long-term memory for the voice tutor.
@@ -69,9 +75,15 @@ export function useTutorMemory({ studentId, videoDbId, onContextRefreshed }: Use
       logger.debug('[TutorMemory] Context received:', context.length, 'chars');
       setMemoryContext(context);
       optionsRef.current.onContextRefreshed?.(context);
+      ctxErrorCounter.value = 0; // reset on success
       return context;
     } catch (err) {
-      logger.error('[TutorMemory] Error fetching context:', err);
+      toastEdgeError(err, {
+        action: 'carregar a memória do tutor',
+        logScope: 'TutorMemory',
+        suppressFirstN: 1,
+        counter: ctxErrorCounter,
+      });
       return '';
     } finally {
       setIsLoading(false);
@@ -104,8 +116,14 @@ export function useTutorMemory({ studentId, videoDbId, onContextRefreshed }: Use
 
       if (error) throw error;
       logger.debug('[TutorMemory] Messages flushed successfully');
+      flushErrorCounter.value = 0;
     } catch (err) {
-      logger.error('[TutorMemory] Error flushing messages:', err);
+      toastEdgeError(err, {
+        action: 'salvar mensagens da conversa',
+        logScope: 'TutorMemory',
+        suppressFirstN: 2, // retries are OK — only toast after 3rd failure
+        counter: flushErrorCounter,
+      });
       // Put messages back in buffer for retry
       messageBufferRef.current = [...messages, ...messageBufferRef.current];
     }
