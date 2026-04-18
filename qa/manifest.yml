@@ -1,0 +1,575 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# QA Manifest — Vibe Code / White Label School
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# Dual-purpose artifact:
+#   (1) SPEC do produto — descreve o que deve existir; agente QA reporta gaps
+#   (2) REGRESSION suite — descreve como deve funcionar; agente QA reporta bugs
+#
+# Lido pelo Sniffer QA agent (port 3030) após cada deploy. O agente infere
+# cenários de teste a partir deste manifesto e roda contra a URL pública
+# usando Playwright + Claude/Gemini Vision.
+#
+# Classificação dos achados:
+#   [BUG]  — feature existe e quebrou
+#   [GAP]  — feature descrita aqui ainda não implementada
+#   [DRIFT]— feature mudou de forma não documentada (manifest fora de sync)
+# ═══════════════════════════════════════════════════════════════════════════
+
+manifest:
+  version: 1
+  updated_at: 2026-04-18
+  maintainers: [owner, engineering]
+
+# ─── IDENTITY ──────────────────────────────────────────────────────────────
+
+project:
+  name: Vibe Code / White Label School
+  repo: escola-whitelabel
+  deploy_url: https://escola.12brain.org
+  purpose: |
+    Fábrica autônoma de cursos em vídeo com IA, sob supervisão editorial do
+    professor. Escola sobe PDFs → IA propõe plano didático → gera vídeos
+    aula-a-aula (≤5min cada) → professor aprova em múltiplos gates →
+    disciplina publicada fica igual para todos os alunos, com versionamento
+    para edições futuras.
+  product_modes:
+    vibe_code: "identidade fixa Vibe Code (produto principal)"
+    white_label: "branding customizado por escola cliente"
+  delivery_modes:
+    mode_1_video:
+      description: "curso em vídeos pré-gerados + tutor live de voz nas pausas"
+      priority: parallel_with_mode_2
+    mode_2_live_agent:
+      description: "aula conduzida por avatar real-time com metas rígidas"
+      priority: parallel_with_mode_1
+
+# ─── ROLES & PERMISSIONS ───────────────────────────────────────────────────
+
+roles:
+  platform_admin:
+    description: "Admin da plataforma Vibe Code — revisa flags de segurança"
+    can: [tune_content_filters, review_flagged_schools, ban_schools]
+
+  owner:
+    description: "Dono da escola"
+    can:
+      - "credenciar/revogar professores"
+      - "configurar school settings (consumption_mode, branding)"
+      - "criar disciplinas, subir PDFs"
+      - "revisar plano e vídeos"
+      - "publicar disciplinas"
+
+  teacher:
+    description: "Professor credenciado pelo dono"
+    can:
+      - "criar disciplinas, subir PDFs"
+      - "revisar plano e vídeos"
+      - "publicar disciplinas"   # ambos (owner ou teacher) podem publicar
+
+  student:
+    description: "Aluno da escola"
+    can:
+      - "consumir disciplinas publicadas"
+      - "baixar certificado ao concluir"
+      - "usar tutor live durante aulas"
+
+# ─── SCHOOL CONFIGURATION ──────────────────────────────────────────────────
+
+school_config:
+  chosen_by: owner
+  when: "setup inicial da escola (pode ajustar depois)"
+  options:
+    consumption_mode:
+      sequential: "aluno precisa concluir aula N antes de abrir N+1"
+      free: "aluno navega em qualquer ordem, qualquer hora"
+    branding:
+      vibe_code: "identidade fixa, logo Vibe Code"
+      white_label: "logo/cores/fontes customizáveis pela escola"
+
+# ─── AUDIENCE PROFILE ──────────────────────────────────────────────────────
+
+audience_profile:
+  owner: teacher
+  editable: true  # pode ajustar ANTES de gerar plano, custo zero
+  set_when: "criação da disciplina"
+
+  dimensions:
+    age_group:
+      - criancas_6_10
+      - adolescentes_11_14
+      - jovens_15_17
+      - adultos_18_plus
+    register:
+      - informal_acessivel      # vocab simples, metáforas do cotidiano
+      - formal_academico        # terminologia técnica precisa
+      - corporativo             # cases B2B, exemplos empresariais
+      - tecnico_especialista    # pressupõe base sólida
+    special_needs:              # opcionais, ativa camadas extras
+      - linguagem_inclusiva_tdah
+      - baixa_alfabetizacao
+      - educacao_especial
+
+  flows_into:
+    - "content-manager: system prompt ao dividir PDFs em aulas"
+    - "quiz-generator: calibra dificuldade + vocabulário"
+    - "TTS: escolhe voz com tom coerente"
+    - "Avatar selector: filtra pool de avatares apropriados"
+    - "Mode 2 live agent: recebe junto com lesson_plan"
+    - "Legendas: ajusta densidade de texto por frame"
+
+# ─── ENTRYPOINTS (URLs) ────────────────────────────────────────────────────
+
+entrypoints:
+  public:
+    - url: /
+      expect_redirect: /aluno
+    - url: /login
+      role: any
+    - url: /verificar/<code>
+      role: public  # validação de certificado, sem auth
+
+  student:
+    - url: /aluno
+      role: student
+    - url: /aluno/dashboard
+      role: student
+
+  admin:
+    - url: /admin
+      role: [owner, teacher]
+    - url: /admin/analytics
+      role: [owner, teacher]
+
+# ─── EDITORIAL PIPELINE ────────────────────────────────────────────────────
+
+editorial_pipeline:
+
+  stage_1_plan:
+    trigger: "professor/dono sobe PDFs de uma disciplina"
+    system_does:
+      - "Parse PDFs (lib de PDF parsing server-side)"
+      - "LLM estuda conteúdo, aplica audience_profile"
+      - "Gera proposta de plano didático:"
+      - "  • N aulas, cada uma ≤5min"
+      - "  • Título + assunto + objetivos de cada aula"
+      - "  • Ordem de aprendizado + dependências entre aulas"
+      - "  • Justificativa pedagógica ESPECÍFICA (menciona matéria, público)"
+      - "  • Escolha inicial de avatar + voz (se Modo 1)"
+      - "  • Rascunho de lesson_plan por aula (se Modo 2)"
+    teacher_actions:
+      - action: approve_totally
+        next: stage_2
+      - action: approve_with_changes
+        next: "sistema ajusta plano com feedback, reapresenta"
+      - action: reject
+        next: "sistema regenera plano do zero com feedback"
+
+  stage_2_videos:
+    trigger: "stage_1 approved"
+    constraint: "GERAÇÃO SEQUENCIAL — aula N+1 só inicia após N aprovada"
+    why_sequential: |
+      Minimiza desperdício: se professor pedir reestruturação no meio,
+      aulas subsequentes ainda nem existem → zero retrabalho.
+    per_video_generation:
+      mode_1:
+        - "Script da aula (coerente com audience_profile)"
+        - "Seleção final de avatar + voz (match com matéria + público)"
+        - "Renderização: script → TTS → lip-sync avatar → mp4"
+        - "Identificação de pontos de pausa (teaching moments)"
+        - "Interações tutor live scripted em cada pausa"
+        - "Conclusão + tarefa para próxima aula"
+      mode_2:
+        - "Composição do system prompt do live agent:"
+        - "  • global_constitution (imutável, da plataforma) — inline"
+        - "  • per_lesson_plan (editável pelo professor)"
+        - "  • audience_profile (inline)"
+        - "Dry-run: agente simula aula contra aluno-mock pra verificar"
+        - "Não renderiza vídeo — entregável é o prompt aprovado"
+    teacher_actions:
+      - action: approve
+        next: "libera geração da aula N+1"
+      - action: request_minor_change
+        next: "vide cost_aware_editing — sistema apresenta opções"
+      - action: reject_reshoot
+        next: "regera a aula N inteira com feedback"
+
+  stage_3_publish:
+    trigger: "todas aulas + interações aprovadas"
+    system_does: "sela pacote como ready_to_publish"
+    publish_permission: [owner, teacher]
+    result:
+      - "Disciplina v1 autorizada para consumo pelos alunos"
+      - "Versão fica imutável para quem já começou"
+      - "Edições futuras geram v2 sem quebrar alunos em curso"
+
+# Estados da disciplina — state machine canônica
+discipline_states:
+  - pdf_uploaded           # PDFs subidos, aguardando análise
+  - plan_generating        # IA estudando
+  - plan_pending_review    # professor precisa revisar
+  - plan_revision_requested # professor pediu mudanças
+  - plan_approved          # plano OK, pode gerar aula 1
+  - video_N_generating     # aula N em renderização
+  - video_N_pending_review # professor precisa revisar aula N
+  - video_N_revision       # mudanças pedidas (ver cost_aware_editing)
+  - video_N_approved       # aula N OK
+  - ready_to_publish       # todas aulas aprovadas
+  - published              # acessível pelos alunos (imutável)
+  - revision_open          # edição em andamento → gera v2
+
+# ─── COST-AWARE EDITING ────────────────────────────────────────────────────
+
+cost_aware_editing:
+  principle: "Sistema nunca executa re-render caro sem professor confirmar."
+
+  change_categories:
+    cheap:
+      examples: ["edit de legenda", "ajuste de metadados", "reordenação de pausas"]
+      cost_order: "~50-500 tokens, instantâneo"
+    medium:
+      examples: ["regen TTS áudio", "ajuste de pontos de pausa com regen parcial"]
+      cost_order: "~3k-10k tokens + segundos de TTS"
+    expensive:
+      examples: ["regen avatar + lip-sync", "reshoot completo", "mudança de avatar/voz"]
+      cost_order: "~10k-50k tokens + minutos de render + $0.20-$1.00"
+
+  example_flow:
+    teacher_asks: "Trocar 'três estados da água' por 'os 3 estados físicos da água'"
+    system_responds: |
+      Essa mudança pode ser aplicada de 2 formas:
+        (a) Editar legenda apenas        custo: ~50 tokens   instantâneo
+        (b) Re-renderizar áudio + vídeo  custo: ~3k tokens + 45s render + $0.30
+      Escolha: [a] [b] [cancelar]
+    teacher_picks: a
+    system_executes: "apenas edit de legenda"
+
+# ─── VERSIONING ────────────────────────────────────────────────────────────
+
+versioning:
+  rule: "Versão publicada é IMUTÁVEL pros alunos que já começaram."
+  new_edit_flow:
+    - "Professor abre disciplina publicada → clica 'Nova versão'"
+    - "Sistema entra em revision_open (clone de v1)"
+    - "Professor edita aulas/plano — passa pelo pipeline editorial"
+    - "Quando aprovada: v2 é publicada"
+    - "Alunos em v1 seguem em v1 até concluírem (ou migrarem manual)"
+  student_upgrade: "opt-in via tela 'versão atualizada disponível'"
+
+# ─── MODE 1 — VIDEO ───────────────────────────────────────────────────────
+
+mode_1_video:
+  deliverable: "pacote de vídeos mp4 + pontos de pausa + scripts tutor live"
+  tech_stack:
+    video_render: "HeyGen streaming API (VITE_HEYGEN_API_KEY)"
+    tts: "OpenAI / ElevenLabs"
+    storage: "Cloudflare Stream"
+    live_tutor: "OpenAI Realtime (primary) + Gemini Live (fallback)"
+
+  live_tutor_in_pauses:
+    trigger: "aluno chega em timestamp de pausa"
+    tutor_does:
+      - "reforça conceito-chave da pausa anterior"
+      - "faz 1-2 perguntas checando compreensão"
+      - "responde perguntas espontâneas do aluno (RAG sobre transcript)"
+      - "libera continuação da aula"
+    closing_of_lesson:
+      - "conclui síntese da aula"
+      - "dá tarefa ponte pra próxima aula"
+
+# ─── MODE 2 — LIVE AGENT ───────────────────────────────────────────────────
+
+mode_2_live_agent:
+  deliverable: "agente ao vivo com constituição rígida + plano de aula editável"
+  principle: |
+    Produto NÃO é vídeo. É um agente em tempo real com plano rígido +
+    empatia. Controle do COMO é da plataforma (imutável). Controle do
+    QUÊ é do professor (editável por aula).
+
+  # CAMADA 1 — imutável, controlada pela plataforma
+  global_constitution:
+    owner: platform
+    editable_by: platform_only
+    rationale: "Garante consistência de marca + segurança em todas as escolas"
+
+    tone_requirements:
+      - "empático: nunca envergonha aluno por resposta errada"
+      - "encorajador: celebra progresso, mesmo pequeno"
+      - "paciente: reformula até 3x quando aluno não entende"
+      - "persistente: não encerra sem verificar completion_criteria"
+
+    forbidden_deviations:
+      - "política, religião, tópicos sensíveis"
+      - "conteúdo inadequado à age_group declarada"
+      - "responder off-topic — sempre redireciona gentilmente"
+
+    behavioral_patterns:
+      - "silêncio do aluno → pergunta aberta amigável"
+      - "resposta errada → reformula explicação, não julga"
+      - "resistência do aluno → empatia + investigação do que trava"
+      - "aluno off-task → retomada gentil sem repreensão"
+
+    safety_rules:
+      - "nunca compartilhar dados pessoais"
+      - "não dar conselho médico/jurídico/financeiro irrestrito"
+      - "em crise emocional detectada → direcionar pra humano/emergência"
+      - "suspeita de abuso → protocolo de notificação"
+
+  # CAMADA 2 — editável pelo dono/professor por aula
+  per_lesson_plan:
+    owner: school
+    editable_by: [owner, teacher]
+    rationale: "Define o QUE cada aula cobre, sem tocar no COMO"
+
+    structure:
+      goals:
+        example:
+          - "aluno distingue os 3 estados físicos da água"
+          - "aluno explica como ciclo da água influencia a atmosfera"
+      allowed_scope:
+        example:
+          - "estados físicos"
+          - "transições de fase (fusão, vaporização, etc.)"
+          - "ciclo da água na atmosfera"
+      completion_criteria:
+        example:
+          - "aluno descreve 3 estados com suas palavras"
+          - "aluno dá 1 exemplo do cotidiano pra cada estado"
+          - "aluno explica 1 conexão com o clima"
+
+# ─── CONTENT SAFETY ────────────────────────────────────────────────────────
+
+content_safety:
+  principle: |
+    Floor de segurança universal. Disclaimer na ToS cobre VERACIDADE
+    factual (responsabilidade da escola). Estes filtros cobrem
+    CONTEÚDO ILEGAL/DANOSO (plataforma NUNCA hospeda, qualquer escola).
+
+  rejection_triggers:
+    - "instruções operacionais para crimes (armas, drogas, fraudes, invasão)"
+    - "exploração ou sexualização de menores (qualquer contexto)"
+    - "incitação a violência, terrorismo ou ódio (racismo, xenofobia, etc.)"
+    - "doxxing ou dados pessoais de terceiros sem consentimento"
+    - "violação flagrante de copyright"
+    - "conselho médico/jurídico/financeiro irrestrito sem disclaimers"
+
+  enforcement_points:
+    - layer: pdf_upload
+      action: "scan imediato, rejeita antes de persistir"
+      tech: "Claude/Gemini content moderation + regex de gatilhos conhecidos"
+    - layer: plan_generation
+      action: "LLM halt+motivo se detectar gatilho no input"
+    - layer: video_generation
+      action: "script passa por guardrail antes de TTS/render"
+    - layer: mode_2_runtime
+      action: "global_constitution recusa + registra incidente"
+    - layer: publish_gate
+      action: "varredura final antes de liberar pra alunos"
+
+  flag_handling:
+    auto_action: "bloqueia operação, notifica dono + platform_admin"
+    review_by: platform_admin
+    possible_outcomes:
+      - falso_positivo: "libera + ajusta sensibilidade"
+      - remove_conteudo: "apaga item, mantém escola ativa"
+      - suspende_escola: "bane temporário + investigação"
+      - bane_definitivo: "encerra conta, preserva auditoria"
+
+# ─── USER JOURNEYS ─────────────────────────────────────────────────────────
+
+user_journeys:
+
+  owner:
+    - "Dono cria escola, escolhe mode vibe_code ou white_label"
+    - "Dono configura branding (logo, cores) se white_label"
+    - "Dono define school_config.consumption_mode (sequential ou free)"
+    - "Dono credencia professor por email → professor recebe convite Clerk"
+    - "Dono acessa /admin, vê lista de disciplinas + status de cada"
+    - "Dono revoga acesso de professor quando necessário"
+    - "Dono publica disciplina aprovada (ou delega ao professor)"
+
+  teacher:
+    - "Professor login, vê dashboard com fila 'minhas revisões pendentes'"
+    - "Professor cria nova disciplina, define audience_profile"
+    - "Professor sobe PDFs do conteúdo (pode ser múltiplos)"
+    - "Professor recebe notificação (Telegram/email) quando plano pronto"
+    - "Professor lê plano + justificativa, aprova totalmente"
+    - "Professor recebe notificação quando aula 1 gerada"
+    - "Professor assiste aula 1, pede ajuste de legenda"
+    - "Sistema mostra opções (a) legenda cheap / (b) regen caro — professor escolhe (a)"
+    - "Professor aprova aula 1 → sistema dispara aula 2 automaticamente"
+    - "Loop continua até última aula aprovada"
+    - "Professor publica disciplina"
+    - "Meses depois, professor abre 'Nova versão' → v2 sem quebrar alunos de v1"
+
+  student_mode_1:
+    - "Aluno login via Clerk, chega em /aluno"
+    - "Aluno vê lista de disciplinas disponíveis (filtros, busca)"
+    - "Aluno abre disciplina → dashboard de progresso"
+    - "Aluno abre aula 1 → vídeo ≤5min toca"
+    - "Em cada ponto de pausa, tutor live (voz) reforça + faz pergunta"
+    - "Aluno responde (voz ou texto), tutor ajusta, libera continuação"
+    - "Ao fim da aula: tutor conclui + passa tarefa ponte"
+    - "Se consumption_mode=sequential: aluno precisa concluir quiz/tarefa
+       antes de abrir aula 2"
+    - "Se consumption_mode=free: aluno pode pular pra qualquer aula"
+    - "Aluno completa disciplina → certificado gerado com /verificar/:code"
+
+  student_mode_2:
+    - "Aluno inicia aula → avatar real-time aparece (HeyGen streaming)"
+    - "Avatar apresenta metas da aula claramente"
+    - "Avatar conduz conversacionalmente, adapta a ritmo/respostas"
+    - "Aluno pode fazer perguntas dentro do allowed_scope"
+    - "Ao fim: avatar verifica que completion_criteria foram cumpridos"
+    - "Se sim: libera próxima aula (conforme consumption_mode)"
+    - "Se não: estende aula ou agenda reforço"
+
+# ─── EXPECTED BEHAVIORS ────────────────────────────────────────────────────
+
+expected_behaviors:
+  editorial:
+    - "Justificativa pedagógica é específica (menciona matéria + público)"
+    - "Vídeos sempre ≤5min (hard ceiling)"
+    - "Geração sequencial de vídeos é respeitada (N+1 não inicia antes de N aprovado)"
+    - "Avatar + voz mudam entre disciplinas conforme audience + matéria"
+    - "Cost-aware editing mostra opções ANTES de executar"
+    - "Dashboard 'minhas revisões pendentes' presente pra owner/teacher"
+    - "Publicação exige TODAS aulas aprovadas (não publica parcial)"
+    - "V1 publicada permanece imutável após nova edição criar v2"
+
+  student:
+    - "Layout responsivo em 375px / 768px / desktop"
+    - "Mensagens de erro em pt-BR específicas (não 'erro genérico')"
+    - "Clerk auth funciona em Safari iOS + Chrome Android"
+    - "Routes protegidas redirecionam pra /login sem sessão"
+    - "Tutor de voz conecta em <5s"
+    - "Latência de resposta do tutor <2s"
+    - "Captions visíveis e toggleable (padrão: on)"
+    - "Mode 2: avatar ∼cumpre completion_criteria antes de encerrar"
+
+  platform:
+    - "Content safety bloqueia conteúdo criminal com motivo claro"
+    - "Admin da plataforma vê dashboard de incidentes com gravidade"
+    - "Flag handling notifica dono + registra em audit log"
+
+# ─── ANTI-BEHAVIORS ────────────────────────────────────────────────────────
+
+anti_behaviors:
+  editorial:
+    - "Gerar aula N+1 antes da aula N ser aprovada (viola sequencial)"
+    - "Re-renderizar avatar + áudio sem confirmar custo com professor"
+    - "Publicar disciplina com vídeos pending_review"
+    - "Professor não-credenciado acessar /admin"
+    - "Justificativa pedagógica genérica tipo 'plano didático coerente'"
+    - "Aceitar PDF com conteúdo criminal (deve ser rejeitado no upload)"
+    - "Alterar global_constitution via UI de escola (é imutável)"
+
+  student:
+    - "Aluno em v1 ver aula atualizada de v2 sem opt-in"
+    - "Mode 1: video player travar em buffering sem mensagem"
+    - "Mode 2: avatar entrar em loop de resposta vazia"
+    - "Mode 2: aluno desviar pra off-topic e agente seguir (deve redirecionar)"
+    - "Mode 2: avatar envergonhar aluno por resposta errada"
+    - "Layout quebrar (overflow horizontal) em 375px"
+    - "Modo sequential: aluno abrir aula futura sem concluir anterior"
+
+  platform:
+    - "Filtro de content safety dar falso negativo sem log"
+    - "Bloquear conteúdo sem explicar ao dono da escola o motivo"
+    - "Tratar filtros como opcionais por plano de assinatura"
+
+# ─── INTEGRATIONS ─────────────────────────────────────────────────────────
+
+integrations:
+  llm_content:      "Grok (XAI_API_KEY) — via content-manager edge function"
+  llm_tutor_voice:  "OpenAI Realtime (primary) + Gemini Live (fallback)"
+  avatar:           "HeyGen streaming (VITE_HEYGEN_API_KEY)"
+  auth:             "Clerk"
+  db_and_functions: "Supabase (postgres + edge functions + storage)"
+  video_storage:    "Cloudflare Stream"
+  pdf_parsing:      "TBD — biblioteca server-side (pdf-parse, pdfjs, ou similar)"
+
+# ─── TEST DATA ────────────────────────────────────────────────────────────
+
+test_data:
+  auth:
+    clerk_test_owner_email: "TODO"
+    clerk_test_teacher_email: "TODO"
+    clerk_test_student_email: "TODO"
+    test_password: "TODO"
+  content:
+    sample_pdf_chemistry_water: "TODO path"
+    sample_pdf_math_8th_grade: "TODO path"
+    sample_pdf_criminal_content: "TODO — deve ser REJEITADO pelo filtro"
+  certificates:
+    valid_code: "TODO"
+    invalid_code: "XXX-INVALID-999"
+
+# ─── OUT OF SCOPE ─────────────────────────────────────────────────────────
+
+out_of_scope:
+  - "Validação factual do conteúdo — responsabilidade editorial é da escola (ver ToS)"
+  - "Performance real do Cloudflare Stream (infra externa)"
+  - "Cobrança Stripe detalhada (outro escopo de QA)"
+  - "Qualidade absoluta da pedagogia — QA verifica aderência ao pipeline, não mérito acadêmico"
+
+# ─── CURRENT IMPLEMENTATION STATUS (gap analysis, 2026-04-18) ──────────────
+# Atualize conforme features saírem do [GAP] pro [BUILT]
+
+current_implementation_status:
+  built:
+    - "HeyGen avatar streaming (VITE_HEYGEN_API_KEY integrada)"
+    - "OpenAI Realtime + Gemini Live tutor voice (useOpenAIRealtime.ts, useGeminiLive.ts)"
+    - "Edge functions: analyze-youtube, content-manager, quiz-generator, embed-transcript, agent-evaluator, agent-feedback, agent-achievements"
+    - "Admin.tsx workflow manual (botão 'Gerar teaching moments' manual)"
+    - "Certificates (generate-certificate, verifyCertificate)"
+    - "Upload de PDF/TXT/DOCX em VideoAnalysis.tsx (parser server-side parcial)"
+    - "Conceito de aulas ≤5min em UI (NarrativeLibrary.tsx, MIN_CHARS_5MIN)"
+
+  gaps:
+    - "Pipeline autônomo 'PDF → plano → vídeos' (hoje é manual, muitos cliques)"
+    - "Avatar + voice selector automático baseado em matéria + audience_profile"
+    - "Geração sequencial enforcement (hoje não existe)"
+    - "Cost-aware editing flow (custo não é mostrado antes de regen)"
+    - "Dashboard 'minhas revisões pendentes'"
+    - "Versionamento v1/v2 imutável"
+    - "Configuração school_config.consumption_mode"
+    - "Audience profile completo (age/register/special_needs)"
+    - "Mode 2: per_lesson_plan estruturado + global_constitution aplicada"
+    - "Mode 2: dry-run contra aluno-mock durante aprovação"
+    - "Content safety layers em todos os enforcement_points"
+    - "Notifications (Telegram/email) quando review pendente"
+
+# ─── NOTES FOR THE QA AGENT ────────────────────────────────────────────────
+
+notes_for_agent: |
+  Agente, por favor:
+
+  1. CLASSIFICAÇÃO DE ACHADOS
+     - [BUG]   fluxo existe e quebrou → abre issue com gravidade
+     - [GAP]   fluxo descrito aqui ainda não implementado → reporta como roadmap item
+     - [DRIFT] UI mudou sem atualizar manifest → pede atualização desta spec
+
+  2. PRIORIDADE DE TESTE (por impacto):
+     A. Autenticação (Clerk)
+     B. Fluxo editorial: stage_1 plan → stage_2 videos → stage_3 publish
+     C. Student journey mode_1 happy path
+     D. Student journey mode_2 happy path
+     E. Anti-behaviors (teste adversário)
+     F. Content safety (tentar subir PDF com trigger)
+     G. Responsividade (375/768/desktop)
+
+  3. NUNCA DISPARE EM QA:
+     - Geração real de vídeo caro (use TEST_MODE=dry_run se disponível)
+     - Publicação real de disciplina (use staging ou use feature flag)
+     - Operações destrutivas (DELETE disciplina, revogar professor ativo)
+
+  4. VALIDAÇÃO VISUAL:
+     - Quando assert é difícil em código (layout, emoção), use Vision LLM
+     - Screenshot + prompt "isso parece certo dado [expected_behavior]?"
+     - Reporte com confiança: high/medium/low
+
+  5. FORMATO DO REPORT:
+     - Telegram DM: resumo (X pass, Y fail, Z gap) + screenshots dos fails
+     - Markdown report completo em /qa/reports/YYYY-MM-DD-HHMM.md
+     - GitHub issue auto-criada por bug (opcional, via flag)
