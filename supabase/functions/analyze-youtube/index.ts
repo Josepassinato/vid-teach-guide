@@ -201,7 +201,7 @@ function parseTranscriptXml(xml: string): string {
   const texts: string[] = [];
   
   for (const match of textMatches) {
-    let text = match[1]
+    const text = match[1]
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')

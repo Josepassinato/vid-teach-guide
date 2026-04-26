@@ -522,7 +522,7 @@ Quando detectar emoção marcante, USE save_emotional_observation para registrar
 
   // Handle agent connection events - process pending actions
   useEffect(() => {
-    let introTimeout: ReturnType<typeof setTimeout> | null = null;
+    const introTimeout: ReturnType<typeof setTimeout> | null = null;
     
     logger.debug(`🎬 [VOICECHAT EFFECT] Status changed effect - status: ${status}, agentMode: ${agentMode}`);
     
