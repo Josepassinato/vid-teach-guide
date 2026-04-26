@@ -200,6 +200,98 @@ serve(async (req) => {
         );
       }
 
+      case "migrate_storage": {
+        // Migra videos com URLs externas (S3 Tavus) pra Supabase Storage permanente.
+        // Para cada video: refresh URL via Tavus API → download → upload → update DB.
+        const tavusKey = Deno.env.get("TAVUS_API_KEY");
+        if (!tavusKey) throw new Error("TAVUS_API_KEY nao configurada");
+
+        // Cria bucket se nao existir — usa REST API direto pra contornar bug do supabase-js
+        const bucketResp = await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'apikey': supabaseServiceKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: 'videos',
+            name: 'videos',
+            public: true,
+            file_size_limit: 500 * 1024 * 1024,
+            allowed_mime_types: ['video/mp4', 'video/webm', 'video/quicktime'],
+          }),
+        });
+        const bucketRespText = await bucketResp.text();
+        console.log(`createBucket REST: HTTP ${bucketResp.status} ${bucketRespText.substring(0, 200)}`);
+        // 200/409 (ja existe) ambos OK; outros sao erro
+
+        // Lista todos videos do Tavus pra mapear video_id por nome/URL
+        const tvResp = await fetch('https://tavusapi.com/v2/videos', { headers: { 'x-api-key': tavusKey }});
+        if (!tvResp.ok) throw new Error(`Tavus API ${tvResp.status}`);
+        const tvData = await tvResp.json();
+        const tavusByName = new Map();
+        for (const v of (tvData.data || [])) tavusByName.set(v.video_name, v);
+
+        // Lista videos do DB com URLs externas (nao Supabase Storage)
+        const { data: videos, error: listErr } = await supabase
+          .from('videos')
+          .select('id, title, video_url, video_type')
+          .not('video_url', 'is', null);
+        if (listErr) throw listErr;
+
+        const supabaseStorageDomain = supabaseUrl.replace('https://', '');
+        const results = [];
+        for (const v of (videos || [])) {
+          if (v.video_url?.includes(supabaseStorageDomain)) {
+            results.push({ id: v.id, title: v.title, status: 'already_in_storage' });
+            continue;
+          }
+
+          // Acha video correspondente no Tavus pelo nome
+          const tv = tavusByName.get(v.title);
+          if (!tv?.download_url) {
+            results.push({ id: v.id, title: v.title, status: 'not_found_in_tavus' });
+            continue;
+          }
+
+          try {
+            // Pede URL fresca diretamente (signature renovada)
+            const detail = await fetch(`https://tavusapi.com/v2/videos/${tv.video_id}`, { headers: { 'x-api-key': tavusKey }});
+            const detailData = await detail.json();
+            const freshUrl = detailData.download_url;
+
+            const dl = await fetch(freshUrl);
+            if (!dl.ok) throw new Error(`download HTTP ${dl.status}`);
+            const blob = await dl.blob();
+            const sizeMB = Math.round(blob.size / 1024 / 1024);
+
+            const path = `lessons/${tv.video_id}.mp4`;
+            const { error: upErr } = await supabase.storage
+              .from('videos')
+              .upload(path, blob, { contentType: 'video/mp4', upsert: true });
+            if (upErr) throw upErr;
+
+            const { data: pub } = supabase.storage.from('videos').getPublicUrl(path);
+
+            const { error: updErr } = await supabase
+              .from('videos')
+              .update({ video_url: pub.publicUrl, video_type: 'direct' })
+              .eq('id', v.id);
+            if (updErr) throw updErr;
+
+            results.push({ id: v.id, title: v.title, status: 'migrated', size_mb: sizeMB, url: pub.publicUrl });
+          } catch (e) {
+            results.push({ id: v.id, title: v.title, status: 'failed', error: (e as Error).message });
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ message: 'Migração concluída', results }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         throw new Error("Ação inválida");
     }
