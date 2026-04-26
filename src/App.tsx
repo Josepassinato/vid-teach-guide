@@ -14,6 +14,7 @@ import { BrandingProvider } from "./branding";
 
 const Admin = lazy(() => import("./pages/Admin"));
 const Analytics = lazy(() => import("./pages/Analytics"));
+const Logs = lazy(() => import("./pages/Logs"));
 const Student = lazy(() => import("./pages/Student"));
 const StudentDashboard = lazy(() => import("./pages/StudentDashboard"));
 const DebugPanel = lazy(() => import("./components/DebugPanel"));
@@ -73,6 +74,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <Analytics />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin/logs"
+      element={
+        <ProtectedRoute>
+          <Logs />
         </ProtectedRoute>
       }
     />
