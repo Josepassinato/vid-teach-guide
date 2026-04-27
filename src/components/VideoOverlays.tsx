@@ -28,20 +28,39 @@ interface VideoOverlaysProps {
 
 export function VideoOverlays({ videoId, currentTime }: VideoOverlaysProps) {
   const [overlays, setOverlays] = useState<Overlay[]>([]);
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
     if (!videoId) return;
     let cancelled = false;
+
+    // Verifica se o video tem overlays HABILITADOS — admin precisa ligar manualmente.
+    // Se nao, o video roda normal (sem nenhum overlay aparecendo).
     supabase
-      .from('lesson_overlays')
-      .select('*')
-      .eq('video_id', videoId)
-      .order('start_sec', { ascending: true })
+      .from('videos')
+      .select('overlays_enabled')
+      .eq('id', videoId)
+      .single()
       .then(({ data }) => {
-        if (!cancelled && data) setOverlays(data as Overlay[]);
+        if (cancelled) return;
+        const isOn = !!(data && (data as { overlays_enabled?: boolean }).overlays_enabled);
+        setEnabled(isOn);
+        if (!isOn) return;
+
+        // Busca overlays so se enabled
+        supabase
+          .from('lesson_overlays')
+          .select('*')
+          .eq('video_id', videoId)
+          .order('start_sec', { ascending: true })
+          .then(({ data: ovs }) => {
+            if (!cancelled && ovs) setOverlays(ovs as Overlay[]);
+          });
       });
     return () => { cancelled = true; };
   }, [videoId]);
+
+  if (!enabled) return null;
 
   const active = overlays.filter(
     (o) => currentTime >= o.start_sec && currentTime <= o.end_sec

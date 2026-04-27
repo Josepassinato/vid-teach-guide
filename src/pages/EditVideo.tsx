@@ -17,6 +17,7 @@ interface VideoData {
   title: string;
   video_url: string | null;
   video_type: string;
+  overlays_enabled: boolean;
 }
 
 export default function EditVideo() {
@@ -30,10 +31,22 @@ export default function EditVideo() {
 
   const loadVideo = async () => {
     if (!id) return;
-    const { data: vid } = await supabase.from('videos').select('id,title,video_url,video_type').eq('id', id).single();
+    const { data: vid } = await supabase
+      .from('videos')
+      .select('id,title,video_url,video_type,overlays_enabled')
+      .eq('id', id)
+      .single();
     if (vid) setVideo(vid as VideoData);
     const { data: ovs } = await supabase.from('lesson_overlays').select('*').eq('video_id', id).order('start_sec');
     if (ovs) setOverlays(ovs as Overlay[]);
+  };
+
+  const toggleEnabled = async () => {
+    if (!video) return;
+    const next = !video.overlays_enabled;
+    await supabase.from('videos').update({ overlays_enabled: next }).eq('id', video.id);
+    setVideo({ ...video, overlays_enabled: next });
+    toast.success(next ? 'Overlays ATIVADOS — alunos verão as animações' : 'Overlays desativados — vídeo roda normal');
   };
 
   useEffect(() => { loadVideo(); /* eslint-disable-next-line */ }, [id]);
@@ -118,14 +131,30 @@ export default function EditVideo() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <Link to="/admin"><Button variant="outline" size="sm">← Admin</Button></Link>
           <h1 className="text-2xl font-bold mt-2">Editor: {video.title}</h1>
           <p className="text-sm text-muted-foreground">Adicione textos e destaques sincronizados com o vídeo</p>
         </div>
-        <Button onClick={newOverlay}>+ Adicionar Overlay</Button>
+        <div className="flex items-center gap-3">
+          {/* Toggle: ativar/desativar overlays para os alunos */}
+          <Button
+            onClick={toggleEnabled}
+            variant={video.overlays_enabled ? 'default' : 'outline'}
+            className={video.overlays_enabled ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            {video.overlays_enabled ? '🟢 Animações ATIVADAS' : '⚪ Animações desativadas'}
+          </Button>
+          <Button onClick={newOverlay}>+ Adicionar Overlay</Button>
+        </div>
       </div>
+      {!video.overlays_enabled && overlays.length > 0 && (
+        <div className="mb-4 p-3 rounded bg-yellow-100 border border-yellow-300 text-yellow-900 text-sm">
+          ⚠ Você tem {overlays.length} overlay(s) cadastrado(s), mas as animações estão <strong>desativadas</strong>.
+          Os alunos vão ver o vídeo normal. Clique em "🟢 Animações ATIVADAS" para liberar.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Video player com preview de overlays */}
