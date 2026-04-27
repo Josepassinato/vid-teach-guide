@@ -16,6 +16,8 @@ export interface DirectVideoPlayerRef {
   unlockPlayback: () => void;
 }
 
+import { VideoOverlays } from '@/components/VideoOverlays';
+
 export type DirectVideoPlayerProps = {
   videoUrl: string;
   title?: string;
@@ -26,10 +28,12 @@ export type DirectVideoPlayerProps = {
   onSeek?: (seconds: number) => void;
   teachingMoments?: Array<{ timestamp_seconds: number; topic?: string }>;
   quizTimestamps?: number[];
+  /** Video ID — quando passado, busca overlays cadastrados em lesson_overlays */
+  videoId?: string;
 };
 
 export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPlayerProps>(
-  function DirectVideoPlayer({ videoUrl, title, expanded = false, onEnded, onPlay, onPause, onSeek, teachingMoments = [], quizTimestamps = [] }, ref) {
+  function DirectVideoPlayer({ videoUrl, title, expanded = false, onEnded, onPlay, onPause, onSeek, teachingMoments = [], quizTimestamps = [], videoId }, ref) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -262,7 +266,10 @@ export const DirectVideoPlayer = forwardRef<DirectVideoPlayerRef, DirectVideoPla
             playsInline
             preload="metadata"
           />
-          
+
+          {/* Overlays cadastrados em lesson_overlays — sincronizados com currentTime */}
+          {videoId && <VideoOverlays videoId={videoId} currentTime={currentTime} />}
+
           {!isReady && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
               <div className="animate-pulse text-muted-foreground">Carregando vídeo...</div>

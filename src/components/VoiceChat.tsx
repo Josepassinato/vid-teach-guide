@@ -1069,6 +1069,7 @@ INSTRUÇÕES:
                 <DirectVideoPlayer
                   ref={videoPlayerRef as React.RefObject<DirectVideoPlayerRef>}
                   videoUrl={videoUrl}
+                  videoId={videoDbId}
                   title={videoTitle}
                   expanded={isVideoExpanded}
                   onEnded={handleVideoEnded}
